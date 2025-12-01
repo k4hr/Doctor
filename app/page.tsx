@@ -42,7 +42,11 @@ export default function LandingPage() {
 
       <div className="lp-inner">
         <h1 className="lp-title">
-          <span className="lp-gpt">ВРАЧИ.ТУТ</span>
+          <span className="lp-logo">
+            <span className="lp-logo-main">ВРАЧИ</span>
+            <span className="lp-logo-dot">.</span>
+            <span className="lp-logo-accent">ТУТ</span>
+          </span>
         </h1>
 
         <p className="lp-subtitle">
@@ -89,23 +93,24 @@ export default function LandingPage() {
           text-wrap: balance;
         }
 
-        .lp-gpt {
-          background: linear-gradient(
-            120deg,
-            #8fa3ff 0%,
-            #b9adff 20%,
-            #ffd98b 40%,
-            #b6efe6 60%,
-            #a7b6ff 80%,
-            #8fa3ff 100%
-          );
-          background-size: 220% 220%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          animation: shimmer 9s ease-in-out infinite;
-          text-shadow: 0 2px 30px rgba(160, 175, 255, 0.35);
-          letter-spacing: 0.01em;
+        .lp-logo {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 4px;
+          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
+            sans-serif;
+        }
+
+        .lp-logo-main {
+          color: #0b0c10; /* чёрный/тёмный */
+        }
+
+        .lp-logo-dot {
+          color: #0b0c10;
+        }
+
+        .lp-logo-accent {
+          color: #24c768; /* аккуратный зелёный акцент про здоровье */
         }
 
         .lp-subtitle {
@@ -113,18 +118,6 @@ export default function LandingPage() {
           font-size: 16px;
           line-height: 1.5;
           opacity: 0.8;
-        }
-
-        @keyframes shimmer {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
         }
 
         .lp-cta {
