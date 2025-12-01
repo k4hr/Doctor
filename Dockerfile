@@ -29,6 +29,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# создаём public, даже если её нет в репо
+RUN mkdir -p public
+
 # Собираем Next-приложение
 RUN npm run build
 
