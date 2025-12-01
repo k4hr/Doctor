@@ -5,7 +5,6 @@ import type { Metadata, Viewport } from 'next';
 import TwaBootstrap from '../components/TwaBootstrap';
 import GlobalSafeTop from '../components/GlobalSafeTop';
 import TMAInit from '../components/TMAInit';
-import VKBootstrap from '../components/VKBootstrap';
 
 /** Всегда СВЕТЛАЯ тема + отключаем масштабирование (iOS zoom fix) */
 export const viewport: Viewport = {
@@ -31,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" data-theme="light">
       <head>
-        {/* Дублируем meta viewport для совместимости с WebView VK/Telegram */}
+        {/* Дублируем meta viewport для совместимости с WebView Telegram */}
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
@@ -48,21 +47,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body style={{ background: '#F5F7FA', color: '#0B0C10' }}>
-        {/* Глобальный фон (если он описан в globals.css) */}
+        {/* Глобальный фон */}
         <div className="lm-bg" />
 
         {/* Безопасная зона под хедер TWA */}
         <GlobalSafeTop />
 
-        {/* Инициализация Telegram WebApp: ready()+expand() */}
+        {/* Инициализация Telegram WebApp: ready()+expand() + светлый хедер */}
         <TMAInit />
 
-        {/* Контент приложения (обёрнут в VKBootstrap и TwaBootstrap) */}
-        <VKBootstrap>
-          <div className="lm-page">
-            <TwaBootstrap>{children}</TwaBootstrap>
-          </div>
-        </VKBootstrap>
+        {/* Контент приложения с TWA bootstrap'ом */}
+        <div className="lm-page">
+          <TwaBootstrap>{children}</TwaBootstrap>
+        </div>
       </body>
     </html>
   );
