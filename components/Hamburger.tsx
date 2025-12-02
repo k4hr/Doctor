@@ -21,7 +21,7 @@ function lockBodyScroll() {
       document.body.scrollTop ||
       0;
 
-    document.body.dataset.scrollY = String(scrollY);
+    (document.body as any).dataset.scrollY = String(scrollY);
 
     document.body.style.position = 'fixed';
     document.body.style.top = `-${scrollY}px`;
@@ -33,13 +33,13 @@ function lockBodyScroll() {
 
 function unlockBodyScroll() {
   try {
-    const scrollYStr = document.body.dataset.scrollY;
+    const scrollYStr = (document.body as any).dataset.scrollY;
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
     document.body.style.right = '';
     document.body.style.width = '';
-    delete document.body.dataset.scrollY;
+    delete (document.body as any).dataset.scrollY;
 
     if (scrollYStr) {
       const y = parseInt(scrollYStr, 10);
@@ -171,10 +171,11 @@ export default function Hamburger() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Контейнер контента шторки */
+        /* Контейнер контента шторки
+           — опускаем всё ниже от крестика ~ на 1.5 высоты зелёной кнопки */
         .side-inner {
           height: 100%;
-          padding: calc(env(safe-area-inset-top, 0px) + 80px) 20px 32px;
+          padding: calc(env(safe-area-inset-top, 0px) + 130px) 20px 32px;
           display: flex;
           flex-direction: column;
           align-items: center;
