@@ -35,7 +35,7 @@ export default function Hamburger() {
 
       {/* Правая шторка */}
       <aside className="side-menu">
-        {/* Кнопка закрытия в шапке шторки */}
+        {/* Крестик в правом верхнем углу шторки */}
         <button type="button" className="side-close" onClick={closeMenu}>
           ✕
         </button>
@@ -103,17 +103,19 @@ export default function Hamburger() {
             sans-serif;
         }
 
-        /* X в правом верхнем углу шторки */
+        /* X в правом верхнем углу шторки — чёрный и чуть ниже */
         .side-close {
           position: absolute;
-          top: 18px;
+          top: calc(env(safe-area-inset-top, 0px) + 24px);
           right: 18px;
           border: none;
-          background: rgba(15, 23, 42, 0.06);
-          border-radius: 999px;
-          padding: 4px 10px;
-          font-size: 16px;
+          background: transparent;
+          padding: 4px;
+          font-size: 20px;
+          line-height: 1;
           cursor: pointer;
+          color: #0b0c10; /* чёрный */
+          -webkit-tap-highlight-color: transparent;
         }
 
         /* Контейнер, центрированный по ВЫСОТЕ шторки */
@@ -121,8 +123,8 @@ export default function Hamburger() {
           height: 100%;
           padding: 0 20px;
           display: flex;
-          flex-direction: column;      /* <-- колонка */
-          justify-content: center;     /* <-- центр по вертикали */
+          flex-direction: column;
+          justify-content: center;
         }
 
         .side-items {
@@ -132,7 +134,7 @@ export default function Hamburger() {
           display: flex;
           flex-direction: column;
           gap: 24px;
-          text-align: center;          /* текст по центру */
+          text-align: center;
         }
 
         .side-items button {
@@ -142,7 +144,7 @@ export default function Hamburger() {
           background: none;
           border: none;
           border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-          color: #0b0c10; /* тот же чёрный, что и на главной */
+          color: #0b0c10;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
         }
