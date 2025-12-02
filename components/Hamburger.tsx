@@ -96,7 +96,7 @@ export default function Hamburger() {
           <nav className="side-items">
             <button type="button">Мой профиль</button>
             <button type="button">Консультации</button>
-            <button type="button">Врач</button>
+            <button type="button">Врачи</button>
             <button type="button">Врачам</button>
             <button type="button">Помощь</button>
             <button type="button">О нас</button>
