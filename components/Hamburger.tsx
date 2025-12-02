@@ -1,6 +1,8 @@
 /* path: components/Hamburger.tsx */
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -51,6 +53,8 @@ function unlockBodyScroll() {
 }
 
 export default function Hamburger() {
+  const router = useRouter();
+
   const openMenu = () => {
     haptic('light');
     try {
@@ -64,6 +68,12 @@ export default function Hamburger() {
       document.body.classList.remove('menu-open');
       unlockBodyScroll();
     } catch {}
+  };
+
+  const goVrachi = () => {
+    haptic('light');
+    closeMenu();
+    router.push('/hamburger/vrachi');
   };
 
   return (
@@ -96,7 +106,12 @@ export default function Hamburger() {
           <nav className="side-items">
             <button type="button">Мой профиль</button>
             <button type="button">Консультации</button>
-            <button type="button">Врачи</button>
+
+            {/* Кнопка "Врач" ведёт на /hamburger/vrachi */}
+            <button type="button" onClick={goVrachi}>
+              Врач
+            </button>
+
             <button type="button">Врачам</button>
             <button type="button">Помощь</button>
             <button type="button">О нас</button>
@@ -172,7 +187,8 @@ export default function Hamburger() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Контейнер контента шторки */
+        /* Контейнер контента шторки
+           — опускаем всё ниже от крестика ~ на 1.5 высоты зелёной кнопки */
         .side-inner {
           height: 100%;
           padding: calc(env(safe-area-inset-top, 0px) + 130px) 20px 32px;
