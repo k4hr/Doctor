@@ -21,16 +21,16 @@ export default function TopBar() {
       <style jsx>{`
         .app-topbar {
           position: sticky;
-          top: calc(env(safe-area-inset-top, 0px) + 8px);
+          /* отпускаем ниже телеграм-хедера */
+          top: calc(env(safe-area-inset-top, 0px) + 52px);
           z-index: 1000;
-          /* лёгкий фон, чтобы текст не терялся на карточках при скролле */
           background: linear-gradient(
             to bottom,
             rgba(248, 250, 252, 0.98),
             rgba(248, 250, 252, 0.92),
             rgba(248, 250, 252, 0)
           );
-          margin: -8px 0 4px;
+          margin: 0 0 4px;
           padding-bottom: 8px;
         }
 
