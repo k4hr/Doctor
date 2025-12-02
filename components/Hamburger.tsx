@@ -40,7 +40,7 @@ export default function Hamburger() {
           ✕
         </button>
 
-        {/* ВНУТРЕННИЙ КОНТЕЙНЕР, который центруется по высоте ШТОРКИ */}
+        {/* Контейнер, центрированный по ВЫСОТЕ шторки */}
         <div className="side-inner">
           <nav className="side-items">
             <button type="button">Мой профиль</button>
@@ -121,7 +121,8 @@ export default function Hamburger() {
           height: 100%;
           padding: 0 20px;
           display: flex;
-          justify-content: center; /* вертикальный центр внутри шторки */
+          flex-direction: column;      /* <-- колонка */
+          justify-content: center;     /* <-- центр по вертикали */
         }
 
         .side-items {
@@ -130,12 +131,12 @@ export default function Hamburger() {
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 14px;
-          text-align: left;
+          gap: 24px;
+          text-align: center;          /* текст по центру */
         }
 
         .side-items button {
-          padding: 8px 0;
+          padding: 4px 0;
           font-size: 16px;
           font-weight: 600;
           background: none;
