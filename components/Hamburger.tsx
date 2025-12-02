@@ -7,17 +7,62 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
+/**
+ * Лочим скролл "по-человечески":
+ *  - запоминаем текущий scrollY
+ *  - фиксируем body
+ *  - при закрытии возвращаем всё как было
+ */
+function lockBodyScroll() {
+  try {
+    const scrollY =
+      window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+
+    document.body.dataset.scrollY = String(scrollY);
+
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  } catch {}
+}
+
+function unlockBodyScroll() {
+  try {
+    const scrollYStr = document.body.dataset.scrollY;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    delete document.body.dataset.scrollY;
+
+    if (scrollYStr) {
+      const y = parseInt(scrollYStr, 10);
+      if (!Number.isNaN(y)) {
+        window.scrollTo(0, y);
+      }
+    }
+  } catch {}
+}
+
 export default function Hamburger() {
   const openMenu = () => {
     haptic('light');
     try {
       document.body.classList.add('menu-open');
+      lockBodyScroll();
     } catch {}
   };
 
   const closeMenu = () => {
     try {
       document.body.classList.remove('menu-open');
+      unlockBodyScroll();
     } catch {}
   };
 
@@ -166,12 +211,6 @@ export default function Hamburger() {
 
         body.menu-open .side-menu {
           right: 0;
-        }
-
-        /* Лочим скролл под меню, чтобы всё не ехало */
-        body.menu-open {
-          overflow: hidden;
-          overscroll-behavior: contain;
         }
       `}</style>
     </>
