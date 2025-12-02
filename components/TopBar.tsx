@@ -21,17 +21,14 @@ export default function TopBar() {
       <style jsx>{`
         .app-topbar {
           position: sticky;
-          /* отпускаем ниже телеграм-хедера */
           top: calc(env(safe-area-inset-top, 0px) + 52px);
           z-index: 1000;
-          background: linear-gradient(
-            to bottom,
-            rgba(248, 250, 252, 0.98),
-            rgba(248, 250, 252, 0.92),
-            rgba(248, 250, 252, 0)
-          );
-          margin: 0 0 4px;
-          padding-bottom: 8px;
+
+          /* Белая панель на всю ширину экрана */
+          margin: 0 -16px 8px; /* убираем внутренние отступы main, чтобы растянуть на весь экран */
+          padding: 10px 16px 12px;
+          background: #ffffff;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
         }
 
         .app-topbar-row {
