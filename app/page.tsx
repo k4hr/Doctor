@@ -27,12 +27,20 @@ export default function LandingPage() {
     } catch {}
   }, []);
 
-  const handleStart = () => {
+  const handlePatientStart = () => {
     setCookie('welcomed', '1');
+    setCookie('role', 'patient');
     haptic('medium');
-    // Пока остаёмся на этой же странице.
-    // Когда появится основной экран (например, /client),
-    // сюда просто добавим router.push('/client').
+    // TODO: когда появится основной экран для пациентов,
+    // добавить router.push('/client')
+  };
+
+  const handleDoctorStart = () => {
+    setCookie('welcomed', '1');
+    setCookie('role', 'doctor');
+    haptic('medium');
+    // TODO: когда появится кабинет врача,
+    // добавить router.push('/doctor')
   };
 
   return (
@@ -55,15 +63,24 @@ export default function LandingPage() {
           прямо внутри Telegram Mini App.
         </p>
 
-        <button
-          type="button"
-          className="lp-cta lp-cta--glass"
-          aria-label="Начать"
-          onClick={handleStart}
-        >
-          ЗАДАТЬ ВОПРОС ВРАЧУ
-          <span className="lp-cta-glow" aria-hidden />
-        </button>
+        <div className="lp-actions">
+          <button
+            type="button"
+            className="lp-cta lp-cta--glass lp-cta--primary"
+            onClick={handlePatientStart}
+          >
+            Я ПАЦИЕНТ
+            <span className="lp-cta-glow" aria-hidden />
+          </button>
+
+          <button
+            type="button"
+            className="lp-cta lp-cta--secondary"
+            onClick={handleDoctorStart}
+          >
+            Я ВРАЧ
+          </button>
+        </div>
       </div>
 
       <style jsx>{`
@@ -102,7 +119,7 @@ export default function LandingPage() {
         }
 
         .lp-logo-main {
-          color: #0b0c10; /* чёрный/тёмный */
+          color: #0b0c10;
         }
 
         .lp-logo-dot {
@@ -110,7 +127,7 @@ export default function LandingPage() {
         }
 
         .lp-logo-accent {
-          color: #24c768; /* аккуратный зелёный акцент про здоровье */
+          color: #24c768; /* зелёный акцент */
         }
 
         .lp-subtitle {
@@ -118,6 +135,13 @@ export default function LandingPage() {
           font-size: 16px;
           line-height: 1.5;
           opacity: 0.8;
+        }
+
+        .lp-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          align-items: center;
         }
 
         .lp-cta {
@@ -142,6 +166,12 @@ export default function LandingPage() {
           touch-action: manipulation;
           border: none;
           cursor: pointer;
+          width: 100%;
+          max-width: 320px;
+        }
+
+        .lp-cta--primary {
+          text-transform: uppercase;
         }
 
         .lp-cta--glass {
@@ -167,6 +197,14 @@ export default function LandingPage() {
           pointer-events: none;
           mix-blend-mode: screen;
           opacity: 0.8;
+        }
+
+        .lp-cta--secondary {
+          background: transparent;
+          border-radius: 16px;
+          border: 1px solid rgba(13, 18, 32, 0.12);
+          box-shadow: 0 8px 22px rgba(17, 23, 40, 0.08);
+          font-weight: 700;
         }
 
         .lp-cta-glow {
@@ -201,6 +239,11 @@ export default function LandingPage() {
           box-shadow:
             0 18px 42px rgba(17, 23, 40, 0.18),
             inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
+        .lp-cta--secondary:hover {
+          box-shadow: 0 14px 30px rgba(17, 23, 40, 0.12);
+          background: rgba(255, 255, 255, 0.6);
         }
 
         .lp-cta:active {
