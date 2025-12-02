@@ -103,10 +103,10 @@ export default function Hamburger() {
             sans-serif;
         }
 
-        /* X в правом верхнем углу шторки — чёрный и чуть ниже */
+        /* X в правом верхнем углу шторки — чёрный и ОЩУТИМО ниже телеграм-меню */
         .side-close {
           position: absolute;
-          top: calc(env(safe-area-inset-top, 0px) + 24px);
+          top: calc(env(safe-area-inset-top, 0px) + 56px);
           right: 18px;
           border: none;
           background: transparent;
@@ -114,7 +114,7 @@ export default function Hamburger() {
           font-size: 20px;
           line-height: 1;
           cursor: pointer;
-          color: #0b0c10; /* чёрный */
+          color: #0b0c10;
           -webkit-tap-highlight-color: transparent;
         }
 
