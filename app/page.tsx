@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import Hamburger from '../components/Hamburger';
 
 type Question = {
   id: number;
@@ -16,7 +17,8 @@ const QUESTIONS: Question[] = [
   {
     id: 1,
     title: 'Температура у ребёнка 38.7',
-    snippet: 'Вчера прививка, сегодня высокая температура и вялость. Давала Нурофен…',
+    snippet:
+      'Вчера прививка, сегодня высокая температура и вялость. Давала Нурофен…',
     status: 'answering',
     speciality: 'Педиатр',
     timeAgo: '2 мин назад',
@@ -24,7 +26,8 @@ const QUESTIONS: Question[] = [
   {
     id: 2,
     title: 'Боль в груди при вдохе',
-    snippet: 'Тянущая боль слева при глубоком вдохе, не могу понять, сердце это или мышца…',
+    snippet:
+      'Тянущая боль слева при глубоком вдохе, не могу понять, сердце это или мышца…',
     status: 'waiting',
     speciality: 'Терапевт',
     timeAgo: '5 мин назад',
@@ -32,7 +35,8 @@ const QUESTIONS: Question[] = [
   {
     id: 3,
     title: 'Сыпь после антибиотиков',
-    snippet: 'Пил антибиотики 5 дней, появилась сыпь на руках и шее. Это аллергия?',
+    snippet:
+      'Пил антибиотики 5 дней, появилась сыпь на руках и шее. Это аллергия?',
     status: 'done',
     speciality: 'Аллерголог',
     timeAgo: '18 мин назад',
@@ -40,7 +44,8 @@ const QUESTIONS: Question[] = [
   {
     id: 4,
     title: 'Паническая атака или сердце?',
-    snippet: 'Внезапно начинается сильное сердцебиение, бросает в жар и трясёт…',
+    snippet:
+      'Внезапно начинается сильное сердцебиение, бросает в жар и трясёт…',
     status: 'answering',
     speciality: 'Психотерапевт',
     timeAgo: '10 мин назад',
@@ -71,11 +76,17 @@ export default function FeedPage() {
   return (
     <main className="feed">
       <header className="feed-header">
-        <div className="feed-logo">
-          <span className="feed-logo-main">ВРАЧИ</span>
-          <span className="feed-logo-dot">.</span>
-          <span className="feed-logo-accent">ТУТ</span>
+        <div className="feed-header-row">
+          <div className="feed-logo">
+            <span className="feed-logo-main">ВРАЧИ</span>
+            <span className="feed-logo-dot">.</span>
+            <span className="feed-logo-accent">ТУТ</span>
+          </div>
+
+          {/* Кнопка трёх полосок + меню */}
+          <Hamburger />
         </div>
+
         <p className="feed-subtitle">
           Живые медицинские вопросы в реальном времени.
           <br />
@@ -136,6 +147,13 @@ export default function FeedPage() {
         .feed-header {
           text-align: left;
           margin-bottom: 4px;
+        }
+
+        .feed-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
         }
 
         .feed-logo {
