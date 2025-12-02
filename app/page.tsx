@@ -31,16 +31,14 @@ export default function LandingPage() {
     setCookie('welcomed', '1');
     setCookie('role', 'patient');
     haptic('medium');
-    // TODO: когда появится основной экран для пациентов,
-    // добавить router.push('/client')
+    // TODO: router.push('/client')
   };
 
   const handleDoctorStart = () => {
     setCookie('welcomed', '1');
     setCookie('role', 'doctor');
     haptic('medium');
-    // TODO: когда появится кабинет врача,
-    // добавить router.push('/doctor')
+    // TODO: router.push('/doctor')
   };
 
   return (
@@ -66,16 +64,15 @@ export default function LandingPage() {
         <div className="lp-actions">
           <button
             type="button"
-            className="lp-cta lp-cta--glass lp-cta--primary"
+            className="lp-cta lp-cta--role lp-cta--patient"
             onClick={handlePatientStart}
           >
             Я ПАЦИЕНТ
-            <span className="lp-cta-glow" aria-hidden />
           </button>
 
           <button
             type="button"
-            className="lp-cta lp-cta--secondary"
+            className="lp-cta lp-cta--role lp-cta--doctor"
             onClick={handleDoctorStart}
           >
             Я ВРАЧ
@@ -153,116 +150,66 @@ export default function LandingPage() {
           border-radius: 18px;
           font-weight: 900;
           letter-spacing: 0.06em;
-          text-decoration: none !important;
-          color: #0d1220 !important;
+          text-decoration: none;
           -webkit-tap-highlight-color: transparent;
           user-select: none;
           transition:
             transform 0.12s ease,
-            box-shadow 0.2s ease,
-            border-color 0.2s ease,
-            background 0.2s ease;
+            box-shadow 0.18s ease,
+            border-color 0.18s ease,
+            background 0.18s ease,
+            color 0.18s ease;
           isolation: isolate;
           touch-action: manipulation;
-          border: none;
+          border: 1px solid rgba(13, 18, 32, 0.12);
           cursor: pointer;
           width: 100%;
           max-width: 320px;
-        }
-
-        .lp-cta--primary {
+          background: rgba(255, 255, 255, 0.9);
+          color: #0d1220;
           text-transform: uppercase;
+          box-shadow: 0 12px 30px rgba(17, 23, 40, 0.14);
         }
 
-        .lp-cta--glass {
-          background: rgba(255, 255, 255, 0.82);
-          border: 1px solid rgba(13, 18, 32, 0.14);
-          box-shadow:
-            0 14px 34px rgba(17, 23, 40, 0.14),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-          backdrop-filter: saturate(160%) blur(14px);
-          -webkit-backdrop-filter: saturate(160%) blur(14px);
-        }
-
-        .lp-cta--glass::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: inherit;
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.65),
-            rgba(255, 255, 255, 0) 55%
-          );
-          pointer-events: none;
-          mix-blend-mode: screen;
-          opacity: 0.8;
-        }
-
-        .lp-cta--secondary {
-          background: transparent;
-          border-radius: 16px;
-          border: 1px solid rgba(13, 18, 32, 0.12);
-          box-shadow: 0 8px 22px rgba(17, 23, 40, 0.08);
-          font-weight: 700;
-        }
-
-        .lp-cta-glow {
-          position: absolute;
-          inset: -22%;
-          border-radius: 28px;
-          background: radial-gradient(
-            60% 60% at 50% 50%,
-            rgba(255, 255, 255, 0.6),
-            rgba(255, 255, 255, 0) 60%
-          );
-          filter: blur(18px);
-          z-index: -1;
-          pointer-events: none;
-          animation: pulse 2.6s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 0.5;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.85;
-            transform: scale(1.03);
-          }
-        }
-
+        /* одинаковый hover/active для обеих */
         .lp-cta:hover {
           transform: translateY(-1px);
-          box-shadow:
-            0 18px 42px rgba(17, 23, 40, 0.18),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-        }
-
-        .lp-cta--secondary:hover {
-          box-shadow: 0 14px 30px rgba(17, 23, 40, 0.12);
-          background: rgba(255, 255, 255, 0.6);
+          box-shadow: 0 18px 40px rgba(17, 23, 40, 0.18);
+          background: rgba(255, 255, 255, 0.96);
         }
 
         .lp-cta:active {
           transform: translateY(0);
+          box-shadow: 0 8px 22px rgba(17, 23, 40, 0.16);
         }
 
         .lp-cta:focus-visible {
           outline: 0;
-          box-shadow:
-            0 0 0 3px rgba(26, 115, 232, 0.25),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+          box-shadow: 0 0 0 3px rgba(36, 199, 104, 0.25),
+            0 10px 30px rgba(17, 23, 40, 0.18);
+        }
+
+        /* модификаторы ролей (визуально — только цвет) */
+        .lp-cta--patient {
+          /* базовый белый — как сейчас */
+        }
+
+        .lp-cta--doctor {
+          border-color: rgba(36, 199, 104, 0.5);
+          color: #24c768;
+        }
+
+        .lp-cta--doctor:hover {
+          background: rgba(255, 255, 255, 0.98);
+          border-color: rgba(36, 199, 104, 0.8);
         }
 
         @supports not (
           (backdrop-filter: blur(10px)) or
           (-webkit-backdrop-filter: blur(10px))
         ) {
-          .lp-cta--glass {
-            background: rgba(255, 255, 255, 0.95);
+          .lp-cta {
+            background: #ffffff;
           }
         }
 
