@@ -3,22 +3,57 @@
 
 import { useEffect } from 'react';
 
+type Question = {
+  id: number;
+  title: string;
+  snippet: string;
+  status: 'answering' | 'waiting' | 'done';
+  speciality: string;
+  timeAgo: string;
+};
+
+const QUESTIONS: Question[] = [
+  {
+    id: 1,
+    title: 'Температура у ребёнка 38.7',
+    snippet: 'Вчера прививка, сегодня высокая температура и вялость. Давала Нурофен…',
+    status: 'answering',
+    speciality: 'Педиатр',
+    timeAgo: '2 мин назад',
+  },
+  {
+    id: 2,
+    title: 'Боль в груди при вдохе',
+    snippet: 'Тянущая боль слева при глубоком вдохе, не могу понять, сердце это или мышца…',
+    status: 'waiting',
+    speciality: 'Терапевт',
+    timeAgo: '5 мин назад',
+  },
+  {
+    id: 3,
+    title: 'Сыпь после антибиотиков',
+    snippet: 'Пил антибиотики 5 дней, появилась сыпь на руках и шее. Это аллергия?',
+    status: 'done',
+    speciality: 'Аллерголог',
+    timeAgo: '18 мин назад',
+  },
+  {
+    id: 4,
+    title: 'Паническая атака или сердце?',
+    snippet: 'Внезапно начинается сильное сердцебиение, бросает в жар и трясёт…',
+    status: 'answering',
+    speciality: 'Психотерапевт',
+    timeAgo: '10 мин назад',
+  },
+];
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
   } catch {}
 }
 
-function setCookie(k: string, v: string) {
-  try {
-    const maxAge = 60 * 60 * 24 * 365;
-    document.cookie = `${k}=${encodeURIComponent(
-      v,
-    )}; Path=/; Max-Age=${maxAge}; SameSite=None; Secure`;
-  } catch {}
-}
-
-export default function LandingPage() {
+export default function FeedPage() {
   useEffect(() => {
     const w: any = window;
     try {
@@ -27,225 +62,213 @@ export default function LandingPage() {
     } catch {}
   }, []);
 
-  const handlePatientStart = () => {
-    setCookie('welcomed', '1');
-    setCookie('role', 'patient');
-    haptic('medium');
-    // TODO: router.push('/client')
-  };
-
-  const handleDoctorStart = () => {
-    setCookie('welcomed', '1');
-    setCookie('role', 'doctor');
-    haptic('medium');
-    // TODO: router.push('/doctor')
+  const handleQuestionClick = (q: Question) => {
+    haptic('light');
+    // TODO: открыть конкретный вопрос, когда появится /question/[id]
+    console.log('open question', q.id);
   };
 
   return (
-    <main className="lp">
-      <div className="lp-orb orb-tr" aria-hidden />
-      <div className="lp-orb orb-bl" aria-hidden />
-
-      <div className="lp-inner">
-        <h1 className="lp-title">
-          <span className="lp-logo">
-            <span className="lp-logo-main">ВРАЧИ</span>
-            <span className="lp-logo-dot">.</span>
-            <span className="lp-logo-accent">ТУТ</span>
-          </span>
-        </h1>
-
-        <p className="lp-subtitle">
-          Онлайн-консультации с проверенными врачами
-          <br />
-          прямо внутри Telegram Mini App.
-        </p>
-
-        <div className="lp-actions">
-          <button
-            type="button"
-            className="lp-cta lp-cta--role lp-cta--patient"
-            onClick={handlePatientStart}
-          >
-            Я ПАЦИЕНТ
-          </button>
-
-          <button
-            type="button"
-            className="lp-cta lp-cta--role lp-cta--doctor"
-            onClick={handleDoctorStart}
-          >
-            Я ВРАЧ
-          </button>
+    <main className="feed">
+      <header className="feed-header">
+        <div className="feed-logo">
+          <span className="feed-logo-main">ВРАЧИ</span>
+          <span className="feed-logo-dot">.</span>
+          <span className="feed-logo-accent">ТУТ</span>
         </div>
-      </div>
+        <p className="feed-subtitle">
+          Живые медицинские вопросы в реальном времени.
+          <br />
+          Отвечают проверенные врачи.
+        </p>
+      </header>
 
-      {/* Локальные стили экрана */}
+      <section className="feed-list" aria-label="Онлайн-вопросы пациентов">
+        {QUESTIONS.map((q) => (
+          <button
+            key={q.id}
+            type="button"
+            className="q-card"
+            onClick={() => handleQuestionClick(q)}
+          >
+            <div className="q-top">
+              <h2 className="q-title">{q.title}</h2>
+              <span
+                className={
+                  'q-status ' +
+                  (q.status === 'answering'
+                    ? 'q-status--answering'
+                    : q.status === 'waiting'
+                    ? 'q-status--waiting'
+                    : 'q-status--done')
+                }
+              >
+                {q.status === 'answering' && 'Врач отвечает'}
+                {q.status === 'waiting' && 'Ожидает врача'}
+                {q.status === 'done' && 'Ответ готов'}
+              </span>
+            </div>
+            <p className="q-snippet">{q.snippet}</p>
+            <div className="q-meta">
+              <span className="q-chip">{q.speciality}</span>
+              <span className="q-time">{q.timeAgo}</span>
+            </div>
+          </button>
+        ))}
+      </section>
+
+      <footer className="feed-footer">
+        <p>
+          Хотите задать свой вопрос?{' '}
+          <span className="feed-link">Скоро добавим кнопку для пациентов</span>
+        </p>
+      </footer>
+
       <style jsx>{`
-        .lp {
-          position: relative;
+        .feed {
           min-height: 100dvh;
-          padding: 24px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-          display: grid;
-          place-items: center;
-          color: #0d1220;
-          background: transparent;
-          overflow: hidden; /* защита от внутреннего скролла main */
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
         }
 
-        .lp-inner {
-          width: 100%;
-          max-width: 860px;
-          text-align: center;
+        .feed-header {
+          text-align: left;
+          margin-bottom: 4px;
         }
 
-        .lp-title {
-          margin: 0 0 12px;
-          line-height: 1.06;
-          font-size: clamp(42px, 9vw, 90px);
-          font-weight: 900;
-          letter-spacing: -0.02em;
-          text-wrap: balance;
-        }
-
-        .lp-logo {
+        .feed-logo {
           display: inline-flex;
           align-items: baseline;
           gap: 4px;
           font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
             sans-serif;
-        }
-
-        .lp-logo-main {
-          color: #0b0c10;
-        }
-
-        .lp-logo-dot {
-          color: #0b0c10;
-        }
-
-        .lp-logo-accent {
-          color: #24c768; /* зелёный акцент */
-        }
-
-        .lp-subtitle {
-          margin: 0 0 26px;
-          font-size: 16px;
-          line-height: 1.5;
-          opacity: 0.8;
-        }
-
-        .lp-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          align-items: center;
-        }
-
-        .lp-cta {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px 30px;
-          border-radius: 18px;
           font-weight: 900;
-          letter-spacing: 0.06em;
-          text-decoration: none;
-          -webkit-tap-highlight-color: transparent;
-          user-select: none;
-          transition:
-            transform 0.12s ease,
-            box-shadow 0.18s ease,
-            border-color 0.18s ease,
-            background 0.18s ease,
-            color 0.18s ease;
-          isolation: isolate;
-          touch-action: manipulation;
-          border: 1px solid rgba(13, 18, 32, 0.12);
-          cursor: pointer;
-          width: 100%;
-          max-width: 320px;
-          background: rgba(255, 255, 255, 0.9);
-          color: #0d1220;
-          text-transform: uppercase;
-          box-shadow: 0 12px 30px rgba(17, 23, 40, 0.14);
+          font-size: 26px;
+          letter-spacing: -0.02em;
         }
 
-        .lp-cta:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 18px 40px rgba(17, 23, 40, 0.18);
-          background: rgba(255, 255, 255, 0.96);
+        .feed-logo-main,
+        .feed-logo-dot {
+          color: #0b0c10;
         }
 
-        .lp-cta:active {
-          transform: translateY(0);
-          box-shadow: 0 8px 22px rgba(17, 23, 40, 0.16);
-        }
-
-        .lp-cta:focus-visible {
-          outline: 0;
-          box-shadow: 0 0 0 3px rgba(36, 199, 104, 0.25),
-            0 10px 30px rgba(17, 23, 40, 0.18);
-        }
-
-        .lp-cta--doctor {
-          border-color: rgba(36, 199, 104, 0.5);
+        .feed-logo-accent {
           color: #24c768;
         }
 
-        .lp-cta--doctor:hover {
-          background: rgba(255, 255, 255, 0.98);
-          border-color: rgba(36, 199, 104, 0.8);
+        .feed-subtitle {
+          margin: 6px 0 0;
+          font-size: 14px;
+          line-height: 1.4;
+          color: rgba(11, 12, 16, 0.7);
         }
 
-        @supports not (
-          (backdrop-filter: blur(10px)) or
-          (-webkit-backdrop-filter: blur(10px))
-        ) {
-          .lp-cta {
-            background: #ffffff;
-          }
+        .feed-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 8px;
         }
 
-        .lp-orb {
-          position: absolute;
-          width: 60vmin;
-          height: 60vmin;
-          border-radius: 50%;
-          filter: blur(48px);
-          opacity: 0.16;
-          pointer-events: none;
-          background: radial-gradient(
-            closest-side,
-            #9aa7ff,
-            transparent 70%
-          );
+        .q-card {
+          text-align: left;
+          padding: 14px 14px 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(10, 12, 20, 0.08);
+          background: rgba(255, 255, 255, 0.9);
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.08);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
         }
 
-        .orb-tr {
-          top: -18vmin;
-          right: -18vmin;
+        .q-card:active {
+          transform: translateY(1px);
+          box-shadow: 0 6px 18px rgba(18, 28, 45, 0.12);
         }
 
-        .orb-bl {
-          bottom: -22vmin;
-          left: -22vmin;
+        .q-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 8px;
         }
 
-        @media (max-width: 420px) {
-          .lp-cta {
-            padding: 14px 24px;
-            border-radius: 16px;
-          }
+        .q-title {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 700;
+          color: #0b0c10;
         }
-      `}</style>
 
-      {/* Глобально вырубаем скролл только пока смонтирован этот экран */}
-      <style jsx global>{`
-        html,
-        body {
-          overflow: hidden;
+        .q-status {
+          font-size: 11px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid transparent;
+          white-space: nowrap;
+        }
+
+        .q-status--answering {
+          background: rgba(36, 199, 104, 0.08);
+          border-color: rgba(36, 199, 104, 0.35);
+          color: #15834a;
+        }
+
+        .q-status--waiting {
+          background: rgba(245, 158, 11, 0.08);
+          border-color: rgba(245, 158, 11, 0.35);
+          color: #92400e;
+        }
+
+        .q-status--done {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.18);
+          color: rgba(15, 23, 42, 0.8);
+        }
+
+        .q-snippet {
+          margin: 4px 0 0;
+          font-size: 13px;
+          line-height: 1.4;
+          color: rgba(11, 12, 16, 0.8);
+        }
+
+        .q-meta {
+          margin-top: 6px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+        }
+
+        .q-chip {
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.04);
+          color: rgba(15, 23, 42, 0.9);
+        }
+
+        .q-time {
+          color: rgba(15, 23, 42, 0.55);
+        }
+
+        .feed-footer {
+          margin-top: 6px;
+          font-size: 11px;
+          color: rgba(15, 23, 42, 0.55);
+          text-align: center;
+        }
+
+        .feed-link {
+          color: #24c768;
+          font-weight: 600;
         }
       `}</style>
     </main>
