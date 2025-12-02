@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import Hamburger from '../components/Hamburger';
+import TopBar from '../components/TopBar';
 
 type Question = {
   id: number;
@@ -75,18 +75,10 @@ export default function FeedPage() {
 
   return (
     <main className="feed">
+      {/* При скролле эта панель остаётся прилепленной сверху */}
+      <TopBar />
+
       <header className="feed-header">
-        <div className="feed-header-row">
-          <div className="feed-logo">
-            <span className="feed-logo-main">ВРАЧИ</span>
-            <span className="feed-logo-dot">.</span>
-            <span className="feed-logo-accent">ТУТ</span>
-          </div>
-
-          {/* Кнопка трёх полосок + меню */}
-          <Hamburger />
-        </div>
-
         <p className="feed-subtitle">
           Живые медицинские вопросы в реальном времени.
           <br />
@@ -149,35 +141,8 @@ export default function FeedPage() {
           margin-bottom: 4px;
         }
 
-        .feed-header-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .feed-logo {
-          display: inline-flex;
-          align-items: baseline;
-          gap: 4px;
-          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
-            sans-serif;
-          font-weight: 900;
-          font-size: 26px;
-          letter-spacing: -0.02em;
-        }
-
-        .feed-logo-main,
-        .feed-logo-dot {
-          color: #0b0c10;
-        }
-
-        .feed-logo-accent {
-          color: #24c768;
-        }
-
         .feed-subtitle {
-          margin: 6px 0 0;
+          margin: 0;
           font-size: 14px;
           line-height: 1.4;
           color: rgba(11, 12, 16, 0.7);
