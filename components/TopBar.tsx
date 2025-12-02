@@ -24,12 +24,10 @@ export default function TopBar() {
           top: calc(env(safe-area-inset-top, 0px) + 52px);
           z-index: 1000;
 
-          /* настоящая полноэкранная панель */
-          width: 100vw;
-          margin-left: 50%;
-          transform: translateX(-50%);
-
+          /* Растягиваем панель на ширину экрана за счёт отступов main (16px) */
+          margin: 0 -16px 8px;
           padding: 10px 16px 12px;
+
           background: #ffffff;
           box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
         }
