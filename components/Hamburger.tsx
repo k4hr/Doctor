@@ -30,23 +30,27 @@ export default function Hamburger() {
         <span />
       </button>
 
-      {/* Затемнение + выезжающее меню */}
+      {/* Затемнение фона */}
       <div className="menu-overlay" onClick={closeMenu} />
 
+      {/* Правая шторка */}
       <aside className="side-menu">
+        {/* Кнопка закрытия в шапке шторки */}
         <button type="button" className="side-close" onClick={closeMenu}>
           ✕
         </button>
 
-        <nav className="side-items">
-          <button type="button">Мой профиль</button>
-          <button type="button">Мои консультации</button>
-          <button type="button">Стать врачом</button>
-          <button type="button">О сервисе</button>
-        </nav>
+        {/* ВНУТРЕННИЙ КОНТЕЙНЕР, который центруется по высоте ШТОРКИ */}
+        <div className="side-inner">
+          <nav className="side-items">
+            <button type="button">Мой профиль</button>
+            <button type="button">Мои консультации</button>
+            <button type="button">Стать врачом</button>
+            <button type="button">О сервисе</button>
+          </nav>
+        </div>
       </aside>
 
-      {/* Глобальные стили меню */}
       <style jsx global>{`
         /* Кнопка в хедере */
         .menu-btn {
@@ -71,66 +75,87 @@ export default function Hamburger() {
           transition: 0.2s;
         }
 
-        /* Полупрозрачный фон */
+        /* Затемнение */
         .menu-overlay {
           position: fixed;
           inset: 0;
           background: rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(2px);
+          backdrop-filter: blur(4px);
           opacity: 0;
           pointer-events: none;
-          transition: 0.25s ease;
+          transition: opacity 0.25s ease;
           z-index: 9998;
         }
 
-        /* Правое меню */
+        /* Белая шторка справа */
         .side-menu {
           position: fixed;
           top: 0;
-          right: -260px;
-          width: 260px;
+          right: -100%;
+          width: 78%;
+          max-width: 360px;
           height: 100%;
           background: #ffffff;
-          box-shadow: -4px 0 22px rgba(0, 0, 0, 0.08);
-          padding: 20px;
+          box-shadow: -4px 0 22px rgba(0, 0, 0, 0.12);
           transition: right 0.28s ease;
-          display: flex;
-          flex-direction: column;
           z-index: 9999;
+          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
+            sans-serif;
         }
 
+        /* X в правом верхнем углу шторки */
         .side-close {
-          align-self: flex-end;
+          position: absolute;
+          top: 18px;
+          right: 18px;
           border: none;
-          background: transparent;
-          font-size: 20px;
-          padding: 0;
-          margin-bottom: 14px;
+          background: rgba(15, 23, 42, 0.06);
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 16px;
           cursor: pointer;
+        }
+
+        /* Контейнер, центрированный по ВЫСОТЕ шторки */
+        .side-inner {
+          height: 100%;
+          padding: 0 20px;
+          display: flex;
+          justify-content: center; /* вертикальный центр внутри шторки */
         }
 
         .side-items {
+          width: 100%;
+          max-width: 260px;
+          margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          margin-top: 8px;
+          gap: 14px;
+          text-align: left;
         }
 
         .side-items button {
-          padding: 10px 0;
-          text-align: left;
-          font-size: 15px;
+          padding: 8px 0;
+          font-size: 16px;
+          font-weight: 600;
           background: none;
           border: none;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+          color: #0b0c10; /* тот же чёрный, что и на главной */
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .side-items button:last-child {
           border-bottom: none;
         }
 
-        /* Активное состояние: body.menu-open */
+        .side-items button:active {
+          transform: scale(0.98);
+          opacity: 0.8;
+        }
+
+        /* Активное состояние */
         body.menu-open .menu-overlay {
           opacity: 1;
           pointer-events: all;
