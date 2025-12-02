@@ -8,10 +8,10 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 /**
- * Лочим скролл "по-человечески":
+ * Лочим скролл:
  *  - запоминаем текущий scrollY
  *  - фиксируем body
- *  - при закрытии возвращаем всё как было
+ *  - при закрытии возвращаем, как было
  */
 function lockBodyScroll() {
   try {
@@ -85,13 +85,21 @@ export default function Hamburger() {
           ✕
         </button>
 
-        {/* Контейнер, центрированный по ВЫСОТЕ шторки */}
+        {/* Контейнер содержимого */}
         <div className="side-inner">
+          {/* Зелёная кнопка "Задать вопрос" */}
+          <button type="button" className="side-primary-btn">
+            Задать вопрос
+          </button>
+
+          {/* Пункты меню */}
           <nav className="side-items">
-            <button type="button">Мой профиль</button>
-            <button type="button">Мои консультации</button>
-            <button type="button">Стать врачом</button>
-            <button type="button">О сервисе</button>
+            <button type="button">Консультации</button>
+            <button type="button">Врач</button>
+            <button type="button">Врачам</button>
+            <button type="button">Помощь</button>
+            <button type="button">О нас</button>
+            <button type="button">Контакты</button>
           </nav>
         </div>
       </aside>
@@ -163,13 +171,37 @@ export default function Hamburger() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Контейнер, центрированный по ВЫСОТЕ шторки */
+        /* Контейнер контента шторки */
         .side-inner {
           height: 100%;
-          padding: 0 20px;
+          padding: calc(env(safe-area-inset-top, 0px) + 80px) 20px 32px;
           display: flex;
           flex-direction: column;
-          justify-content: center;
+          align-items: center;
+          box-sizing: border-box;
+        }
+
+        /* Зелёная кнопка "Задать вопрос" */
+        .side-primary-btn {
+          width: 100%;
+          max-width: 260px;
+          padding: 14px 16px;
+          border-radius: 999px;
+          border: none;
+          background: #24c768;
+          color: #ffffff;
+          font-size: 16px;
+          font-weight: 700;
+          text-align: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.35);
+          margin-bottom: 32px;
+        }
+
+        .side-primary-btn:active {
+          transform: scale(0.98);
+          box-shadow: 0 6px 14px rgba(36, 199, 104, 0.4);
         }
 
         .side-items {
@@ -178,24 +210,19 @@ export default function Hamburger() {
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          gap: 18px;
           text-align: center;
         }
 
         .side-items button {
           padding: 4px 0;
           font-size: 16px;
-          font-weight: 600;
+          font-weight: 500;
           background: none;
           border: none;
-          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-          color: #0b0c10;
+          color: #374151;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-        }
-
-        .side-items button:last-child {
-          border-bottom: none;
         }
 
         .side-items button:active {
