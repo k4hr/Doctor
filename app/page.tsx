@@ -80,6 +80,7 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* Локальные стили экрана */}
       <style jsx>{`
         .lp {
           position: relative;
@@ -89,7 +90,7 @@ export default function LandingPage() {
           place-items: center;
           color: #0d1220;
           background: transparent;
-          overflow: hidden;
+          overflow: hidden; /* защита от внутреннего скролла main */
         }
 
         .lp-inner {
@@ -171,7 +172,6 @@ export default function LandingPage() {
           box-shadow: 0 12px 30px rgba(17, 23, 40, 0.14);
         }
 
-        /* одинаковый hover/active для обеих */
         .lp-cta:hover {
           transform: translateY(-1px);
           box-shadow: 0 18px 40px rgba(17, 23, 40, 0.18);
@@ -187,11 +187,6 @@ export default function LandingPage() {
           outline: 0;
           box-shadow: 0 0 0 3px rgba(36, 199, 104, 0.25),
             0 10px 30px rgba(17, 23, 40, 0.18);
-        }
-
-        /* модификаторы ролей (визуально — только цвет) */
-        .lp-cta--patient {
-          /* базовый белый — как сейчас */
         }
 
         .lp-cta--doctor {
@@ -243,6 +238,14 @@ export default function LandingPage() {
             padding: 14px 24px;
             border-radius: 16px;
           }
+        }
+      `}</style>
+
+      {/* Глобально вырубаем скролл только пока смонтирован этот экран */}
+      <style jsx global>{`
+        html,
+        body {
+          overflow: hidden;
         }
       `}</style>
     </main>
