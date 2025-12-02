@@ -103,7 +103,7 @@ export default function Hamburger() {
             sans-serif;
         }
 
-        /* X в правом верхнем углу шторки — чёрный и ОЩУТИМО ниже телеграм-меню */
+        /* X в правом верхнем углу шторки — чёрный и ниже телеграм-меню */
         .side-close {
           position: absolute;
           top: calc(env(safe-area-inset-top, 0px) + 56px);
@@ -166,6 +166,12 @@ export default function Hamburger() {
 
         body.menu-open .side-menu {
           right: 0;
+        }
+
+        /* Лочим скролл под меню, чтобы всё не ехало */
+        body.menu-open {
+          overflow: hidden;
+          overscroll-behavior: contain;
         }
       `}</style>
     </>
