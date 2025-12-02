@@ -94,6 +94,7 @@ export default function Hamburger() {
 
           {/* Пункты меню */}
           <nav className="side-items">
+            <button type="button">Мой профиль</button>
             <button type="button">Консультации</button>
             <button type="button">Врач</button>
             <button type="button">Врачам</button>
@@ -171,8 +172,7 @@ export default function Hamburger() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Контейнер контента шторки
-           — опускаем всё ниже от крестика ~ на 1.5 высоты зелёной кнопки */
+        /* Контейнер контента шторки */
         .side-inner {
           height: 100%;
           padding: calc(env(safe-area-inset-top, 0px) + 130px) 20px 32px;
