@@ -1,6 +1,8 @@
 /* path: app/hamburger/vrachi/page.tsx */
 'use client';
 
+import TopBarBack from '../../components/TopBarBack';
+
 const GROUPS: { letter: string; items: string[] }[] = [
   {
     letter: 'А',
@@ -144,7 +146,8 @@ const GROUPS: { letter: string; items: string[] }[] = [
 export default function VrachiPage() {
   return (
     <main className="vrachi-page">
-      <h1 className="vrachi-title">Врачи</h1>
+      {/* Топбар с кнопкой "Назад" и ВРАЧИ.ТУТ по центру */}
+      <TopBarBack />
 
       <section className="vrachi-list" aria-label="Список специальностей">
         {GROUPS.map((group) => (
@@ -162,28 +165,21 @@ export default function VrachiPage() {
       <style jsx>{`
         .vrachi-page {
           min-height: 100dvh;
-          padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px
-            calc(env(safe-area-inset-bottom, 0px) + 16px);
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
           background: #ffffff;
           font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
             sans-serif;
         }
 
-        .vrachi-title {
-          margin: 0 0 16px;
-          font-size: 22px;
-          font-weight: 700;
-          color: #111827;
-        }
-
         .vrachi-list {
+          margin-top: 8px;
           display: flex;
           flex-direction: column;
           gap: 24px;
         }
 
         .vrachi-group {
-          /* просто вертикальный стек */
+          /* группируем букву и список, без доп. стилей */
         }
 
         .vrachi-letter {
