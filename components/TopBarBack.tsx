@@ -7,14 +7,14 @@ import Hamburger from './Hamburger';
 export default function TopBarBack() {
   return (
     <>
-      <div className="app-topbar app-topbar--back">
+      <div className="app-topbar">
         <div className="app-topbar-row app-topbar-row--back">
-          {/* Слева — назад */}
+          {/* Слева — текст "← Назад" */}
           <div className="topbar-left">
             <BackBtn fallback="/" label="Назад" />
           </div>
 
-          {/* По центру — ВРАЧИ.ТУТ как в TopBar */}
+          {/* По центру — ВРАЧИ.ТУТ как в обычном TopBar */}
           <div className="app-logo">
             <span className="app-logo-main">ВРАЧИ</span>
             <span className="app-logo-dot">.</span>
@@ -49,7 +49,7 @@ export default function TopBarBack() {
           gap: 12px;
         }
 
-        /* Режим с back-кнопкой: логотип по центру, края — абсолютом */
+        /* Режим с back-текстом: логотип по центру, края — absolute */
         .app-topbar-row--back {
           position: relative;
           justify-content: center;
@@ -65,29 +65,23 @@ export default function TopBarBack() {
         }
 
         .topbar-left {
-          left: 16px;
+          left: 16px; /* прям в левый край панели */
         }
 
         .topbar-right {
           right: 16px;
         }
 
-        /* Причесываем BackBtn под хедер: только текст, без карточки */
-        .topbar-left .list-btn {
-          margin: 0;
-          max-width: none;
-          padding: 0;
-          border: none;
-          background: transparent;
-          box-shadow: none;
-          border-radius: 0;
-
+        /* Наш текст "Назад" — просто текст, но кликабельный */
+        .back-text {
           font-size: 14px;
           font-weight: 500;
           color: #0b0c10;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
-        .topbar-left .list-btn:active {
+        .back-text:active {
           opacity: 0.7;
           transform: translateX(-1px);
         }
