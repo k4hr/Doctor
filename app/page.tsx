@@ -118,7 +118,6 @@ export default function FeedPage() {
         >
           <span className="feed-search-icon">🔍</span>
           <span className="feed-search-placeholder">Поиск по вопросам</span>
-          {/* Иконка «ползунки» справа — как на скрине, просто заглушка */}
           <span className="feed-search-sliders">
             <span />
             <span />
@@ -201,7 +200,6 @@ export default function FeedPage() {
           margin-top: 4px;
         }
 
-        /* Кнопка в том же стиле, что и в гамбургере */
         .feed-ask-btn {
           width: 100%;
           max-width: 260px;
@@ -223,55 +221,56 @@ export default function FeedPage() {
           box-shadow: 0 6px 14px rgba(36, 199, 104, 0.4);
         }
 
-        /* ====== ПОИСК ====== */
-
+        /* ====== ПОИСК — белая строка ====== */
         .feed-search-wrap {
-          margin-top: 10px;
+          margin-top: 12px;
         }
 
         .feed-search-box {
           width: 100%;
-          padding: 10px 14px;
-          border-radius: 999px;
-          border: none;
-          background: #111827;
+          padding: 12px 14px;
+          border-radius: 16px;
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+
           display: flex;
           align-items: center;
           gap: 10px;
+
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
         }
 
         .feed-search-icon {
-          font-size: 16px;
-          opacity: 0.85;
+          font-size: 15px;
+          opacity: 0.6;
         }
 
         .feed-search-placeholder {
           flex: 1;
           text-align: left;
           font-size: 14px;
-          color: rgba(243, 244, 246, 0.7);
+          color: rgba(15, 23, 42, 0.55);
         }
 
         .feed-search-sliders {
           display: inline-flex;
           flex-direction: column;
           justify-content: center;
-          gap: 4px;
+          gap: 3px;
         }
 
         .feed-search-sliders span {
-          width: 16px;
+          width: 14px;
           height: 2px;
           border-radius: 999px;
-          background: #f9fafb;
+          background: rgba(15, 23, 42, 0.5);
         }
 
-        /* ====== ФИЛЬТРЫ / СОРТИРОВКА ====== */
-
+        /* ====== ФИЛЬТРЫ / СОРТИРОВКА — компактные ====== */
         .feed-filters-row {
-          margin-top: 10px;
+          margin-top: 12px;
           display: flex;
           justify-content: space-between;
           gap: 10px;
@@ -279,9 +278,9 @@ export default function FeedPage() {
 
         .pill-btn {
           flex: 1;
-          padding: 8px 10px;
-          border-radius: 999px;
-          font-size: 13px;
+          padding: 8px 0;
+          border-radius: 12px;
+          font-size: 12px;
           font-weight: 500;
           border: 1px solid transparent;
           background: #ffffff;
@@ -291,23 +290,22 @@ export default function FeedPage() {
         }
 
         .pill-btn--ghost {
-          background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.06);
+          background: rgba(15, 23, 42, 0.03);
+          border-color: rgba(15, 23, 42, 0.08);
         }
 
         .pill-btn--outline {
           background: #ffffff;
-          border-color: rgba(36, 199, 104, 0.5);
+          border-color: rgba(36, 199, 104, 0.45);
           color: #059669;
         }
 
         .pill-btn:active {
-          transform: translateY(1px);
-          opacity: 0.85;
+          transform: scale(0.98);
+          opacity: 0.9;
         }
 
         /* ====== ЛЕНТА ВОПРОСОВ ====== */
-
         .feed-list {
           display: flex;
           flex-direction: column;
