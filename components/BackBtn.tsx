@@ -5,14 +5,14 @@ import { useEffect } from 'react';
 
 type BackBtnProps = {
   fallback?: string;
-  label?: string;
+  label?: string; // используем только для aria-label
 };
 
 export default function BackBtn({
   fallback = '/home',
   label = 'Назад',
 }: BackBtnProps) {
-  // Глушим телеграмовский пузырь "Назад"
+  // Глушим телеграмовский системный "Back"
   useEffect(() => {
     const tg: any = (window as any)?.Telegram?.WebApp;
     try {
@@ -30,8 +30,13 @@ export default function BackBtn({
   };
 
   return (
-    <span className="back-text" onClick={handleClick}>
-      ← {label}
+    <span
+      className="back-text"
+      onClick={handleClick}
+      role="button"
+      aria-label={label}
+    >
+      ←
     </span>
   );
 }
