@@ -9,20 +9,20 @@ export default function TopBarBack() {
     <>
       <div className="app-topbar app-topbar--back">
         <div className="app-topbar-row app-topbar-row--back">
-          {/* Левая зона — кнопка "Назад" */}
-          <div className="topbar-backwrap">
+          {/* Слева — назад */}
+          <div className="topbar-left">
             <BackBtn fallback="/" label="Назад" />
           </div>
 
-          {/* Центральный логотип */}
-          <div className="app-logo app-logo--center">
+          {/* По центру — ВРАЧИ.ТУТ как в TopBar */}
+          <div className="app-logo">
             <span className="app-logo-main">ВРАЧИ</span>
             <span className="app-logo-dot">.</span>
             <span className="app-logo-accent">ТУТ</span>
           </div>
 
-          {/* Правая зона — гамбургер */}
-          <div className="topbar-menuwrap">
+          {/* Справа — гамбургер */}
+          <div className="topbar-right">
             <Hamburger />
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function TopBarBack() {
           top: calc(env(safe-area-inset-top, 0px) + 52px);
           z-index: 1000;
 
-          /* как на главной: растягиваем за счёт паддингов main (16px) */
+          /* как на главной: растягиваем за счёт отступов main (16px) */
           margin: 0 -16px 8px;
           padding: 10px 16px 12px;
 
@@ -45,32 +45,35 @@ export default function TopBarBack() {
         .app-topbar-row {
           display: flex;
           align-items: center;
+          justify-content: space-between;
           gap: 12px;
         }
 
-        /* Центрируем логотип, а кнопки слева/справа кладём абсолютом */
+        /* Режим с back-кнопкой: логотип по центру, края — абсолютом */
         .app-topbar-row--back {
           position: relative;
           justify-content: center;
         }
 
-        .topbar-backwrap,
-        .topbar-menuwrap {
+        .topbar-left,
+        .topbar-right {
           position: absolute;
           top: 50%;
           transform: translateY(-50%);
+          display: flex;
+          align-items: center;
         }
 
-        .topbar-backwrap {
+        .topbar-left {
           left: 16px;
         }
 
-        .topbar-menuwrap {
+        .topbar-right {
           right: 16px;
         }
 
-        /* Причесываем BackBtn под хедер: убираем карточку, оставляем текст */
-        .topbar-backwrap .list-btn {
+        /* Причесываем BackBtn под хедер: только текст, без карточки */
+        .topbar-left .list-btn {
           margin: 0;
           max-width: none;
           padding: 0;
@@ -84,7 +87,7 @@ export default function TopBarBack() {
           color: #0b0c10;
         }
 
-        .topbar-backwrap .list-btn:active {
+        .topbar-left .list-btn:active {
           opacity: 0.7;
           transform: translateX(-1px);
         }
@@ -96,7 +99,7 @@ export default function TopBarBack() {
           font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
             sans-serif;
           font-weight: 900;
-          font-size: 22px;
+          font-size: 26px;
           letter-spacing: -0.02em;
         }
 
