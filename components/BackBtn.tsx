@@ -3,34 +3,49 @@
 
 import { useEffect } from 'react';
 
+type BackBtnProps = {
+  fallback?: string;
+  label?: string;
+};
+
 export default function BackBtn({
   fallback = '/home',
   label = 'Назад',
-}: { fallback?: string; label?: string }) {
+}: BackBtnProps) {
   useEffect(() => {
     const tg: any = (window as any)?.Telegram?.WebApp;
+
     try {
-      tg?.BackButton?.show?.();
-      const onClick = () => {
-        if (document.referrer || history.length > 1) history.back();
-        else location.assign(fallback);
+      const handleClick = () => {
+        if (document.referrer || history.length > 1) {
+          history.back();
+        } else {
+          location.assign(fallback);
+        }
       };
-      tg?.BackButton?.onClick?.(onClick);
+
+      tg?.BackButton?.show?.();
+      tg?.BackButton?.onClick?.(handleClick);
+
       return () => {
         tg?.BackButton?.hide?.();
-        tg?.BackButton?.offClick?.(onClick);
+        tg?.BackButton?.offClick?.(handleClick);
       };
-    } catch {}
+    } catch {
+      // тихо игнорируем, если нет Telegram WebApp
+    }
   }, [fallback]);
 
+  const handleClick = () => {
+    if (history.length > 1) {
+      history.back();
+    } else {
+      location.assign(fallback);
+    }
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() =>
-        (history.length > 1 ? history.back() : location.assign(fallback))
-      }
-      className="list-btn"
-    >
+    <button type="button" onClick={handleClick} className="list-btn">
       ← {label}
     </button>
   );
