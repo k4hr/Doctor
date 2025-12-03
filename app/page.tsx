@@ -73,18 +73,23 @@ export default function FeedPage() {
     console.log('open question', q.id);
   };
 
+  const handleAskClick = () => {
+    haptic('medium');
+    // TODO: открыть форму создания вопроса
+    console.log('open ask form');
+  };
+
   return (
     <main className="feed">
       {/* При скролле эта панель остаётся прилепленной сверху */}
       <TopBar />
 
-      <header className="feed-header">
-        <p className="feed-subtitle">
-          Живые медицинские вопросы в реальном времени.
-          <br />
-          Отвечают проверенные врачи.
-        </p>
-      </header>
+      {/* Зелёная кнопка "Задать вопрос" сразу под топбаром */}
+      <div className="feed-ask-wrap">
+        <button type="button" className="feed-ask-btn" onClick={handleAskClick}>
+          Задать вопрос
+        </button>
+      </div>
 
       <section className="feed-list" aria-label="Онлайн-вопросы пациентов">
         {QUESTIONS.map((q) => (
@@ -136,16 +141,33 @@ export default function FeedPage() {
           gap: 18px;
         }
 
-        .feed-header {
-          text-align: left;
-          margin-bottom: 4px;
+        /* Обёртка зелёной кнопки под хедером */
+        .feed-ask-wrap {
+          display: flex;
+          justify-content: center;
+          margin-top: 4px;
         }
 
-        .feed-subtitle {
-          margin: 0;
-          font-size: 14px;
-          line-height: 1.4;
-          color: rgba(11, 12, 16, 0.7);
+        /* Кнопка в том же стиле, что и в гамбургере */
+        .feed-ask-btn {
+          width: 100%;
+          max-width: 260px;
+          padding: 14px 16px;
+          border-radius: 999px;
+          border: none;
+          background: #24c768;
+          color: #ffffff;
+          font-size: 16px;
+          font-weight: 700;
+          text-align: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.35);
+        }
+
+        .feed-ask-btn:active {
+          transform: scale(0.98);
+          box-shadow: 0 6px 14px rgba(36, 199, 104, 0.4);
         }
 
         .feed-list {
