@@ -1,7 +1,7 @@
 /* path: app/hamburger/vrachi/page.tsx */
 'use client';
 
-import TopBarBack from '../../components/TopBarBack';
+import TopBarBack from '../../../components/TopBarBack';
 
 const GROUPS: { letter: string; items: string[] }[] = [
   {
@@ -179,7 +179,6 @@ export default function VrachiPage() {
         }
 
         .vrachi-group {
-          /* группируем букву и список, без доп. стилей */
         }
 
         .vrachi-letter {
