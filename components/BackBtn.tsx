@@ -12,41 +12,29 @@ export default function BackBtn({
   fallback = '/home',
   label = 'Назад',
 }: BackBtnProps) {
+  // На всякий случай отключаем системную кнопку Telegram BackButton
   useEffect(() => {
     const tg: any = (window as any)?.Telegram?.WebApp;
-
     try {
-      const handleClick = () => {
-        if (document.referrer || history.length > 1) {
-          history.back();
-        } else {
-          location.assign(fallback);
-        }
-      };
-
-      tg?.BackButton?.show?.();
-      tg?.BackButton?.onClick?.(handleClick);
-
-      return () => {
-        tg?.BackButton?.hide?.();
-        tg?.BackButton?.offClick?.(handleClick);
-      };
+      tg?.BackButton?.hide?.();
+      tg?.BackButton?.offClick?.(); // если где-то навешивали
     } catch {
-      // тихо игнорируем, если нет Telegram WebApp
+      // тихо игнорируем
     }
-  }, [fallback]);
+  }, []);
 
   const handleClick = () => {
-    if (history.length > 1) {
+    if (history.length > 1 || document.referrer) {
       history.back();
     } else {
       location.assign(fallback);
     }
   };
 
+  // Внешне — просто текст, кликабельный
   return (
-    <button type="button" onClick={handleClick} className="list-btn">
+    <span className="back-text" onClick={handleClick}>
       ← {label}
-    </button>
+    </span>
   );
 }
