@@ -1,3 +1,4 @@
+/* path: components/BackBtn.tsx */
 'use client';
 
 import { useEffect } from 'react';
@@ -29,7 +30,6 @@ export default function BackBtn({
         (history.length > 1 ? history.back() : location.assign(fallback))
       }
       className="list-btn"
-      style={{ maxWidth: 120, marginBottom: 12 }}
     >
       ← {label}
     </button>
