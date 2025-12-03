@@ -93,8 +93,8 @@ export default function TopBarBack() {
 
         /* Аккуратный левый текст "Назад" */
         .back-text {
-          font-size: 14px;
-          font-weight: 500;
+          font-size: 10px;
+          font-weight: 250;
           color: rgba(11, 12, 16, 0.85);
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
