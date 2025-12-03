@@ -79,6 +79,24 @@ export default function FeedPage() {
     console.log('open ask form');
   };
 
+  const handleSearchClick = () => {
+    haptic('light');
+    // TODO: фокус на инпут или открыть отдельный экран поиска
+    console.log('search click');
+  };
+
+  const handleFiltersClick = () => {
+    haptic('light');
+    // TODO: открыть модал с фильтрами (списки врачей и т.п.)
+    console.log('filters click');
+  };
+
+  const handleSortClick = () => {
+    haptic('light');
+    // TODO: переключатель платные/бесплатные
+    console.log('sort click');
+  };
+
   return (
     <main className="feed">
       {/* При скролле эта панель остаётся прилепленной сверху */}
@@ -88,6 +106,41 @@ export default function FeedPage() {
       <div className="feed-ask-wrap">
         <button type="button" className="feed-ask-btn" onClick={handleAskClick}>
           Задать вопрос
+        </button>
+      </div>
+
+      {/* Строка поиска по вопросам */}
+      <div className="feed-search-wrap">
+        <button
+          type="button"
+          className="feed-search-box"
+          onClick={handleSearchClick}
+        >
+          <span className="feed-search-icon">🔍</span>
+          <span className="feed-search-placeholder">Поиск по вопросам</span>
+          {/* Иконка «ползунки» справа — как на скрине, просто заглушка */}
+          <span className="feed-search-sliders">
+            <span />
+            <span />
+          </span>
+        </button>
+      </div>
+
+      {/* Ряд: слева фильтры, справа сортировка */}
+      <div className="feed-filters-row">
+        <button
+          type="button"
+          className="pill-btn pill-btn--ghost"
+          onClick={handleFiltersClick}
+        >
+          Фильтры
+        </button>
+        <button
+          type="button"
+          className="pill-btn pill-btn--outline"
+          onClick={handleSortClick}
+        >
+          Платные / Бесплатные
         </button>
       </div>
 
@@ -169,6 +222,91 @@ export default function FeedPage() {
           transform: scale(0.98);
           box-shadow: 0 6px 14px rgba(36, 199, 104, 0.4);
         }
+
+        /* ====== ПОИСК ====== */
+
+        .feed-search-wrap {
+          margin-top: 10px;
+        }
+
+        .feed-search-box {
+          width: 100%;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: none;
+          background: #111827;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .feed-search-icon {
+          font-size: 16px;
+          opacity: 0.85;
+        }
+
+        .feed-search-placeholder {
+          flex: 1;
+          text-align: left;
+          font-size: 14px;
+          color: rgba(243, 244, 246, 0.7);
+        }
+
+        .feed-search-sliders {
+          display: inline-flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+        }
+
+        .feed-search-sliders span {
+          width: 16px;
+          height: 2px;
+          border-radius: 999px;
+          background: #f9fafb;
+        }
+
+        /* ====== ФИЛЬТРЫ / СОРТИРОВКА ====== */
+
+        .feed-filters-row {
+          margin-top: 10px;
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .pill-btn {
+          flex: 1;
+          padding: 8px 10px;
+          border-radius: 999px;
+          font-size: 13px;
+          font-weight: 500;
+          border: 1px solid transparent;
+          background: #ffffff;
+          color: #111827;
+          -webkit-tap-highlight-color: transparent;
+          cursor: pointer;
+        }
+
+        .pill-btn--ghost {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.06);
+        }
+
+        .pill-btn--outline {
+          background: #ffffff;
+          border-color: rgba(36, 199, 104, 0.5);
+          color: #059669;
+        }
+
+        .pill-btn:active {
+          transform: translateY(1px);
+          opacity: 0.85;
+        }
+
+        /* ====== ЛЕНТА ВОПРОСОВ ====== */
 
         .feed-list {
           display: flex;
