@@ -164,15 +164,17 @@ export default function VrachiPage() {
       <style jsx>{`
         .vrachi-page {
           min-height: 100dvh;
-          /* сверху паддинг убрали, чтобы не толкать TopBarBack */
-          padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
-          background: #ffffff;
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          /* не красим фон в белый, чтобы не было белой простыни поверх градиента */
           font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
             sans-serif;
         }
 
         .vrachi-group {
-          margin-top: 24px;
+          margin-top: 8px;
         }
 
         .vrachi-letter {
