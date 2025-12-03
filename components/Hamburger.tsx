@@ -109,7 +109,7 @@ export default function Hamburger() {
 
             {/* Кнопка "Врач" ведёт на /hamburger/vrachi */}
             <button type="button" onClick={goVrachi}>
-              Врач
+              Врачи
             </button>
 
             <button type="button">Врачам</button>
