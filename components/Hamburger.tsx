@@ -76,6 +76,12 @@ export default function Hamburger() {
     router.push('/hamburger/vrachi');
   };
 
+  const goVopros = () => {
+    haptic('medium');
+    closeMenu();
+    router.push('/vopros');
+  };
+
   return (
     <>
       {/* Кнопка "три полоски" */}
@@ -97,8 +103,12 @@ export default function Hamburger() {
 
         {/* Контейнер содержимого */}
         <div className="side-inner">
-          {/* Зелёная кнопка "Задать вопрос" */}
-          <button type="button" className="side-primary-btn">
+          {/* Зелёная кнопка "Задать вопрос" → /vopros */}
+          <button
+            type="button"
+            className="side-primary-btn"
+            onClick={goVopros}
+          >
             Задать вопрос
           </button>
 
@@ -107,7 +117,7 @@ export default function Hamburger() {
             <button type="button">Мой профиль</button>
             <button type="button">Консультации</button>
 
-            {/* Кнопка "Врач" ведёт на /hamburger/vrachi */}
+            {/* Кнопка "Врачи" ведёт на /hamburger/vrachi */}
             <button type="button" onClick={goVrachi}>
               Врачи
             </button>
@@ -172,7 +182,6 @@ export default function Hamburger() {
             sans-serif;
         }
 
-        /* X в правом верхнем углу шторки — чёрный и ниже телеграм-меню */
         .side-close {
           position: absolute;
           top: calc(env(safe-area-inset-top, 0px) + 56px);
@@ -187,8 +196,6 @@ export default function Hamburger() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        /* Контейнер контента шторки
-           — опускаем всё ниже от крестика ~ на 1.5 высоты зелёной кнопки */
         .side-inner {
           height: 100%;
           padding: calc(env(safe-area-inset-top, 0px) + 130px) 20px 32px;
@@ -198,7 +205,6 @@ export default function Hamburger() {
           box-sizing: border-box;
         }
 
-        /* Зелёная кнопка "Задать вопрос" */
         .side-primary-btn {
           width: 100%;
           max-width: 260px;
@@ -247,7 +253,6 @@ export default function Hamburger() {
           opacity: 0.8;
         }
 
-        /* Активное состояние */
         body.menu-open .menu-overlay {
           opacity: 1;
           pointer-events: all;
