@@ -1,3 +1,4 @@
+/* path: components/DownBarUtil/vozmojnosti.tsx */
 'use client';
 
 function haptic(type: 'light' | 'medium' = 'light') {
@@ -49,7 +50,7 @@ const MODES: ModeCard[] = [
     color: 'red',
     features: [
       { good: true, text: 'Подробная консультация одного выбранного врача' },
-      { good: true, text: 'Работа только со специалистом высокого уровня' },
+      { good: true, text: 'Работа только с опытным специалистом' },
       { good: true, text: 'Полностью персональный подход' },
       { good: true, text: 'Конфиденциальный чат-диалог' },
     ],
@@ -64,7 +65,11 @@ export default function VozmojnostiBlock() {
 
         <div className="vozmo-slider">
           {MODES.map((m) => (
-            <div key={m.id} className="vozmo-card">
+            <div
+              key={m.id}
+              className={`vozmo-card vozmo-card--${m.color}`}
+              onClick={() => haptic('light')}
+            >
               <div className={`vozmo-badge vozmo-badge--${m.color}`}>
                 {m.title}
               </div>
@@ -117,11 +122,32 @@ export default function VozmojnostiBlock() {
 
         .vozmo-card {
           min-width: 82%;
-          background: white;
-          border-radius: 20px;
-          padding: 20px 18px;
-          box-shadow: 0 8px 26px rgba(0, 0, 0, 0.08);
+          border-radius: 22px;
+          padding: 20px 18px 22px;
           scroll-snap-align: center;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+          background: #ffffff;
+        }
+
+        /* ===== Цветовые варианты карточек ===== */
+
+        .vozmo-card--gray {
+          background: radial-gradient(circle at top left, #f9fafb 0, #f3f4f6 45%, #ffffff 85%);
+          border-color: rgba(148, 163, 184, 0.45);
+          box-shadow: 0 12px 28px rgba(148, 163, 184, 0.35);
+        }
+
+        .vozmo-card--gold {
+          background: radial-gradient(circle at top left, #fffbeb 0, #fef3c7 45%, #ffffff 90%);
+          border-color: rgba(217, 119, 6, 0.55);
+          box-shadow: 0 16px 38px rgba(250, 204, 21, 0.8); /* золотая подсветка */
+        }
+
+        .vozmo-card--red {
+          background: radial-gradient(circle at top left, #fef2f2 0, #fee2e2 45%, #ffffff 90%);
+          border-color: rgba(220, 38, 38, 0.6);
+          box-shadow: 0 18px 40px rgba(248, 113, 113, 0.9); /* красное свечение */
         }
 
         .vozmo-badge {
@@ -129,29 +155,33 @@ export default function VozmojnostiBlock() {
           font-weight: 800;
           text-align: center;
           padding: 8px 0;
-          border-radius: 14px;
-          margin-bottom: 8px;
+          border-radius: 18px;
+          margin-bottom: 10px;
+          border: 1px solid transparent;
         }
 
         .vozmo-badge--gray {
-          background: #f3f4f6;
-          color: #4b5563;
+          background: rgba(243, 244, 246, 0.95);
+          border-color: rgba(148, 163, 184, 0.6);
+          color: #374151;
         }
 
         .vozmo-badge--gold {
-          background: #fff3c4;
+          background: rgba(254, 243, 199, 0.96);
+          border-color: rgba(217, 119, 6, 0.8);
           color: #b45309;
         }
 
         .vozmo-badge--red {
-          background: #fee2e2;
+          background: rgba(254, 226, 226, 0.96);
+          border-color: rgba(220, 38, 38, 0.85);
           color: #b91c1c;
         }
 
         .vozmo-mode {
           font-size: 15px;
           text-align: center;
-          margin: 4px 0 12px;
+          margin: 4px 0 14px;
           color: rgba(55, 65, 81, 0.9);
         }
 
@@ -187,7 +217,7 @@ export default function VozmojnostiBlock() {
         }
 
         .vozmo-price {
-          margin-top: 16px;
+          margin-top: 18px;
           font-size: 18px;
           font-weight: 800;
           text-align: center;
