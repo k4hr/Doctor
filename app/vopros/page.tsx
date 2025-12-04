@@ -52,7 +52,7 @@ export default function VoprosPage() {
             className="text-input"
             placeholder="Краткий заголовок вопроса"
           />
-          <p className="field-hинt">
+          <p className="field-hint">
             Например: «Что делать, если морозит и чувствуется слабость?»
           </p>
         </label>
@@ -94,18 +94,15 @@ export default function VoprosPage() {
         .ask-page {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
-          background: radial-gradient(
-            circle at bottom left,
-            #e0fbea 0,
-            #f9fafb 40%,
-            #ffffff 80%
-          );
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          /* НИКАКОГО своего background — берём общий фон приложения */
           font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
             sans-serif;
         }
 
-        /* Больше не карточка: просто контейнер для отступов,
-           без собственного фона и тени */
+        /* Просто вертикальный контейнер, без карточки */
         .ask-card {
           margin-top: 4px;
           padding-bottom: 12px;
