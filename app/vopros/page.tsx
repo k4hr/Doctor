@@ -52,7 +52,7 @@ export default function VoprosPage() {
             className="text-input"
             placeholder="Краткий заголовок вопроса"
           />
-          <p className="field-hint">
+          <p className="field-hинt">
             Например: «Что делать, если морозит и чувствуется слабость?»
           </p>
         </label>
@@ -104,12 +104,14 @@ export default function VoprosPage() {
             sans-serif;
         }
 
+        /* Больше не карточка: просто контейнер для отступов,
+           без собственного фона и тени */
         .ask-card {
           margin-top: 4px;
-          padding: 18px 16px 20px;
-          border-radius: 20px;
-          background: #ffffff;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+          padding-bottom: 12px;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
         }
 
         .ask-header {
