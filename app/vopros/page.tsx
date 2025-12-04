@@ -2,7 +2,7 @@
 'use client';
 
 import TopBarBack from '../../components/TopBarBack';
-import { VRACHI_LIST } from '../../lib/vrachi';
+import { VRACHI_LIST } from '../lib/vrachi';
 
 export default function VoprosPage() {
   return (
@@ -44,7 +44,7 @@ export default function VoprosPage() {
           </p>
         </label>
 
-        {/* Краткий заголовок */}
+        {/* Заголовок */}
         <label className="field">
           <span className="field-label">Заголовок вопроса</span>
           <input
@@ -84,8 +84,7 @@ export default function VoprosPage() {
         <button
           type="button"
           className="ask-submit"
-          // TODO: обработчик отправки
-          onClick={() => null}
+          onClick={() => null} // TODO: сабмит
         >
           Отправить вопрос
         </button>
