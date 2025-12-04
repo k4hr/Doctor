@@ -1,6 +1,8 @@
 /* path: components/DownBarUtil/vrachionline.tsx */
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 export type Doctor = {
   id: number;
   name: string;
@@ -41,9 +43,16 @@ function haptic(type: 'light' | 'medium' = 'light') {
 
 /** Блок "Врачи онлайн" для доунбара (заглушка) */
 export default function VrachiOnlineBlock() {
+  const router = useRouter();
+
   const handleDoctorClick = (id: number) => {
     haptic('light');
     console.log('open doctor', id);
+  };
+
+  const handleAllDoctorsClick = () => {
+    haptic('medium');
+    router.push('/hamburger/vrachi');
   };
 
   return (
@@ -79,6 +88,15 @@ export default function VrachiOnlineBlock() {
             </button>
           ))}
         </div>
+
+        {/* Кнопка "Все врачи" под списком */}
+        <button
+          type="button"
+          className="doconline-all"
+          onClick={handleAllDoctorsClick}
+        >
+          Все врачи
+        </button>
       </section>
 
       <style jsx>{`
@@ -126,6 +144,7 @@ export default function VrachiOnlineBlock() {
           gap: 10px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          text-align: left; /* чтобы спец-ть была как у имени */
         }
 
         .doconline-card:active {
@@ -201,6 +220,27 @@ export default function VrachiOnlineBlock() {
         .doconline-rating {
           color: #166534;
           font-weight: 600;
+        }
+
+        .doconline-all {
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(34, 197, 94, 0.7);
+          background: rgba(255, 255, 255, 0.96);
+          color: #166534;
+          font-size: 13px;
+          font-weight: 600;
+          text-align: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 8px 18px rgba(22, 163, 74, 0.12);
+        }
+
+        .doconline-all:active {
+          transform: scale(0.98);
+          box-shadow: 0 5px 12px rgba(22, 163, 74, 0.2);
         }
       `}</style>
     </>
