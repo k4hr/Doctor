@@ -24,7 +24,7 @@ const MODES: ModeCard[] = [
     price: 'Бесплатно',
     color: 'gray',
     features: [
-      { good: true, text: 'Вопрос попадает в обшую очередь' },
+      { good: true, text: 'Вопрос попадает в общую очередь' },
       { good: false, text: 'Нет гарантии получения ответа' },
       { good: true, text: 'Среднее время публикации около 2-3 часов' },
     ],
