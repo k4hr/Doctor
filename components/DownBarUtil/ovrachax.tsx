@@ -12,43 +12,58 @@ type Feature = {
   label: string;
   title: string;
   description: string;
-  color: 'blue' | 'green' | 'yellow';
+  color: 'blue' | 'green' | 'yellow' | 'red';
 };
 
 const FEATURES: Feature[] = [
   {
     id: 1,
-    label: '01',
+    label: '1',
     title: 'Широкий выбор специалистов',
-    description: 'Врачи почти всех направлений — от терапевта до узких профилей.',
+    description:
+      'Врачи почти всех направлений — от терапевта до узких профилей.',
     color: 'blue',
   },
   {
     id: 2,
-    label: '02',
+    label: '2',
     title: 'Подтверждённое образование',
-    description: 'Документы проверяются администрацией сервиса перед допуском к приёму.',
+    description:
+      'Документы проверяются администрацией сервиса перед допуском к приёму.',
     color: 'green',
   },
   {
     id: 3,
-    label: '03',
+    label: '3',
     title: 'Рейтинг по отзывам пациентов',
-    description: 'Оценка врача формируется на основе реальных консультаций.',
+    description:
+      'Оценка врача формируется на основе реальных консультаций.',
     color: 'yellow',
+  },
+  {
+    id: 4,
+    label: '4',
+    title: 'Всегда есть врач онлайн',
+    description:
+      'Часть специалистов дежурит постоянно, поэтому ваш вопрос не останется без внимания.',
+    color: 'red',
   },
 ];
 
 export default function OvrachaxBlock() {
   const handleAskClick = () => {
     haptic('medium');
-    // TODO: переход на страницу вопроса /vopros
+    // TODO: реальный переход на /vopros
     console.log('go to /vopros');
   };
 
   return (
     <>
       <section className="ovrachax">
+        <header className="ovrachax-header">
+          <h2>Квалифицированные консультации врачей</h2>
+        </header>
+
         {FEATURES.map((f) => (
           <div key={f.id} className="ovrachax-item">
             <div className={`ovrachax-circle ovrachax-circle--${f.color}`}>
@@ -83,6 +98,17 @@ export default function OvrachaxBlock() {
             'Segoe UI', sans-serif;
         }
 
+        .ovrachax-header {
+          margin-bottom: 4px;
+        }
+
+        .ovrachax-header h2 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 800;
+          color: #111827;
+        }
+
         .ovrachax-item {
           width: 100%;
           display: flex;
@@ -100,28 +126,50 @@ export default function OvrachaxBlock() {
           justify-content: center;
           font-size: 26px;
           font-weight: 800;
+          border-width: 8px;
+          border-style: solid;
+          /* базовая прозрачная обводка, дальше переопределяем стороны */
+          border-color: rgba(148, 163, 184, 0.12);
         }
 
         .ovrachax-circle span {
           transform: translateY(2px);
         }
 
+        /* 1 — синий, жирный сегмент смотрит ВВЕРХ */
         .ovrachax-circle--blue {
-          border: 8px solid rgba(59, 130, 246, 0.25);
-          border-top-color: rgba(59, 130, 246, 0.8);
+          border-top-color: rgba(59, 130, 246, 0.9);
+          border-right-color: rgba(59, 130, 246, 0.2);
+          border-bottom-color: rgba(59, 130, 246, 0.1);
+          border-left-color: rgba(59, 130, 246, 0.2);
           color: rgba(37, 99, 235, 1);
         }
 
+        /* 2 — зелёный, жирный сегмент смотрит ВПРАВО */
         .ovrachax-circle--green {
-          border: 8px solid rgba(34, 197, 94, 0.25);
-          border-top-color: rgba(34, 197, 94, 0.8);
+          border-right-color: rgba(34, 197, 94, 0.9);
+          border-bottom-color: rgba(34, 197, 94, 0.2);
+          border-left-color: rgba(34, 197, 94, 0.1);
+          border-top-color: rgba(34, 197, 94, 0.2);
           color: rgba(22, 163, 74, 1);
         }
 
+        /* 3 — жёлтый, жирный сегмент смотрит ВНИЗ */
         .ovrachax-circle--yellow {
-          border: 8px solid rgba(234, 179, 8, 0.25);
-          border-top-color: rgba(234, 179, 8, 0.9);
+          border-bottom-color: rgba(234, 179, 8, 0.95);
+          border-left-color: rgba(234, 179, 8, 0.25);
+          border-top-color: rgba(234, 179, 8, 0.12);
+          border-right-color: rgba(234, 179, 8, 0.25);
           color: rgba(202, 138, 4, 1);
+        }
+
+        /* 4 — красный, жирный сегмент смотрит ВЛЕВО */
+        .ovrachax-circle--red {
+          border-left-color: rgba(239, 68, 68, 0.95);
+          border-top-color: rgba(239, 68, 68, 0.25);
+          border-right-color: rgba(239, 68, 68, 0.12);
+          border-bottom-color: rgba(239, 68, 68, 0.25);
+          color: rgba(185, 28, 28, 1);
         }
 
         .ovrachax-text {
