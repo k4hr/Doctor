@@ -4,6 +4,7 @@
 import { useEffect } from 'react';
 import TopBar from '../components/TopBar';
 import MainSearch from '../components/MainSearch';
+import DownBar from '../components/DownBar';
 
 type Question = {
   id: number;
@@ -70,112 +71,126 @@ export default function FeedPage() {
 
   const handleQuestionClick = (q: Question) => {
     haptic('light');
-    // TODO: открыть конкретный вопрос, когда появится /question/[id]
     console.log('open question', q.id);
   };
 
   const handleAskClick = () => {
     haptic('medium');
-    // TODO: открыть форму создания вопроса
     console.log('open ask form');
   };
 
   const handleSearchClick = () => {
     haptic('light');
-    // TODO: фокус на инпут или открыть отдельный экран поиска
     console.log('search click');
   };
 
   const handleFiltersClick = () => {
     haptic('light');
-    // TODO: открыть модал с фильтрами (списки врачей и т.п.)
     console.log('filters click');
   };
 
   const handleSortClick = () => {
     haptic('light');
-    // TODO: переключатель платные/бесплатные
     console.log('sort click');
   };
 
   return (
     <main className="feed">
-      {/* При скролле эта панель остаётся прилепленной сверху */}
-      <TopBar />
+      {/* ВСЁ содержимое страницы */}
+      <div className="feed-content">
+        {/* Топбар */}
+        <TopBar />
 
-      {/* Зелёная кнопка "Задать вопрос" сразу под топбаром */}
-      <div className="feed-ask-wrap">
-        <button type="button" className="feed-ask-btn" onClick={handleAskClick}>
-          Задать вопрос
-        </button>
-      </div>
-
-      {/* Строка поиска вынесена в компонент */}
-      <MainSearch onClick={handleSearchClick} />
-
-      {/* Ряд: слева фильтры, справа сортировка */}
-      <div className="feed-filters-row">
-        <button
-          type="button"
-          className="pill-btn pill-btn--ghost"
-          onClick={handleFiltersClick}
-        >
-          Фильтры
-        </button>
-        <button
-          type="button"
-          className="pill-btn pill-btn--outline"
-          onClick={handleSortClick}
-        >
-          Платные / Бесплатные
-        </button>
-      </div>
-
-      <section className="feed-list" aria-label="Онлайн-вопросы пациентов">
-        {QUESTIONS.map((q) => (
+        {/* Зелёная кнопка "Задать вопрос" */}
+        <div className="feed-ask-wrap">
           <button
-            key={q.id}
             type="button"
-            className="q-card"
-            onClick={() => handleQuestionClick(q)}
+            className="feed-ask-btn"
+            onClick={handleAskClick}
           >
-            <div className="q-top">
-              <h2 className="q-title">{q.title}</h2>
-              <span
-                className={
-                  'q-status ' +
-                  (q.status === 'answering'
-                    ? 'q-status--answering'
-                    : q.status === 'waiting'
-                    ? 'q-status--waiting'
-                    : 'q-status--done')
-                }
-              >
-                {q.status === 'answering' && 'Врач отвечает'}
-                {q.status === 'waiting' && 'Ожидает врача'}
-                {q.status === 'done' && 'Ответ готов'}
-              </span>
-            </div>
-            <p className="q-snippet">{q.snippet}</p>
-            <div className="q-meta">
-              <span className="q-chip">{q.speciality}</span>
-              <span className="q-time">{q.timeAgo}</span>
-            </div>
+            Задать вопрос
           </button>
-        ))}
-      </section>
+        </div>
 
-      <footer className="feed-footer">
-        <p>
-          Хотите задать свой вопрос?{' '}
-          <span className="feed-link">Скоро добавим кнопку для пациентов</span>
-        </p>
-      </footer>
+        {/* Поиск */}
+        <MainSearch onClick={handleSearchClick} />
+
+        {/* Фильтры / сортировка */}
+        <div className="feed-filters-row">
+          <button
+            type="button"
+            className="pill-btn pill-btn--ghost"
+            onClick={handleFiltersClick}
+          >
+            Фильтры
+          </button>
+          <button
+            type="button"
+            className="pill-btn pill-btn--outline"
+            onClick={handleSortClick}
+          >
+            Платные / Бесплатные
+          </button>
+        </div>
+
+        {/* Лента вопросов */}
+        <section className="feed-list" aria-label="Онлайн-вопросы пациентов">
+          {QUESTIONS.map((q) => (
+            <button
+              key={q.id}
+              type="button"
+              className="q-card"
+              onClick={() => handleQuestionClick(q)}
+            >
+              <div className="q-top">
+                <h2 className="q-title">{q.title}</h2>
+                <span
+                  className={
+                    'q-status ' +
+                    (q.status === 'answering'
+                      ? 'q-status--answering'
+                      : q.status === 'waiting'
+                      ? 'q-status--waiting'
+                      : 'q-status--done')
+                  }
+                >
+                  {q.status === 'answering' && 'Врач отвечает'}
+                  {q.status === 'waiting' && 'Ожидает врача'}
+                  {q.status === 'done' && 'Ответ готов'}
+                </span>
+              </div>
+              <p className="q-snippet">{q.snippet}</p>
+              <div className="q-meta">
+                <span className="q-chip">{q.speciality}</span>
+                <span className="q-time">{q.timeAgo}</span>
+              </div>
+            </button>
+          ))}
+        </section>
+
+        <footer className="feed-footer">
+          <p>
+            Хотите задать свой вопрос?{' '}
+            <span className="feed-link">
+              Скоро добавим кнопку для пациентов
+            </span>
+          </p>
+        </footer>
+      </div>
+
+      {/* DownBar всегда внизу, потому что main — flex и у контента flex:1 */}
+      <DownBar />
 
       <style jsx>{`
         .feed {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .feed-content {
+          flex: 1;
           display: flex;
           flex-direction: column;
           gap: 18px;
