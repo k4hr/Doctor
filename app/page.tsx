@@ -184,7 +184,8 @@ export default function FeedPage() {
       <style jsx>{`
         .feed {
           min-height: 100dvh;
-          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+          padding: 16px 16px
+            calc(env(safe-area-inset-bottom, 0px) + 96px); /* нижний запас под DownBar + sticky TopBar */
           display: flex;
           flex-direction: column;
         }
