@@ -126,28 +126,41 @@ export default function VozmojnostiBlock() {
           padding: 20px 18px 22px;
           scroll-snap-align: center;
           border: 1px solid rgba(15, 23, 42, 0.08);
-          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
           background: #ffffff;
+          /* одна маленькая чёрная тень для всех */
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
         }
 
-        /* ===== Цветовые варианты карточек ===== */
+        /* ===== Цветовые варианты карточек (без цветных теней) ===== */
 
         .vozmo-card--gray {
-          background: radial-gradient(circle at top left, #f9fafb 0, #f3f4f6 45%, #ffffff 85%);
-          border-color: rgba(148, 163, 184, 0.45);
-          box-shadow: 0 12px 28px rgba(148, 163, 184, 0.35);
+          background: radial-gradient(
+            circle at top left,
+            #f9fafb 0,
+            #f3f4f6 45%,
+            #ffffff 85%
+          );
+          border-color: rgba(148, 163, 184, 0.5);
         }
 
         .vozmo-card--gold {
-          background: radial-gradient(circle at top left, #fffbeb 0, #fef3c7 45%, #ffffff 90%);
-          border-color: rgba(217, 119, 6, 0.55);
-          box-shadow: 0 16px 38px rgba(250, 204, 21, 0.8); /* золотая подсветка */
+          background: radial-gradient(
+            circle at top left,
+            #fffbeb 0,
+            #fef3c7 45%,
+            #ffffff 90%
+          );
+          border-color: rgba(217, 119, 6, 0.5);
         }
 
         .vozmo-card--red {
-          background: radial-gradient(circle at top left, #fef2f2 0, #fee2e2 45%, #ffffff 90%);
-          border-color: rgba(220, 38, 38, 0.6);
-          box-shadow: 0 18px 40px rgba(248, 113, 113, 0.9); /* красное свечение */
+          background: radial-gradient(
+            circle at top left,
+            #fef2f2 0,
+            #fee2e2 45%,
+            #ffffff 90%
+          );
+          border-color: rgba(220, 38, 38, 0.5);
         }
 
         .vozmo-badge {
