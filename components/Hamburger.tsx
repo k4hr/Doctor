@@ -82,6 +82,13 @@ export default function Hamburger() {
     router.push('/vopros');
   };
 
+  // большая кнопка "Я врач"
+  const goVracham = () => {
+    haptic('medium');
+    closeMenu();
+    router.push('/vracham'); // маршрут для кабинета/анкеты врача
+  };
+
   return (
     <>
       {/* Кнопка "три полоски" */}
@@ -127,6 +134,15 @@ export default function Hamburger() {
             <button type="button">О нас</button>
             <button type="button">Контакты</button>
           </nav>
+
+          {/* Большая нижняя кнопка "Я врач" */}
+          <button
+            type="button"
+            className="side-doctor-btn"
+            onClick={goVracham}
+          >
+            Я врач
+          </button>
         </div>
       </aside>
 
@@ -251,6 +267,31 @@ export default function Hamburger() {
         .side-items button:active {
           transform: scale(0.98);
           opacity: 0.8;
+        }
+
+        /* Большая нижняя кнопка "Я врач" */
+        .side-doctor-btn {
+          margin-top: 40px;
+          width: 100%;
+          max-width: 260px;
+          padding: 14px 16px;
+          border-radius: 999px;
+          border: 1.5px solid rgba(34, 197, 94, 0.9);
+          background: #ffffff;
+          color: #22c55e;
+          font-size: 16px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          text-align: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 8px 20px rgba(34, 197, 94, 0.18);
+        }
+
+        .side-doctor-btn:active {
+          transform: scale(0.98);
+          box-shadow: 0 6px 14px rgba(34, 197, 94, 0.28);
         }
 
         body.menu-open .menu-overlay {
