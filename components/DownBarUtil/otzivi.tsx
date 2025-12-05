@@ -114,15 +114,6 @@ export default function OtziviBlock() {
         <h2 className="otzivi-title">Отзывы наших пользователей</h2>
 
         <div className="otzivi-card-wrap">
-          <button
-            type="button"
-            className="otzivi-arrow otzivi-arrow--left"
-            onClick={handlePrev}
-            aria-label="Предыдущий отзыв"
-          >
-            ‹
-          </button>
-
           <article className="otzivi-card">
             <div className="otzivi-stars">★★★★★</div>
 
@@ -133,32 +124,44 @@ export default function OtziviBlock() {
               <span className="otzivi-name">{current.name}</span>
             </div>
           </article>
+        </div>
+
+        {/* Контролы: стрелки + точки в одной линии под карточкой */}
+        <div className="otzivi-controls">
+          <button
+            type="button"
+            className="otzivi-arrow"
+            onClick={handlePrev}
+            aria-label="Предыдущий отзыв"
+          >
+            ‹
+          </button>
+
+          <div className="otzivi-dots">
+            {REVIEWS.map((r, i) => (
+              <button
+                key={r.id}
+                type="button"
+                className={
+                  'otzivi-dot' + (i === index ? ' otzivi-dot--active' : '')
+                }
+                onClick={() => {
+                  haptic('light');
+                  setIndex(i);
+                }}
+                aria-label={`Перейти к отзыву ${i + 1}`}
+              />
+            ))}
+          </div>
 
           <button
             type="button"
-            className="otzivi-arrow otzivi-arrow--right"
+            className="otzivi-arrow"
             onClick={handleNext}
             aria-label="Следующий отзыв"
           >
             ›
           </button>
-        </div>
-
-        <div className="otzivi-dots">
-          {REVIEWS.map((r, i) => (
-            <button
-              key={r.id}
-              type="button"
-              className={
-                'otzivi-dot' + (i === index ? ' otzivi-dot--active' : '')
-              }
-              onClick={() => {
-                haptic('light');
-                setIndex(i);
-              }}
-              aria-label={`Перейти к отзыву ${i + 1}`}
-            />
-          ))}
         </div>
       </section>
 
@@ -194,16 +197,11 @@ export default function OtziviBlock() {
         }
 
         .otzivi-card-wrap {
-          position: relative;
           width: 100%;
           max-width: 420px;
-          display: flex;
-          align-items: stretch;
-          justify-content: center;
         }
 
         .otzivi-card {
-          flex: 1;
           background: #ffffff;
           border-radius: 22px;
           padding: 18px 18px 16px;
@@ -249,10 +247,18 @@ export default function OtziviBlock() {
           color: #111827;
         }
 
+        /* Стрелки + точки под карточкой */
+        .otzivi-controls {
+          margin-top: 6px;
+          width: 100%;
+          max-width: 420px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
         .otzivi-arrow {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
           width: 32px;
           height: 32px;
           border-radius: 999px;
@@ -268,24 +274,16 @@ export default function OtziviBlock() {
           -webkit-tap-highlight-color: transparent;
         }
 
-        .otzivi-arrow--left {
-          left: -6px;
-        }
-
-        .otzivi-arrow--right {
-          right: -6px;
-        }
-
         .otzivi-arrow:active {
-          transform: translateY(-50%) scale(0.96);
+          transform: scale(0.96);
           box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
         }
 
         .otzivi-dots {
+          flex: 1;
           display: flex;
           gap: 6px;
           justify-content: center;
-          margin-top: 4px;
         }
 
         .otzivi-dot {
