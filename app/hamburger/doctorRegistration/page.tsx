@@ -23,11 +23,10 @@ export default function DoctorRegistrationPage() {
 
     try {
       (window as any)?.Telegram?.WebApp?.showAlert?.(
-        'Анкета врача сохранена (черновик). Позже подключим отправку на сервер.'
+        'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
       );
     } catch {
-      // fallback
-      alert('Анкета врача сохранена (черновик).');
+      alert('Анкета врача сохранена.');
     }
   };
 
@@ -77,7 +76,7 @@ export default function DoctorRegistrationPage() {
             <input
               name="middleName"
               type="text"
-              placeholder="Отчество (при наличии)"
+              placeholder="Отчество (по желанию)"
               className="docreg-input"
             />
           </label>
@@ -108,10 +107,10 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">Дата рождения</span>
             <div className="docreg-dob-row">
               <input
-                name="birthYear"
+                name="birthDay"
                 type="number"
                 inputMode="numeric"
-                placeholder="Год"
+                placeholder="День"
                 className="docreg-input"
               />
               <input
@@ -122,10 +121,10 @@ export default function DoctorRegistrationPage() {
                 className="docreg-input"
               />
               <input
-                name="birthDay"
+                name="birthYear"
                 type="number"
                 inputMode="numeric"
-                placeholder="День"
+                placeholder="Год"
                 className="docreg-input"
               />
             </div>
@@ -146,18 +145,19 @@ export default function DoctorRegistrationPage() {
         <section className="docreg-card">
           <h2 className="docreg-card-title">Профессиональные навыки</h2>
 
-          <label className="docreg-field">
+          <div className="docreg-field">
             <span className="docreg-label">
-              Специализация<span className="req">*</span>
+              Специализации<span className="req">*</span>
             </span>
+
             <select
-              name="speciality"
+              name="speciality1"
               required
               className="docreg-input docreg-select"
               defaultValue=""
             >
               <option value="" disabled>
-                Выберите специализацию
+                Основная специализация
               </option>
               {VRACHI_LIST.map((spec) => (
                 <option key={spec} value={spec}>
@@ -165,11 +165,43 @@ export default function DoctorRegistrationPage() {
                 </option>
               ))}
             </select>
+
+            <select
+              name="speciality2"
+              className="docreg-input docreg-select docreg-select-second"
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Дополнительная специализация (по желанию)
+              </option>
+              {VRACHI_LIST.map((spec) => (
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
+              ))}
+            </select>
+
+            <select
+              name="speciality3"
+              className="docreg-input docreg-select docreg-select-third"
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Ещё одна специализация (по желанию)
+              </option>
+              {VRACHI_LIST.map((spec) => (
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
+              ))}
+            </select>
+
             <span className="docreg-hint">
-              Позже добавим выбор нескольких специальностей и загрузку
-              сертификатов.
+              Выберите до трёх специальностей, по которым у вас есть профильное
+              образование и по которым вы сможете консультировать и подтвердить
+              квалификацию документами.
             </span>
-          </label>
+          </div>
 
           <label className="docreg-field">
             <span className="docreg-label">
@@ -250,31 +282,14 @@ export default function DoctorRegistrationPage() {
           <h2 className="docreg-card-title">Контактные данные</h2>
 
           <label className="docreg-field">
-            <span className="docreg-label">Телефон</span>
-            <input
-              name="phone"
-              type="tel"
-              placeholder="+7..."
-              className="docreg-input"
-            />
-          </label>
-
-          <label className="docreg-field">
-            <span className="docreg-label">E-mail</span>
+            <span className="docreg-label">
+              E-mail<span className="req">*</span>
+            </span>
             <input
               name="email"
               type="email"
+              required
               placeholder="doctor@example.com"
-              className="docreg-input"
-            />
-          </label>
-
-          <label className="docreg-field">
-            <span className="docreg-label">Ссылка на профиль</span>
-            <input
-              name="profileLink"
-              type="url"
-              placeholder="Личная страница, сайт или соцсети (опционально)"
               className="docreg-input"
             />
           </label>
@@ -295,6 +310,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={3}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
 
           <label className="docreg-field">
@@ -308,6 +326,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={3}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
 
           <label className="docreg-field">
@@ -321,6 +342,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={3}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
 
           <label className="docreg-field">
@@ -331,6 +355,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={2}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
 
           <label className="docreg-field">
@@ -341,6 +368,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={2}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
 
           <label className="docreg-field">
@@ -351,6 +381,9 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={2}
             />
+            <span className="docreg-hint">
+              Это поле будет отображаться в вашем профиле.
+            </span>
           </label>
         </section>
 
@@ -359,8 +392,8 @@ export default function DoctorRegistrationPage() {
         </button>
 
         <p className="docreg-footnote">
-          Это черновой вариант анкеты. Позже добавим загрузку документов и
-          полноценную модерацию.
+          Нажимая «Сохранить анкету», вы подтверждаете корректность указанных
+          данных.
         </p>
       </form>
 
@@ -373,7 +406,7 @@ export default function DoctorRegistrationPage() {
           gap: 16px;
           font-family: Montserrat, Manrope, system-ui, -apple-system,
             'Segoe UI', sans-serif;
-          background: #f3f4f6;
+          background: #f9fafb;
         }
 
         .docreg-title {
@@ -463,6 +496,11 @@ export default function DoctorRegistrationPage() {
           padding-right: 28px;
         }
 
+        .docreg-select-second,
+        .docreg-select-third {
+          margin-top: 6px;
+        }
+
         .docreg-hint {
           font-size: 11px;
           color: #9ca3af;
@@ -520,6 +558,7 @@ export default function DoctorRegistrationPage() {
           margin: 6px 4px 0;
           font-size: 11px;
           color: #9ca3af;
+          text-align: left;
         }
       `}</style>
     </main>
