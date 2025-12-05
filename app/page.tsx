@@ -96,11 +96,11 @@ export default function FeedPage() {
 
   return (
     <main className="feed">
-      {/* ВСЁ содержимое страницы */}
-      <div className="feed-content">
-        {/* Топбар */}
-        <TopBar />
+      {/* sticky-контейнер для TopBar — теперь это весь main */}
+      <TopBar />
 
+      {/* Всё остальное содержимое, включая DownBar */}
+      <section className="feed-main">
         {/* Зелёная кнопка "Задать вопрос" */}
         <div className="feed-ask-wrap">
           <button
@@ -176,25 +176,26 @@ export default function FeedPage() {
             </span>
           </p>
         </footer>
-      </div>
 
-      {/* DownBar всегда внизу, потому что main — flex и у контента flex:1 */}
-      <DownBar />
+        {/* DownBar — просто последний блок страницы */}
+        <DownBar />
+      </section>
 
       <style jsx>{`
         .feed {
           min-height: 100dvh;
           padding: 16px 16px
-            calc(env(safe-area-inset-bottom, 0px) + 96px); /* нижний запас под DownBar + sticky TopBar */
-          display: flex;
-          flex-direction: column;
+            calc(env(safe-area-inset-bottom, 0px) + 24px);
+          /* без flex, просто обычный поток. sticky у TopBar теперь
+             ограничен всей высотой main, куда входит и DownBar */
         }
 
-        .feed-content {
-          flex: 1;
+        .feed-main {
+          margin-top: 12px;
           display: flex;
           flex-direction: column;
           gap: 18px;
+          padding-bottom: 72px; /* небольшой запас, чтобы внизу было что скроллить */
         }
 
         /* Обёртка зелёной кнопки под хедером */
@@ -225,7 +226,6 @@ export default function FeedPage() {
           box-shadow: 0 6px 14px rgba(36, 199, 104, 0.4);
         }
 
-        /* ====== ФИЛЬТРЫ / СОРТИРОВКА — компактные ====== */
         .feed-filters-row {
           margin-top: 12px;
           display: flex;
@@ -262,7 +262,6 @@ export default function FeedPage() {
           opacity: 0.9;
         }
 
-        /* ====== ЛЕНТА ВОПРОСОВ ====== */
         .feed-list {
           display: flex;
           flex-direction: column;
