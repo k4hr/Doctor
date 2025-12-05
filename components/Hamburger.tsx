@@ -129,7 +129,6 @@ export default function Hamburger() {
               Врачи
             </button>
 
-            <button type="button">Врачам</button>
             <button type="button">Помощь</button>
             <button type="button">О нас</button>
             <button type="button">Контакты</button>
