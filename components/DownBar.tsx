@@ -4,6 +4,7 @@
 import VrachiOnlineBlock from './DownBarUtil/vrachionline';
 import OvrachaxBlock from './DownBarUtil/ovrachax';
 import VozmojnostiBlock from './DownBarUtil/vozmojnosti';
+import MiniInfoBlock from './DownBarUtil/miniinfo';
 
 /**
  * Общий DownBar — просто блок в конце страницы.
@@ -15,6 +16,7 @@ export default function DownBar() {
         <VrachiOnlineBlock />
         <OvrachaxBlock />
         <VozmojnostiBlock />
+        <MiniInfoBlock />
       </section>
 
       <style jsx>{`
