@@ -82,11 +82,11 @@ export default function Hamburger() {
     router.push('/vopros');
   };
 
-  // большая кнопка "Я врач"
+  // большая кнопка "Я врач" → инфостраница для врачей
   const goVracham = () => {
     haptic('medium');
     closeMenu();
-    router.push('/vracham'); // маршрут для кабинета/анкеты врача
+    router.push('/hamburger/doctorRegistration/Infopage');
   };
 
   return (
