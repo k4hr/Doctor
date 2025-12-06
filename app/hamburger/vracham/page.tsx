@@ -74,8 +74,8 @@ export default function DoctorInfoPage() {
           вопроса и внутренних правил сервиса.
         </p>
         <p className="docinfo-text">
-          Начисления копятся на внутреннем балансе. Вывод средств —
-          по указанным реквизитам (счёт ИП, самозанятый, карта и т.д.).
+          Начисления копятся на внутреннем балансе. Вывод средств — по
+          указанным реквизитам (счёт ИП, самозанятый, карта и т.д.).
         </p>
       </section>
 
@@ -110,12 +110,9 @@ export default function DoctorInfoPage() {
           gap: 14px;
           font-family: Montserrat, Manrope, system-ui, -apple-system,
             'Segoe UI', sans-serif;
-          background: radial-gradient(
-            circle at top,
-            #e0f7f0 0,
-            #f3f4f6 45%,
-            #f9fafb 100%
-          );
+          background: #f9fafb; /* простой светлый фон, без серых пятен */
+          overflow-x: hidden; /* убираем горизонтальный скролл */
+          box-sizing: border-box;
         }
 
         .docinfo-title {
@@ -147,11 +144,7 @@ export default function DoctorInfoPage() {
 
         .docinfo-card--accent {
           border-color: rgba(248, 113, 113, 0.25);
-          background: linear-gradient(
-            135deg,
-            rgba(248, 250, 252, 1),
-            rgba(254, 242, 242, 1)
-          );
+          background: #fef2f2;
         }
 
         .docinfo-card-title {
