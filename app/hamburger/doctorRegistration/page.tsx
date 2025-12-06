@@ -400,13 +400,10 @@ export default function DoctorRegistrationPage() {
       <style jsx>{`
         .docreg {
           min-height: 100dvh;
-          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          font-family: Montserrat, Manrope, system-ui, -apple-system,
-            'Segoe UI', sans-serif;
-          background: #f9fafb;
+          padding: 16px 16px
+            calc(env(safe-area-inset-bottom, 0px) + 24px);
+          /* без flex, чтобы TopBarBack работал как на главной */
+          overflow-x: hidden; /* убираем горизонтальный скролл */
         }
 
         .docreg-title {
@@ -433,6 +430,7 @@ export default function DoctorRegistrationPage() {
           flex-direction: column;
           gap: 14px;
           margin-top: 4px;
+          padding-bottom: 72px;
         }
 
         .docreg-card {
@@ -478,6 +476,7 @@ export default function DoctorRegistrationPage() {
           font-size: 14px;
           outline: none;
           background: #ffffff;
+          box-sizing: border-box; /* чтобы поля не вылезали за контейнер */
         }
 
         .docreg-input:focus,
