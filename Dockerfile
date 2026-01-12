@@ -32,7 +32,7 @@ COPY . .
 # создаём public, даже если её нет в репо
 RUN mkdir -p public
 
-# Собираем Next-приложение
+# Собираем Next-приложение (у тебя в package.json build: "npx prisma generate && next build" или аналог)
 RUN npm run build
 
 # ---------- deps-prod ----------
@@ -42,7 +42,11 @@ WORKDIR /app
 COPY package.json ./
 COPY package-lock.json* ./
 
-# Важно: НЕ использовать --ignore-scripts, чтобы next подтянул свой бинарь
+# ✅ ВАЖНО: Prisma schema должна быть доступна во время postinstall (prisma generate)
+# Копируем только prisma-часть (быстро и безопасно)
+COPY prisma ./prisma
+
+# Важно: НЕ использовать --ignore-scripts, чтобы postinstall (prisma generate) отработал
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev --no-audit --no-fund ; \
     else \
