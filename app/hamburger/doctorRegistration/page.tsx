@@ -37,7 +37,9 @@ export default function DoctorRegistrationPage() {
       <h1 className="docreg-title">Анкета врача</h1>
       <p className="docreg-sub">
         Заполните основные данные. Эти сведения помогут пациентам найти вас в
-        сервисе <span className="brand">ВРАЧИ.ТУТ</span>.
+        сервисе{' '}
+        <span className="brand-black">ВРАЧИ.</span>
+        <span className="brand-green">ТУТ</span>.
       </p>
 
       <form className="docreg-form" onSubmit={handleSubmit}>
@@ -401,7 +403,6 @@ export default function DoctorRegistrationPage() {
         .docreg {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-          /* ВАЖНО: НЕ ставим overflow на родителя sticky-топбара */
         }
 
         .docreg-title {
@@ -418,7 +419,12 @@ export default function DoctorRegistrationPage() {
           color: #6b7280;
         }
 
-        .brand {
+        .brand-black {
+          font-weight: 800;
+          color: #111827;
+        }
+
+        .brand-green {
           font-weight: 800;
           color: #24c768;
         }
