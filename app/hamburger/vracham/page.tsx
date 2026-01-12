@@ -1,4 +1,3 @@
-/* path: app/hamburger/vracham/page.tsx */
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -20,10 +19,8 @@ export default function DoctorInfoPage() {
 
   return (
     <main className="docinfo-page">
-      {/* хедер с кнопкой "назад" — как обычный TopBar, просто другой компонент */}
       <TopBarBack />
 
-      {/* основной контент страницы, по структуре как feed-main */}
       <section className="docinfo-main">
         <h1 className="docinfo-title">Работа с сервисом для врачей</h1>
         <p className="docinfo-sub">
@@ -32,7 +29,8 @@ export default function DoctorInfoPage() {
           зарабатывать на платных консультациях.
         </p>
 
-        <section className="docinfo-card docinfo-card--accent">
+        {/* ЗОЛОТОЙ АКЦЕНТ */}
+        <section className="docinfo-card docinfo-card--gold">
           <p className="docinfo-accent-title">
             Возможность дохода на онлайн-консультациях
           </p>
@@ -48,7 +46,8 @@ export default function DoctorInfoPage() {
           <ol className="docinfo-ol">
             <li>
               Заполнить анкету врача и отправить её на модерацию в сервисе{' '}
-              <span className="brand">ВРАЧИ.ТУТ</span>.
+              <span className="brand-black">ВРАЧИ.</span>
+              <span className="brand-green">ТУТ</span>.
             </li>
             <li>
               Подтвердить контакты и загрузить документы, подтверждающие
@@ -85,9 +84,7 @@ export default function DoctorInfoPage() {
         <section className="docinfo-card">
           <h2 className="docinfo-card-title">Преимущества для врача</h2>
           <ul className="docinfo-ul">
-            <li>
-              Дополнительный источник дохода за счёт онлайн-консультаций.
-            </li>
+            <li>Дополнительный источник дохода за счёт онлайн-консультаций.</li>
             <li>Реклама собственных услуг и приёма.</li>
             <li>
               Привлечение новых пациентов через персональный профиль в сервисе.
@@ -109,15 +106,11 @@ export default function DoctorInfoPage() {
       </section>
 
       <style jsx>{`
-        /* главный контейнер — как .feed на главной */
         .docinfo-page {
           min-height: 100dvh;
-          padding: 16px 16px
-            calc(env(safe-area-inset-bottom, 0px) + 24px);
-          /* без flex, обычный поток — чтобы sticky/TopBarBack вёл себя так же */
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
         }
 
-        /* основной контент — как feed-main */
         .docinfo-main {
           margin-top: 12px;
           display: flex;
@@ -140,7 +133,12 @@ export default function DoctorInfoPage() {
           color: #6b7280;
         }
 
-        .brand {
+        .brand-black {
+          font-weight: 800;
+          color: #111827;
+        }
+
+        .brand-green {
           font-weight: 800;
           color: #24c768;
         }
@@ -148,14 +146,18 @@ export default function DoctorInfoPage() {
         .docinfo-card {
           background: #ffffff;
           border-radius: 18px;
-          padding: 14px 14px 13px;
+          padding: 14px;
           box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
           border: 1px solid rgba(15, 23, 42, 0.04);
         }
 
-        .docinfo-card--accent {
-          border-color: rgba(248, 113, 113, 0.25);
-          background: #fef2f2;
+        /* 🟡 ЗОЛОТОЙ БЛОК */
+        .docinfo-card--gold {
+          background: linear-gradient(180deg, #fff8e1, #fffdf5);
+          border: 1px solid rgba(212, 175, 55, 0.55);
+          box-shadow:
+            0 0 0 1px rgba(212, 175, 55, 0.15),
+            0 10px 28px rgba(212, 175, 55, 0.35);
         }
 
         .docinfo-card-title {
@@ -168,8 +170,8 @@ export default function DoctorInfoPage() {
         .docinfo-accent-title {
           margin: 0 0 6px;
           font-size: 15px;
-          font-weight: 700;
-          color: #b91c1c;
+          font-weight: 800;
+          color: #9c7a19;
         }
 
         .docinfo-text {
@@ -194,20 +196,12 @@ export default function DoctorInfoPage() {
           color: #374151;
         }
 
-        .docinfo-ol li {
-          margin-bottom: 4px;
-        }
-
         .docinfo-ul {
           margin: 4px 0;
           padding-left: 18px;
           font-size: 13px;
           line-height: 1.5;
           color: #374151;
-        }
-
-        .docinfo-ul li {
-          margin-bottom: 4px;
         }
 
         .docinfo-cta {
@@ -220,15 +214,12 @@ export default function DoctorInfoPage() {
           color: #ffffff;
           font-size: 16px;
           font-weight: 700;
-          text-align: center;
           cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
         }
 
         .docinfo-cta:active {
           transform: scale(0.98);
-          box-shadow: 0 6px 16px rgba(36, 199, 104, 0.45);
         }
 
         .docinfo-footnote {
