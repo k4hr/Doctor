@@ -11,22 +11,74 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
+function getTelegramInitData(): string {
+  try {
+    return (window as any)?.Telegram?.WebApp?.initData || '';
+  } catch {
+    return '';
+  }
+}
+
 export default function DoctorRegistrationPage() {
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     haptic('medium');
 
     const form = e.currentTarget;
     const data = Object.fromEntries(new FormData(form).entries());
 
-    console.log('doctor registration form:', data);
+    // Берём initData (это НЕ файл, а строка, которую Telegram передаёт WebApp)
+    const initData = getTelegramInitData();
+
+    if (!initData) {
+      const msg =
+        'Не удалось получить данные Telegram. Откройте анкету именно через Telegram (WebApp).';
+      try {
+        (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
+      } catch {
+        alert(msg);
+      }
+      return;
+    }
 
     try {
-      (window as any)?.Telegram?.WebApp?.showAlert?.(
-        'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
-      );
-    } catch {
-      alert('Анкета врача сохранена.');
+      const res = await fetch('/api/doctor/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, initData }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        const msg =
+          j?.error === 'BAD_HASH'
+            ? 'Ошибка проверки Telegram (BAD_HASH). Проверь TELEGRAM_BOT_TOKEN на сервере.'
+            : 'Ошибка сохранения анкеты. Попробуйте ещё раз.';
+        try {
+          (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
+        } catch {
+          alert(msg);
+        }
+        return;
+      }
+
+      try {
+        (window as any)?.Telegram?.WebApp?.showAlert?.(
+          'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
+        );
+      } catch {
+        alert(
+          'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = 'Сеть/сервер недоступны. Попробуйте позже.';
+      try {
+        (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
+      } catch {
+        alert(msg);
+      }
     }
   };
 
