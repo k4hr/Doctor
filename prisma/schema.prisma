@@ -1,0 +1,65 @@
+/* path: prisma/schema.prisma */
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DoctorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Doctor {
+  id        String       @id @default(cuid())
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  status    DoctorStatus @default(PENDING)
+
+  // Привязка к Telegram-пользователю
+  telegramId        String  @unique
+  telegramUsername  String?
+  telegramFirstName String?
+  telegramLastName  String?
+
+  // БЛОК 1 — Личные данные
+  lastName    String
+  firstName   String
+  middleName  String?
+  gender      String
+  birthDay    Int?
+  birthMonth  Int?
+  birthYear   Int?
+  city        String?
+
+  // БЛОК 2 — Профессиональные навыки
+  speciality1     String
+  speciality2     String?
+  speciality3     String?
+  education       String
+  degree          String?
+  workplace       String?
+  position        String?
+  experienceYears Int
+  awards          String?
+
+  // БЛОК 3 — Контактные данные
+  email String
+
+  // БЛОК 4 — Дополнительно
+  about             String
+  specialityDetails String
+  experienceDetails String
+  courses           String?
+  achievements      String?
+  publications      String?
+
+  @@index([status])
+  @@index([speciality1])
+  @@index([city])
+}
