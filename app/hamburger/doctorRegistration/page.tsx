@@ -400,10 +400,8 @@ export default function DoctorRegistrationPage() {
       <style jsx>{`
         .docreg {
           min-height: 100dvh;
-          padding: 16px 16px
-            calc(env(safe-area-inset-bottom, 0px) + 24px);
-          /* без flex, чтобы TopBarBack работал как на главной */
-          overflow-x: hidden; /* убираем горизонтальный скролл */
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          /* ВАЖНО: НЕ ставим overflow на родителя sticky-топбара */
         }
 
         .docreg-title {
@@ -439,6 +437,8 @@ export default function DoctorRegistrationPage() {
           padding: 16px 14px 14px;
           box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
           border: 1px solid rgba(15, 23, 42, 0.04);
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .docreg-card-title {
@@ -476,7 +476,8 @@ export default function DoctorRegistrationPage() {
           font-size: 14px;
           outline: none;
           background: #ffffff;
-          box-sizing: border-box; /* чтобы поля не вылезали за контейнер */
+          box-sizing: border-box;
+          max-width: 100%;
         }
 
         .docreg-input:focus,
@@ -542,7 +543,6 @@ export default function DoctorRegistrationPage() {
           color: #ffffff;
           font-size: 16px;
           font-weight: 700;
-          text-align: center;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
