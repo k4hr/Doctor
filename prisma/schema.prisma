@@ -1,5 +1,3 @@
-/* path: prisma/schema.prisma */
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -21,23 +19,23 @@ model Doctor {
   updatedAt DateTime     @updatedAt
   status    DoctorStatus @default(PENDING)
 
-  // Привязка к Telegram-пользователю
+  // Telegram
   telegramId        String  @unique
   telegramUsername  String?
   telegramFirstName String?
   telegramLastName  String?
 
-  // БЛОК 1 — Личные данные
-  lastName    String
-  firstName   String
-  middleName  String?
-  gender      String
-  birthDay    Int?
-  birthMonth  Int?
-  birthYear   Int?
-  city        String?
+  // Личные данные
+  lastName   String
+  firstName  String
+  middleName String?
+  gender     String
+  birthDay   Int?
+  birthMonth Int?
+  birthYear  Int?
+  city       String?
 
-  // БЛОК 2 — Профессиональные навыки
+  // Профессиональные данные
   speciality1     String
   speciality2     String?
   speciality3     String?
@@ -48,10 +46,10 @@ model Doctor {
   experienceYears Int
   awards          String?
 
-  // БЛОК 3 — Контактные данные
+  // Контакты
   email String
 
-  // БЛОК 4 — Дополнительно
+  // Дополнительно
   about             String
   specialityDetails String
   experienceDetails String
