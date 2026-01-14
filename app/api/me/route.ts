@@ -17,16 +17,19 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
 
   params.delete('hash');
 
+  // data_check_string
   const dataCheckString = [...params.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join('\n');
 
+  // secret_key = HMAC_SHA256("WebAppData", bot_token)
   const secretKey = crypto
     .createHmac('sha256', 'WebAppData')
     .update(botToken)
     .digest();
 
+  // hash = HMAC_SHA256(secret_key, data_check_string)
   const computedHash = crypto
     .createHmac('sha256', secretKey)
     .update(dataCheckString)
@@ -69,9 +72,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
-    }
+    if (!body) return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
 
     const initData = body?.initData as string | undefined;
     if (!initData) {
