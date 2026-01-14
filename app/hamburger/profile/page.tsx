@@ -18,18 +18,20 @@ type TgUserUnsafe = {
   last_name?: string;
 };
 
-function getTgUserFromInitData(): TgUserUnsafe | null {
+function getTelegramInitData(): string {
   try {
-    const initData = (window as any)?.Telegram?.WebApp?.initData as
-      | string
-      | undefined;
+    return (window as any)?.Telegram?.WebApp?.initData || '';
+  } catch {
+    return '';
+  }
+}
 
+function getTgUserFromInitData(initData: string): TgUserUnsafe | null {
+  try {
     if (!initData) return null;
-
     const params = new URLSearchParams(initData);
     const userStr = params.get('user');
     if (!userStr) return null;
-
     const u = JSON.parse(userStr);
     return u || null;
   } catch {
@@ -37,16 +39,21 @@ function getTgUserFromInitData(): TgUserUnsafe | null {
   }
 }
 
-function getTgUserUnsafe(): TgUserUnsafe | null {
+function getTgUser(): TgUserUnsafe | null {
   try {
-    // 1) быстрый путь
-    const u = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
-    if (u) return u;
+    const webApp = (window as any)?.Telegram?.WebApp;
+    const unsafeUser = webApp?.initDataUnsafe?.user;
+    if (unsafeUser) return unsafeUser;
 
-    // 2) запасной путь — парсим initData
-    return getTgUserFromInitData();
+    const initData = webApp?.initData || '';
+    const parsed = getTgUserFromInitData(initData);
+    if (parsed) return parsed;
+
+    return null;
   } catch {
-    return getTgUserFromInitData();
+    // на всякий
+    const initData = getTelegramInitData();
+    return getTgUserFromInitData(initData);
   }
 }
 
@@ -57,12 +64,11 @@ function getDisplayName(u: TgUserUnsafe | null): string {
 
   if (first || last) return [first, last].filter(Boolean).join(' ');
   if (user) return `@${user}`;
-
   return 'пользователь';
 }
 
 function isAdminTelegramId(id: string): boolean {
-  // В .env задай:
+  // .env:
   // NEXT_PUBLIC_ADMIN_TELEGRAM_IDS="123,456,789"
   const raw = (process.env.NEXT_PUBLIC_ADMIN_TELEGRAM_IDS || '').trim();
   if (!raw) return false;
@@ -82,7 +88,27 @@ export default function ProfilePage() {
   const [tgUser, setTgUser] = useState<TgUserUnsafe | null>(null);
 
   useEffect(() => {
-    setTgUser(getTgUserUnsafe());
+    // просим Telegram “докинуть” данные
+    try {
+      (window as any)?.Telegram?.WebApp?.ready?.();
+    } catch {}
+
+    // ретраи (важно для десктопа: данные часто приходят не мгновенно)
+    let tries = 0;
+    const maxTries = 30; // ~3 секунды при интервале 100мс
+
+    const tick = () => {
+      const u = getTgUser();
+      if (u) {
+        setTgUser(u);
+        return;
+      }
+      tries += 1;
+      if (tries >= maxTries) return;
+      setTimeout(tick, 100);
+    };
+
+    tick();
   }, []);
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
@@ -112,7 +138,6 @@ export default function ProfilePage() {
         Здравствуйте <span className="profile-name">{displayName}</span>
       </p>
 
-      {/* быстрые действия */}
       <section className="profile-card">
         <button
           type="button"
@@ -151,7 +176,6 @@ export default function ProfilePage() {
         </button>
       </section>
 
-      {/* админ-меню (видно только admin id) */}
       {isAdmin && (
         <section className="profile-card admin">
           <h2 className="profile-card-title">Админ-меню</h2>
