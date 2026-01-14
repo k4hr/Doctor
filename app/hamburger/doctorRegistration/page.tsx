@@ -65,15 +65,19 @@ export default function DoctorRegistrationPage() {
         return;
       }
 
+      // ✅ УСПЕХ: идём на следующий шаг (загрузка фото/диплома)
+      // (doctorId можно вытащить из ответа, если понадобится позже)
+      await res.json().catch(() => ({}));
+
       try {
         (window as any)?.Telegram?.WebApp?.showAlert?.(
-          'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
+          'Анкета сохранена. Теперь загрузите фото и диплом.'
         );
       } catch {
-        alert(
-          'Анкета врача сохранена. В ближайшее время мы свяжемся с вами в Telegram.'
-        );
+        alert('Анкета сохранена. Теперь загрузите фото и диплом.');
       }
+
+      router.push('/hamburger/doctorRegistration/docs');
     } catch (err) {
       console.error(err);
       const msg = 'Сеть/сервер недоступны. Попробуйте позже.';
@@ -462,8 +466,7 @@ export default function DoctorRegistrationPage() {
         </button>
 
         <p className="docreg-footnote">
-          Нажимая «Далее», вы подтверждаете корректность указанных
-          данных.
+          Нажимая «Далее», вы подтверждаете корректность указанных данных.
         </p>
       </form>
 
