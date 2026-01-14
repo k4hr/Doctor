@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import TopBarBack from '../../components/TopBarBack';
+import TopBarBack from '../../../components/TopBarBack';
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -66,7 +66,10 @@ export default function ProfilePage() {
     return String(v);
   }, [tgUser]);
 
-  const isAdmin = useMemo(() => (telegramId ? isAdminTelegramId(telegramId) : false), [telegramId]);
+  const isAdmin = useMemo(
+    () => (telegramId ? isAdminTelegramId(telegramId) : false),
+    [telegramId]
+  );
 
   const go = (path: string) => {
     haptic('light');
@@ -84,22 +87,38 @@ export default function ProfilePage() {
 
       {/* быстрые действия */}
       <section className="profile-card">
-        <button className="profile-btn" onClick={() => go('/hamburger/questions')}>
+        <button
+          type="button"
+          className="profile-btn"
+          onClick={() => go('/hamburger/questions')}
+        >
           <span className="profile-btn-title">Вопросы</span>
           <span className="profile-btn-sub">Актуальные и архив</span>
         </button>
 
-        <button className="profile-btn" onClick={() => go('/hamburger/consultations')}>
+        <button
+          type="button"
+          className="profile-btn"
+          onClick={() => go('/hamburger/consultations')}
+        >
           <span className="profile-btn-title">Консультации</span>
           <span className="profile-btn-sub">Ваши консультации</span>
         </button>
 
-        <button className="profile-btn" onClick={() => go('/hamburger/history')}>
+        <button
+          type="button"
+          className="profile-btn"
+          onClick={() => go('/hamburger/history')}
+        >
           <span className="profile-btn-title">История операций</span>
           <span className="profile-btn-sub">Платежи и списания</span>
         </button>
 
-        <button className="profile-btn" onClick={() => go('/hamburger/profile/edit')}>
+        <button
+          type="button"
+          className="profile-btn"
+          onClick={() => go('/hamburger/profile/edit')}
+        >
           <span className="profile-btn-title">Редактирование профиля</span>
           <span className="profile-btn-sub">Данные и настройки</span>
         </button>
@@ -110,7 +129,11 @@ export default function ProfilePage() {
         <section className="profile-card admin">
           <h2 className="profile-card-title">Админ-меню</h2>
 
-          <button className="profile-btn adminBtn" onClick={() => go('/hamburger/admin/doctors')}>
+          <button
+            type="button"
+            className="profile-btn adminBtn"
+            onClick={() => go('/hamburger/admin/doctors')}
+          >
             <span className="profile-btn-title">Анкеты врачей на проверку</span>
             <span className="profile-btn-sub">Модерация и статусы</span>
           </button>
