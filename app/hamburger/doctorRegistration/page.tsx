@@ -2,6 +2,7 @@
 'use client';
 
 import { FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../components/TopBarBack';
 import { VRACHI_LIST } from '../../lib/vrachi';
 
@@ -20,6 +21,8 @@ function getTelegramInitData(): string {
 }
 
 export default function DoctorRegistrationPage() {
+  const router = useRouter();
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     haptic('medium');
@@ -87,6 +90,19 @@ export default function DoctorRegistrationPage() {
       <TopBarBack />
 
       <h1 className="docreg-title">Анкета врача</h1>
+
+      {/* ✅ НОВОЕ: ссылка на требования */}
+      <button
+        type="button"
+        className="docreg-treb-link"
+        onClick={() => {
+          haptic('light');
+          router.push('/hamburger/doctorRegistration/treb');
+        }}
+      >
+        Требования по заполнению профиля
+      </button>
+
       <p className="docreg-sub">
         Заполните основные данные. Эти сведения помогут пациентам найти вас в
         сервисе{' '}
@@ -462,6 +478,25 @@ export default function DoctorRegistrationPage() {
           font-size: 24px;
           font-weight: 900;
           color: #111827;
+        }
+
+        /* ✅ НОВОЕ: стили ссылки */
+        .docreg-treb-link {
+          margin: 6px 0 0;
+          padding: 0;
+          background: transparent;
+          border: none;
+          display: inline-block;
+          font-size: 13px;
+          font-weight: 700;
+          color: #2563eb;
+          text-align: left;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .docreg-treb-link:active {
+          opacity: 0.7;
         }
 
         .docreg-sub {
