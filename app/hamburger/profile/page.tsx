@@ -11,12 +11,16 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-type TgUserUnsafe = {
-  id?: number | string;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
+type TgUser = {
+  id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
 };
+
+type MeResponse =
+  | { ok: true; user: TgUser; doctor: { id: string; status: string } | null }
+  | { ok: false; error: string; hint?: string };
 
 function getTelegramInitData(): string {
   try {
@@ -26,38 +30,7 @@ function getTelegramInitData(): string {
   }
 }
 
-function getTgUserFromInitData(initData: string): TgUserUnsafe | null {
-  try {
-    if (!initData) return null;
-    const params = new URLSearchParams(initData);
-    const userStr = params.get('user');
-    if (!userStr) return null;
-    const u = JSON.parse(userStr);
-    return u || null;
-  } catch {
-    return null;
-  }
-}
-
-function getTgUser(): TgUserUnsafe | null {
-  try {
-    const webApp = (window as any)?.Telegram?.WebApp;
-    const unsafeUser = webApp?.initDataUnsafe?.user;
-    if (unsafeUser) return unsafeUser;
-
-    const initData = webApp?.initData || '';
-    const parsed = getTgUserFromInitData(initData);
-    if (parsed) return parsed;
-
-    return null;
-  } catch {
-    // на всякий
-    const initData = getTelegramInitData();
-    return getTgUserFromInitData(initData);
-  }
-}
-
-function getDisplayName(u: TgUserUnsafe | null): string {
+function getDisplayName(u: TgUser | null): string {
   const first = (u?.first_name || '').trim();
   const last = (u?.last_name || '').trim();
   const user = (u?.username || '').trim();
@@ -85,40 +58,49 @@ function isAdminTelegramId(id: string): boolean {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [tgUser, setTgUser] = useState<TgUserUnsafe | null>(null);
+
+  const [tgUser, setTgUser] = useState<TgUser | null>(null);
+  const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // просим Telegram “докинуть” данные
     try {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
-    // ретраи (важно для десктопа: данные часто приходят не мгновенно)
-    let tries = 0;
-    const maxTries = 30; // ~3 секунды при интервале 100мс
+    const initData = getTelegramInitData();
+    if (!initData) {
+      setLoading(false);
+      return;
+    }
 
-    const tick = () => {
-      const u = getTgUser();
-      if (u) {
-        setTgUser(u);
-        return;
+    (async () => {
+      try {
+        const res = await fetch('/api/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData }),
+        });
+
+        const j = (await res.json().catch(() => null)) as MeResponse | null;
+
+        if (!res.ok || !j || (j as any).ok !== true) {
+          setLoading(false);
+          return;
+        }
+
+        setTgUser(j.user);
+        setDoctorStatus(j.doctor?.status ?? null);
+        setLoading(false);
+      } catch (e) {
+        console.error(e);
+        setLoading(false);
       }
-      tries += 1;
-      if (tries >= maxTries) return;
-      setTimeout(tick, 100);
-    };
-
-    tick();
+    })();
   }, []);
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
-
-  const telegramId = useMemo(() => {
-    const v = tgUser?.id;
-    if (v === undefined || v === null) return '';
-    return String(v);
-  }, [tgUser]);
-
+  const telegramId = useMemo(() => (tgUser?.id ? String(tgUser.id) : ''), [tgUser]);
   const isAdmin = useMemo(
     () => (telegramId ? isAdminTelegramId(telegramId) : false),
     [telegramId]
@@ -134,9 +116,17 @@ export default function ProfilePage() {
       <TopBarBack />
 
       <h1 className="profile-title">Мой профиль</h1>
+
       <p className="profile-hello">
-        Здравствуйте <span className="profile-name">{displayName}</span>
+        Здравствуйте{' '}
+        <span className="profile-name">{loading ? '...' : displayName}</span>
       </p>
+
+      {doctorStatus && (
+        <p className="profile-status">
+          Статус анкеты врача: <b>{doctorStatus}</b>
+        </p>
+      )}
 
       <section className="profile-card">
         <button
@@ -210,7 +200,7 @@ export default function ProfilePage() {
         }
 
         .profile-hello {
-          margin: 6px 0 12px;
+          margin: 6px 0 6px;
           font-size: 14px;
           line-height: 1.45;
           color: #374151;
@@ -219,6 +209,12 @@ export default function ProfilePage() {
         .profile-name {
           font-weight: 800;
           color: #111827;
+        }
+
+        .profile-status {
+          margin: 0 0 12px;
+          font-size: 12px;
+          color: #6b7280;
         }
 
         .profile-card {
