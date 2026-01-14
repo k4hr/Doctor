@@ -18,6 +18,13 @@ type TgUser = {
   last_name: string | null;
 };
 
+type TgUserUnsafe = {
+  id?: number | string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
 type MeResponse =
   | { ok: true; user: TgUser; doctor: { id: string; status: string } | null }
   | { ok: false; error: string; hint?: string };
@@ -30,13 +37,35 @@ function getTelegramInitData(): string {
   }
 }
 
+function getTgUserUnsafe(): TgUserUnsafe | null {
+  try {
+    return (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user || null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeUnsafe(u: TgUserUnsafe | null): TgUser | null {
+  if (!u) return null;
+  const id = u.id === undefined || u.id === null ? '' : String(u.id);
+  if (!id) return null;
+
+  return {
+    id,
+    username: u.username ? String(u.username) : null,
+    first_name: u.first_name ? String(u.first_name) : null,
+    last_name: u.last_name ? String(u.last_name) : null,
+  };
+}
+
+// ✅ Приоритет: @username → first last → пользователь
 function getDisplayName(u: TgUser | null): string {
+  const user = (u?.username || '').trim();
   const first = (u?.first_name || '').trim();
   const last = (u?.last_name || '').trim();
-  const user = (u?.username || '').trim();
 
-  if (first || last) return [first, last].filter(Boolean).join(' ');
   if (user) return `@${user}`;
+  if (first || last) return [first, last].filter(Boolean).join(' ');
   return 'пользователь';
 }
 
@@ -52,7 +81,6 @@ function isAdminTelegramId(id: string): boolean {
       .map((x) => x.trim())
       .filter(Boolean)
   );
-
   return set.has(id);
 }
 
@@ -64,10 +92,15 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1) Сразу пробуем взять имя локально (чтобы не было "пользователь")
+    const unsafeUser = normalizeUnsafe(getTgUserUnsafe());
+    if (unsafeUser) setTgUser(unsafeUser);
+
     try {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
+    // 2) Потом подтягиваем с сервера (проверка подписи + статус анкеты)
     const initData = getTelegramInitData();
     if (!initData) {
       setLoading(false);
@@ -101,6 +134,7 @@ export default function ProfilePage() {
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
   const telegramId = useMemo(() => (tgUser?.id ? String(tgUser.id) : ''), [tgUser]);
+
   const isAdmin = useMemo(
     () => (telegramId ? isAdminTelegramId(telegramId) : false),
     [telegramId]
@@ -119,7 +153,7 @@ export default function ProfilePage() {
 
       <p className="profile-hello">
         Здравствуйте{' '}
-        <span className="profile-name">{loading ? '...' : displayName}</span>
+        <span className="profile-name">{loading && !tgUser ? '...' : displayName}</span>
       </p>
 
       {doctorStatus && (
