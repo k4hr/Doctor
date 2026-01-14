@@ -458,11 +458,11 @@ export default function DoctorRegistrationPage() {
         </section>
 
         <button type="submit" className="docreg-submit">
-          Сохранить анкету
+          Далее
         </button>
 
         <p className="docreg-footnote">
-          Нажимая «Сохранить анкету», вы подтверждаете корректность указанных
+          Нажимая «Далее», вы подтверждаете корректность указанных
           данных.
         </p>
       </form>
