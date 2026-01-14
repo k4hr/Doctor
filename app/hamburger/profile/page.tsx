@@ -37,6 +37,19 @@ function getTelegramInitData(): string {
   }
 }
 
+function getInitDataFromUrl(): string {
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const a = (sp.get('tgWebAppData') || '').trim();
+    if (a) return a;
+    const b = (sp.get('initData') || '').trim();
+    if (b) return b;
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 function getTgUserUnsafe(): TgUserUnsafe | null {
   try {
     return (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user || null;
@@ -57,7 +70,7 @@ function normalizeUnsafe(u: TgUserUnsafe | null): TgUser | null {
   };
 }
 
-// ✅ Приоритет: @username → first last → пользователь
+// Приоритет: @username → first last → пользователь
 function getDisplayName(u: TgUser | null): string {
   const username = (u?.username || '').trim();
   const first = (u?.first_name || '').trim();
@@ -85,9 +98,10 @@ export default function ProfilePage() {
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authHint, setAuthHint] = useState<string | null>(null);
 
   useEffect(() => {
-    // Сразу показываем то, что есть локально
+    // Мгновенно показываем то, что есть локально
     const local = normalizeUnsafe(getTgUserUnsafe());
     if (local) setTgUser(local);
 
@@ -95,8 +109,10 @@ export default function ProfilePage() {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
-    const initData = getTelegramInitData();
+    const initData = getTelegramInitData().trim() || getInitDataFromUrl().trim();
+
     if (!initData) {
+      setAuthHint('Нет initData от Telegram. Откройте приложение через кнопку WebApp в боте (BotFather preview часто не отдаёт initData).');
       setLoading(false);
       return;
     }
@@ -112,6 +128,7 @@ export default function ProfilePage() {
         const j = (await res.json().catch(() => null)) as MeResponse | null;
 
         if (!res.ok || !j || (j as any).ok !== true) {
+          setAuthHint((j as any)?.hint || (j as any)?.error || 'Не удалось загрузить профиль');
           setLoading(false);
           return;
         }
@@ -121,6 +138,7 @@ export default function ProfilePage() {
         setLoading(false);
       } catch (e) {
         console.error(e);
+        setAuthHint('Сеть/сервер недоступны');
         setLoading(false);
       }
     })();
@@ -144,6 +162,8 @@ export default function ProfilePage() {
       <p className="profile-hello">
         Здравствуйте <span className="profile-name">{loading && !tgUser ? '...' : displayName}</span>
       </p>
+
+      {authHint && <p className="profile-hint">{authHint}</p>}
 
       {doctorStatus && (
         <p className="profile-status">
@@ -211,6 +231,13 @@ export default function ProfilePage() {
         .profile-name {
           font-weight: 800;
           color: #111827;
+        }
+
+        .profile-hint {
+          margin: 0 0 12px;
+          font-size: 12px;
+          color: #ef4444;
+          line-height: 1.35;
         }
 
         .profile-status {
