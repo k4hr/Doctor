@@ -49,7 +49,6 @@ function normalizeUnsafe(u: TgUserUnsafe | null): TgUser | null {
   if (!u) return null;
   const id = u.id === undefined || u.id === null ? '' : String(u.id);
   if (!id) return null;
-
   return {
     id,
     username: u.username ? String(u.username) : null,
@@ -60,21 +59,17 @@ function normalizeUnsafe(u: TgUserUnsafe | null): TgUser | null {
 
 // ✅ Приоритет: @username → first last → пользователь
 function getDisplayName(u: TgUser | null): string {
-  const user = (u?.username || '').trim();
+  const username = (u?.username || '').trim();
   const first = (u?.first_name || '').trim();
   const last = (u?.last_name || '').trim();
-
-  if (user) return `@${user}`;
+  if (username) return `@${username}`;
   if (first || last) return [first, last].filter(Boolean).join(' ');
   return 'пользователь';
 }
 
 function isAdminTelegramId(id: string): boolean {
-  // .env:
-  // NEXT_PUBLIC_ADMIN_TELEGRAM_IDS="123,456,789"
   const raw = (process.env.NEXT_PUBLIC_ADMIN_TELEGRAM_IDS || '').trim();
   if (!raw) return false;
-
   const set = new Set(
     raw
       .split(',')
@@ -92,15 +87,14 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1) Сразу пробуем взять имя локально (чтобы не было "пользователь")
-    const unsafeUser = normalizeUnsafe(getTgUserUnsafe());
-    if (unsafeUser) setTgUser(unsafeUser);
+    // Сразу показываем то, что есть локально
+    const local = normalizeUnsafe(getTgUserUnsafe());
+    if (local) setTgUser(local);
 
     try {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
-    // 2) Потом подтягиваем с сервера (проверка подписи + статус анкеты)
     const initData = getTelegramInitData();
     if (!initData) {
       setLoading(false);
@@ -134,11 +128,7 @@ export default function ProfilePage() {
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
   const telegramId = useMemo(() => (tgUser?.id ? String(tgUser.id) : ''), [tgUser]);
-
-  const isAdmin = useMemo(
-    () => (telegramId ? isAdminTelegramId(telegramId) : false),
-    [telegramId]
-  );
+  const isAdmin = useMemo(() => (telegramId ? isAdminTelegramId(telegramId) : false), [telegramId]);
 
   const go = (path: string) => {
     haptic('light');
@@ -152,8 +142,7 @@ export default function ProfilePage() {
       <h1 className="profile-title">Мой профиль</h1>
 
       <p className="profile-hello">
-        Здравствуйте{' '}
-        <span className="profile-name">{loading && !tgUser ? '...' : displayName}</span>
+        Здравствуйте <span className="profile-name">{loading && !tgUser ? '...' : displayName}</span>
       </p>
 
       {doctorStatus && (
@@ -163,38 +152,22 @@ export default function ProfilePage() {
       )}
 
       <section className="profile-card">
-        <button
-          type="button"
-          className="profile-btn"
-          onClick={() => go('/hamburger/questions')}
-        >
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/questions')}>
           <span className="profile-btn-title">Вопросы</span>
           <span className="profile-btn-sub">Актуальные и архив</span>
         </button>
 
-        <button
-          type="button"
-          className="profile-btn"
-          onClick={() => go('/hamburger/consultations')}
-        >
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/consultations')}>
           <span className="profile-btn-title">Консультации</span>
           <span className="profile-btn-sub">Ваши консультации</span>
         </button>
 
-        <button
-          type="button"
-          className="profile-btn"
-          onClick={() => go('/hamburger/history')}
-        >
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/history')}>
           <span className="profile-btn-title">История операций</span>
           <span className="profile-btn-sub">Платежи и списания</span>
         </button>
 
-        <button
-          type="button"
-          className="profile-btn"
-          onClick={() => go('/hamburger/profile/edit')}
-        >
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/profile/edit')}>
           <span className="profile-btn-title">Редактирование профиля</span>
           <span className="profile-btn-sub">Данные и настройки</span>
         </button>
@@ -204,18 +177,13 @@ export default function ProfilePage() {
         <section className="profile-card admin">
           <h2 className="profile-card-title">Админ-меню</h2>
 
-          <button
-            type="button"
-            className="profile-btn adminBtn"
-            onClick={() => go('/hamburger/admin/doctors')}
-          >
+          <button type="button" className="profile-btn adminBtn" onClick={() => go('/hamburger/admin/doctors')}>
             <span className="profile-btn-title">Анкеты врачей на проверку</span>
             <span className="profile-btn-sub">Модерация и статусы</span>
           </button>
 
           <p className="adminHint">
-            Админ-доступ включается через переменную{' '}
-            <span className="mono">NEXT_PUBLIC_ADMIN_TELEGRAM_IDS</span>.
+            Админ-доступ: <span className="mono">NEXT_PUBLIC_ADMIN_TELEGRAM_IDS</span>
           </p>
         </section>
       )}
@@ -318,8 +286,8 @@ export default function ProfilePage() {
         }
 
         .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-            'Liberation Mono', 'Courier New', monospace;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+            monospace;
           font-size: 11px;
           color: #6b7280;
         }
