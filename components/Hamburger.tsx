@@ -10,9 +10,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 /**
- * Лочим скролл:
- *  - фиксируем body
- *  - при закрытии возвращаем, как было
+ * Лочим скролл
  */
 function lockBodyScroll() {
   try {
@@ -55,36 +53,19 @@ export default function Hamburger() {
 
   const openMenu = () => {
     haptic('light');
-    try {
-      document.body.classList.add('menu-open');
-      lockBodyScroll();
-    } catch {}
+    document.body.classList.add('menu-open');
+    lockBodyScroll();
   };
 
   const closeMenu = () => {
-    try {
-      document.body.classList.remove('menu-open');
-      unlockBodyScroll();
-    } catch {}
+    document.body.classList.remove('menu-open');
+    unlockBodyScroll();
   };
 
-  const goVrachi = () => {
-    haptic('light');
+  const go = (path: string, h: 'light' | 'medium' = 'light') => {
+    haptic(h);
     closeMenu();
-    router.push('/hamburger/vrachi');
-  };
-
-  const goVopros = () => {
-    haptic('medium');
-    closeMenu();
-    router.push('/vopros');
-  };
-
-  // БОЛЬШАЯ КНОПКА "Я ВРАЧ" → инфостраница врачам
-  const goVracham = () => {
-    haptic('medium');
-    closeMenu();
-    router.push('/hamburger/vracham'); // <-- ПРАВИЛЬНЫЙ маршрут
+    router.push(path);
   };
 
   return (
@@ -101,40 +82,52 @@ export default function Hamburger() {
 
       {/* Шторка */}
       <aside className="side-menu">
-        {/* Закрыть */}
         <button type="button" className="side-close" onClick={closeMenu}>
           ✕
         </button>
 
         <div className="side-inner">
-          {/* Основная зелёная кнопка */}
+          {/* Основная кнопка */}
           <button
             type="button"
             className="side-primary-btn"
-            onClick={goVopros}
+            onClick={() => go('/vopros', 'medium')}
           >
             Задать вопрос
           </button>
 
-          {/* Пункты меню */}
+          {/* Меню */}
           <nav className="side-items">
-            <button type="button">Мой профиль</button>
-            <button type="button">Консультации</button>
+            <button onClick={() => go('/hamburger/profile')}>
+              Мой профиль
+            </button>
 
-            <button type="button" onClick={goVrachi}>
+            <button onClick={() => go('/hamburger/consultations')}>
+              Консультации
+            </button>
+
+            <button onClick={() => go('/hamburger/vrachi')}>
               Врачи
             </button>
 
-            <button type="button">Помощь</button>
-            <button type="button">О нас</button>
-            <button type="button">Контакты</button>
+            <button onClick={() => go('/hamburger/help')}>
+              Помощь
+            </button>
+
+            <button onClick={() => go('/hamburger/about')}>
+              О нас
+            </button>
+
+            <button onClick={() => go('/hamburger/contacts')}>
+              Контакты
+            </button>
           </nav>
 
           {/* Кнопка врачам */}
           <button
             type="button"
             className="side-doctor-btn"
-            onClick={goVracham}
+            onClick={() => go('/hamburger/vracham', 'medium')}
           >
             Я врач
           </button>
@@ -145,14 +138,12 @@ export default function Hamburger() {
         .menu-btn {
           width: 32px;
           height: 26px;
-          padding: 0;
           border: none;
           background: transparent;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
         }
 
         .menu-btn span {
@@ -160,7 +151,6 @@ export default function Hamburger() {
           width: 100%;
           background: #0b0c10;
           border-radius: 2px;
-          transition: 0.2s;
         }
 
         .menu-overlay {
@@ -185,14 +175,13 @@ export default function Hamburger() {
           transition: right 0.28s ease;
           z-index: 9999;
           box-shadow: -4px 0 22px rgba(0, 0, 0, 0.12);
-          font-family: Montserrat, Manrope, sans-serif;
         }
 
         .side-close {
           position: absolute;
           top: calc(env(safe-area-inset-top) + 56px);
           right: 18px;
-          background: transparent;
+          background: none;
           border: none;
           font-size: 20px;
           cursor: pointer;
@@ -209,16 +198,13 @@ export default function Hamburger() {
         .side-primary-btn {
           width: 100%;
           max-width: 260px;
-          padding: 14px 16px;
+          padding: 14px;
           border-radius: 999px;
           background: #24c768;
           color: #fff;
-          font-size: 16px;
           font-weight: 700;
           border: none;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.35);
           margin-bottom: 32px;
-          cursor: pointer;
         }
 
         .side-items {
@@ -231,11 +217,9 @@ export default function Hamburger() {
         }
 
         .side-items button {
-          padding: 4px 0;
-          font-size: 16px;
-          font-weight: 500;
           border: none;
           background: none;
+          font-size: 16px;
           color: #374151;
           cursor: pointer;
         }
@@ -244,15 +228,13 @@ export default function Hamburger() {
           margin-top: 40px;
           width: 100%;
           max-width: 260px;
-          padding: 14px 16px;
+          padding: 14px;
           border-radius: 999px;
-          border: 1.5px solid rgba(34, 197, 94, 0.9);
-          background: #ffffff;
+          border: 1.5px solid #22c55e;
+          background: #fff;
           color: #22c55e;
           font-weight: 800;
           text-transform: uppercase;
-          box-shadow: 0 8px 20px rgba(34, 197, 94, 0.18);
-          cursor: pointer;
         }
 
         body.menu-open .menu-overlay {
