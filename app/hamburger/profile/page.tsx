@@ -18,12 +18,35 @@ type TgUserUnsafe = {
   last_name?: string;
 };
 
-function getTgUserUnsafe(): TgUserUnsafe | null {
+function getTgUserFromInitData(): TgUserUnsafe | null {
   try {
-    const u = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
+    const initData = (window as any)?.Telegram?.WebApp?.initData as
+      | string
+      | undefined;
+
+    if (!initData) return null;
+
+    const params = new URLSearchParams(initData);
+    const userStr = params.get('user');
+    if (!userStr) return null;
+
+    const u = JSON.parse(userStr);
     return u || null;
   } catch {
     return null;
+  }
+}
+
+function getTgUserUnsafe(): TgUserUnsafe | null {
+  try {
+    // 1) быстрый путь
+    const u = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (u) return u;
+
+    // 2) запасной путь — парсим initData
+    return getTgUserFromInitData();
+  } catch {
+    return getTgUserFromInitData();
   }
 }
 
@@ -31,8 +54,10 @@ function getDisplayName(u: TgUserUnsafe | null): string {
   const first = (u?.first_name || '').trim();
   const last = (u?.last_name || '').trim();
   const user = (u?.username || '').trim();
+
   if (first || last) return [first, last].filter(Boolean).join(' ');
   if (user) return `@${user}`;
+
   return 'пользователь';
 }
 
@@ -41,12 +66,14 @@ function isAdminTelegramId(id: string): boolean {
   // NEXT_PUBLIC_ADMIN_TELEGRAM_IDS="123,456,789"
   const raw = (process.env.NEXT_PUBLIC_ADMIN_TELEGRAM_IDS || '').trim();
   if (!raw) return false;
+
   const set = new Set(
     raw
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean)
   );
+
   return set.has(id);
 }
 
