@@ -42,7 +42,6 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
       .update(dataCheckString)
       .digest('hex');
 
-    // timingSafeEqual для одинаковой длины
     const a = Buffer.from(computedHash, 'utf8');
     const b = Buffer.from(hash, 'utf8');
     if (a.length !== b.length) return { ok: false as const, error: 'BAD_HASH' as const };
@@ -73,23 +72,37 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
   }
 }
 
+function fromUrlParams(req: NextRequest): string {
+  const url = new URL(req.url);
+
+  // Telegram иногда кидает так:
+  // ?tgWebAppData=<urlencoded initData>
+  const tgWebAppData = (url.searchParams.get('tgWebAppData') || '').trim();
+  if (tgWebAppData) return tgWebAppData;
+
+  // на всякий случай
+  const initData = (url.searchParams.get('initData') || '').trim();
+  if (initData) return initData;
+
+  return '';
+}
+
 async function readInitData(req: NextRequest): Promise<string> {
-  // 1) header (удобно иногда)
+  // 1) header
   const h = (req.headers.get('x-telegram-init-data') || '').trim();
   if (h) return h;
 
-  // 2) body.json {initData}
+  // 2) URL params
+  const q = fromUrlParams(req);
+  if (q) return q;
+
+  // 3) JSON body { initData }
   const ct = (req.headers.get('content-type') || '').toLowerCase();
   if (ct.includes('application/json')) {
     const body = await req.json().catch(() => null);
     const b = (body?.initData ? String(body.initData) : '').trim();
     if (b) return b;
   }
-
-  // 3) query ?initData=
-  const url = new URL(req.url);
-  const q = (url.searchParams.get('initData') || '').trim();
-  if (q) return q;
 
   return '';
 }
@@ -98,7 +111,11 @@ export async function POST(req: NextRequest) {
   try {
     if (!BOT_TOKEN) {
       return NextResponse.json(
-        { ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN (or BOT_TOKEN/TG_BOT_TOKEN) in env' },
+        {
+          ok: false,
+          error: 'NO_BOT_TOKEN',
+          hint: 'Set TELEGRAM_BOT_TOKEN (or BOT_TOKEN/TG_BOT_TOKEN) in env',
+        },
         { status: 500 }
       );
     }
@@ -106,7 +123,11 @@ export async function POST(req: NextRequest) {
     const initData = await readInitData(req);
     if (!initData) {
       return NextResponse.json(
-        { ok: false, error: 'NO_INIT_DATA', hint: 'Pass initData in JSON body {initData} or header x-telegram-init-data' },
+        {
+          ok: false,
+          error: 'NO_INIT_DATA',
+          hint: 'Open app via Telegram WebApp button/menu (BotFather preview often has no initData).',
+        },
         { status: 401 }
       );
     }
@@ -118,7 +139,6 @@ export async function POST(req: NextRequest) {
 
     const telegramId = v.user.id;
 
-    // анкета врача (если есть)
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
       select: { id: true, status: true },
