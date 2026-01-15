@@ -77,7 +77,7 @@ function getDisplayName(u: TgUser | null): string {
   const last = (u?.last_name || '').trim();
   if (username) return `@${username}`;
   if (first || last) return [first, last].filter(Boolean).join(' ');
-  return 'пользователь';
+  return 'Пользователь';
 }
 
 function isAdminTelegramId(id: string): boolean {
