@@ -1,3 +1,4 @@
+/* path: app/hamburger/profile/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -17,9 +18,9 @@ type TgUser = {
   last_name: string | null;
 };
 
-type MeResponse =
-  | { ok: true; user: TgUser | null; doctor: { id: string; status: string } | null }
-  | { ok: false; error: string; hint?: string };
+type MeOk = { ok: true; user: TgUser; isAdmin: boolean; via: string };
+type MeErr = { ok: false; error: string; hint?: string };
+type MeResponse = MeOk | MeErr;
 
 function getTelegramInitData(): string {
   try {
@@ -29,61 +30,57 @@ function getTelegramInitData(): string {
   }
 }
 
-function getUnsafeUser(): any | null {
-  try {
-    return (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user || null;
-  } catch {
-    return null;
-  }
-}
-
-function getDisplayName(u: Partial<TgUser> | null): string {
-  const first = String(u?.first_name || '').trim();
-  const last = String(u?.last_name || '').trim();
-  const user = String(u?.username || '').trim();
-
+function getDisplayName(u: TgUser | null): string {
+  const first = (u?.first_name || '').trim();
+  const last = (u?.last_name || '').trim();
+  const user = (u?.username || '').trim();
   if (first || last) return [first, last].filter(Boolean).join(' ');
   if (user) return `@${user}`;
   return 'пользователь';
 }
 
-function isAdminTelegramId(id: string): boolean {
-  const raw = (process.env.NEXT_PUBLIC_ADMIN_TELEGRAM_IDS || '').trim();
-  if (!raw) return false;
-  const set = new Set(raw.split(',').map((x) => x.trim()).filter(Boolean));
-  return set.has(id);
-}
-
 export default function ProfilePage() {
   const router = useRouter();
 
-  const [tgUser, setTgUser] = useState<Partial<TgUser> | null>(null);
-  const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
-  const [warn, setWarn] = useState<string | null>(null);
+  const [tgUser, setTgUser] = useState<TgUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [noInitData, setNoInitData] = useState(false);
 
   useEffect(() => {
     try {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
-    const unsafe = getUnsafeUser();
-    if (unsafe) {
-      // Быстрый UI сразу
-      setTgUser({
-        id: unsafe.id ? String(unsafe.id) : '',
-        username: unsafe.username ? String(unsafe.username) : null,
-        first_name: unsafe.first_name ? String(unsafe.first_name) : null,
-        last_name: unsafe.last_name ? String(unsafe.last_name) : null,
-      });
-    }
-
     const initData = getTelegramInitData();
 
-    // Если initData пустой — сервер ничего не сможет проверить
+    // Если initData реально нет — это 99% BotFather preview / неверный запуск
     if (!initData) {
+      setNoInitData(true);
       setLoading(false);
-      setWarn('Нет initData от Telegram. Открой приложение через кнопку WebApp в твоём боте (не через preview/прямую ссылку).');
+
+      // OPTIONAL: debug для разработки, чтобы можно было тестить админку
+      // открыть страницу так: /hamburger/profile?debug=1&id=123456
+      // и на сервере env: ALLOW_BROWSER_DEBUG=1
+      const url = new URL(window.location.href);
+      const debug = url.searchParams.get('debug') === '1';
+      const id = url.searchParams.get('id');
+
+      if (debug && id) {
+        (async () => {
+          try {
+            const res = await fetch(`/api/me?debug=1&id=${encodeURIComponent(id)}`, {
+              method: 'GET',
+            });
+            const j = (await res.json().catch(() => null)) as MeResponse | null;
+            if (j && (j as any).ok === true) {
+              setTgUser((j as MeOk).user);
+              setIsAdmin((j as MeOk).isAdmin);
+            }
+          } catch {}
+        })();
+      }
+
       return;
     }
 
@@ -98,32 +95,21 @@ export default function ProfilePage() {
         const j = (await res.json().catch(() => null)) as MeResponse | null;
 
         if (!res.ok || !j || (j as any).ok !== true) {
-          const hint = (j as any)?.hint || (j as any)?.error || 'Не удалось загрузить профиль';
-          setWarn(String(hint));
           setLoading(false);
           return;
         }
 
-        if (j.user) setTgUser(j.user);
-        setDoctorStatus(j.doctor?.status ?? null);
-        setWarn(null);
+        setTgUser((j as MeOk).user);
+        setIsAdmin((j as MeOk).isAdmin);
         setLoading(false);
       } catch (e) {
         console.error(e);
-        setWarn('Сеть/сервер недоступны');
         setLoading(false);
       }
     })();
   }, []);
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
-
-  const telegramId = useMemo(() => {
-    const anyId = (tgUser as any)?.id;
-    return anyId ? String(anyId) : '';
-  }, [tgUser]);
-
-  const isAdmin = useMemo(() => (telegramId ? isAdminTelegramId(telegramId) : false), [telegramId]);
 
   const go = (path: string) => {
     haptic('light');
@@ -140,11 +126,14 @@ export default function ProfilePage() {
         Здравствуйте <span className="profile-name">{loading ? '...' : displayName}</span>
       </p>
 
-      {warn && <p className="profile-warn">{warn}</p>}
-
-      {doctorStatus && (
-        <p className="profile-status">
-          Статус анкеты врача: <b>{doctorStatus}</b>
+      {noInitData && (
+        <p className="warn">
+          Нет initData от Telegram. <br />
+          Это бывает в BotFather preview/«Open App». Для реальной авторизации нужно открывать WebApp из кнопки <b>в твоём боте</b> (reply keyboard с <code>web_app</code>).
+          <br />
+          <span className="warnSmall">
+            Для dev-теста админки можно открыть: <code>/hamburger/profile?debug=1&id=123456</code> (и включить <code>ALLOW_BROWSER_DEBUG=1</code>).
+          </span>
         </p>
       )}
 
@@ -178,10 +167,6 @@ export default function ProfilePage() {
             <span className="profile-btn-title">Анкеты врачей на проверку</span>
             <span className="profile-btn-sub">Модерация и статусы</span>
           </button>
-
-          <p className="adminHint">
-            Админ-доступ: <span className="mono">NEXT_PUBLIC_ADMIN_TELEGRAM_IDS</span>
-          </p>
         </section>
       )}
 
@@ -199,7 +184,7 @@ export default function ProfilePage() {
         }
 
         .profile-hello {
-          margin: 6px 0 6px;
+          margin: 6px 0 8px;
           font-size: 14px;
           line-height: 1.45;
           color: #374151;
@@ -210,16 +195,16 @@ export default function ProfilePage() {
           color: #111827;
         }
 
-        .profile-warn {
+        .warn {
           margin: 0 0 12px;
           font-size: 12px;
-          color: #ef4444;
           line-height: 1.35;
+          color: #ef4444;
         }
 
-        .profile-status {
-          margin: 0 0 12px;
-          font-size: 12px;
+        .warnSmall {
+          display: inline-block;
+          margin-top: 6px;
           color: #6b7280;
         }
 
@@ -280,20 +265,6 @@ export default function ProfilePage() {
 
         .adminBtn {
           border-color: rgba(37, 99, 235, 0.35);
-        }
-
-        .adminHint {
-          margin: 2px 2px 0;
-          font-size: 11px;
-          color: #9ca3af;
-          line-height: 1.35;
-        }
-
-        .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-            monospace;
-          font-size: 11px;
-          color: #6b7280;
         }
       `}</style>
     </main>
