@@ -1,115 +1,128 @@
-import type { NextRequest } from 'next/server';
-import crypto from 'crypto';
+/* path: lib/auth/verifyInitData.ts */
+import crypto from 'node:crypto';
 
-export type TgUser = {
-  id: string;
-  username: string | null;
-  first_name: string | null;
-  last_name: string | null;
-};
+/** secret = HMAC_SHA256(key="WebAppData", data=BOT_TOKEN) */
+function buildSecret(botToken: string): Buffer {
+  const serviceKey = Buffer.from('WebAppData', 'utf8');
+  return crypto.createHmac('sha256', serviceKey).update(botToken).digest();
+}
 
+/** Data Check String из всех пар (кроме hash), отсортированных по ключу */
+function buildDataCheckString(params: URLSearchParams): string {
+  const pairs: string[] = [];
+  params.forEach((value, key) => {
+    if (key === 'hash') return;
+    pairs.push(`${key}=${value}`);
+  });
+  pairs.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return pairs.join('\n');
+}
+
+/** Строгая boolean-валидация initData */
 export function verifyInitData(initData: string, botToken: string): boolean {
   try {
+    if (!initData || !botToken) return false;
+
     const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    if (!hash) return false;
+    const gotHash = params.get('hash');
+    if (!gotHash) return false;
 
-    params.delete('hash');
+    const dcs = buildDataCheckString(params);
+    const secret = buildSecret(botToken);
+    const expected = crypto.createHmac('sha256', secret).update(dcs).digest('hex');
 
-    const dataCheckString = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
-
-    const secretKey = crypto
-      .createHmac('sha256', 'WebAppData')
-      .update(botToken)
-      .digest();
-
-    const computed = crypto
-      .createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
-
-    // timing-safe compare
-    const a = Buffer.from(computed, 'utf8');
-    const b = Buffer.from(hash, 'utf8');
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
+    // timing-safe
+    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(gotHash, 'hex'));
   } catch {
     return false;
   }
 }
 
-export function extractTelegramId(initData: string): string | null {
+export function getTelegramUserUnsafe(initData: string): any | null {
   try {
-    const p = new URLSearchParams(initData);
-    const raw = p.get('user');
-    if (!raw) return null;
-    const u = JSON.parse(raw);
-    if (!u?.id) return null;
-    return String(u.id);
+    const params = new URLSearchParams(initData);
+    const userStr = params.get('user');
+    if (!userStr) return null;
+    return JSON.parse(userStr);
   } catch {
     return null;
   }
 }
 
-export function extractTelegramUser(initData: string): TgUser | null {
-  try {
-    const p = new URLSearchParams(initData);
-    const raw = p.get('user');
-    if (!raw) return null;
-    const u = JSON.parse(raw);
-    if (!u?.id) return null;
+export function getTelegramId(initData: string): string | null {
+  const u = getTelegramUserUnsafe(initData);
+  if (!u?.id) return null;
+  return String(u.id);
+}
 
-    return {
-      id: String(u.id),
-      username: u.username ? String(u.username) : null,
-      first_name: u.first_name ? String(u.first_name) : null,
-      last_name: u.last_name ? String(u.last_name) : null,
-    };
-  } catch {
-    return null;
-  }
+export function getTelegramIdStrict(initData: string): string {
+  const id = getTelegramId(initData);
+  if (!id) throw new Error('NO_TELEGRAM_ID');
+  return id;
 }
 
 /**
- * Берём initData из:
- * - JSON body { initData }
- * - header: x-telegram-init-data / x-init-data
- * - query: ?initData=...
- * - cookie: telegram_init_data (если захочешь)
+ * Достаём initData из:
+ *  - headers: x-telegram-init-data / x-tg-init-data / x-init-data
+ *  - query: ?initData= / ?tgInitData=
+ *  - cookie: tg_init_data
  */
-export async function getInitDataFrom(req: NextRequest): Promise<string> {
-  // 1) headers
-  const h =
-    req.headers.get('x-telegram-init-data') ||
-    req.headers.get('x-init-data') ||
-    '';
-  if (h) return h;
-
-  // 2) query
+export function getInitDataFrom(req: Request | { headers?: any; url?: string }): string {
   try {
-    const url = new URL(req.url);
-    const q = url.searchParams.get('initData') || '';
-    if (q) return q;
-  } catch {}
+    const headersAny: any = (req as any)?.headers;
 
-  // 3) cookies (опционально)
-  try {
-    const c = req.cookies.get('telegram_init_data')?.value || '';
-    if (c) return c;
-  } catch {}
+    const getHeader = (name: string) => {
+      if (!headersAny) return '';
+      if (typeof headersAny.get === 'function') {
+        const v = headersAny.get(name);
+        if (typeof v === 'string' && v) return v;
+        const lower = headersAny.get(name.toLowerCase());
+        if (typeof lower === 'string' && lower) return lower;
+      } else {
+        const keys = Object.keys(headersAny);
+        const found = keys.find(k => k.toLowerCase() === name.toLowerCase());
+        if (found) {
+          const v = headersAny[found];
+          if (typeof v === 'string' && v) return v;
+        }
+      }
+      return '';
+    };
 
-  // 4) body
-  try {
-    const ct = req.headers.get('content-type') || '';
-    if (ct.includes('application/json')) {
-      const body = await req.json().catch(() => null);
-      const b = body?.initData;
-      if (typeof b === 'string' && b.trim()) return b.trim();
+    // 1) Headers
+    const headerCandidates = [
+      'x-telegram-init-data',
+      'x-tg-init-data',
+      'x-init-data',
+    ];
+    for (const h of headerCandidates) {
+      const v = getHeader(h);
+      if (v) return v;
     }
-  } catch {}
+
+    // 2) Query
+    const urlStr = (req as any)?.url;
+    if (typeof urlStr === 'string' && urlStr) {
+      const u = new URL(urlStr);
+      const q1 = u.searchParams.get('initData');
+      if (q1) return q1;
+      const q2 = u.searchParams.get('tgInitData');
+      if (q2) return q2;
+    }
+
+    // 3) Cookie
+    try {
+      const cookieHeader = getHeader('cookie');
+      if (cookieHeader) {
+        const m = cookieHeader.match(/(?:^|;\s*)tg_init_data=([^;]+)/i);
+        if (m?.[1]) return decodeURIComponent(m[1]);
+      }
+    } catch {
+      /* ignore */
+    }
+  } catch {
+    /* ignore */
+  }
 
   return '';
 }
