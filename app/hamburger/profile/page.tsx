@@ -1,4 +1,3 @@
-/* path: app/hamburger/profile/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -18,15 +17,8 @@ type TgUser = {
   last_name: string | null;
 };
 
-type TgUserUnsafe = {
-  id?: number | string;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-};
-
 type MeResponse =
-  | { ok: true; user: TgUser; doctor: { id: string; status: string } | null }
+  | { ok: true; user: TgUser | null; doctor: { id: string; status: string } | null }
   | { ok: false; error: string; hint?: string };
 
 function getTelegramInitData(): string {
@@ -37,20 +29,7 @@ function getTelegramInitData(): string {
   }
 }
 
-function getInitDataFromUrl(): string {
-  try {
-    const sp = new URLSearchParams(window.location.search);
-    const a = (sp.get('tgWebAppData') || '').trim();
-    if (a) return a;
-    const b = (sp.get('initData') || '').trim();
-    if (b) return b;
-    return '';
-  } catch {
-    return '';
-  }
-}
-
-function getTgUserUnsafe(): TgUserUnsafe | null {
+function getUnsafeUser(): any | null {
   try {
     return (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user || null;
   } catch {
@@ -58,62 +37,53 @@ function getTgUserUnsafe(): TgUserUnsafe | null {
   }
 }
 
-function normalizeUnsafe(u: TgUserUnsafe | null): TgUser | null {
-  if (!u) return null;
-  const id = u.id === undefined || u.id === null ? '' : String(u.id);
-  if (!id) return null;
-  return {
-    id,
-    username: u.username ? String(u.username) : null,
-    first_name: u.first_name ? String(u.first_name) : null,
-    last_name: u.last_name ? String(u.last_name) : null,
-  };
-}
+function getDisplayName(u: Partial<TgUser> | null): string {
+  const first = String(u?.first_name || '').trim();
+  const last = String(u?.last_name || '').trim();
+  const user = String(u?.username || '').trim();
 
-// Приоритет: @username → first last → пользователь
-function getDisplayName(u: TgUser | null): string {
-  const username = (u?.username || '').trim();
-  const first = (u?.first_name || '').trim();
-  const last = (u?.last_name || '').trim();
-  if (username) return `@${username}`;
   if (first || last) return [first, last].filter(Boolean).join(' ');
-  return 'Пользователь';
+  if (user) return `@${user}`;
+  return 'пользователь';
 }
 
 function isAdminTelegramId(id: string): boolean {
   const raw = (process.env.NEXT_PUBLIC_ADMIN_TELEGRAM_IDS || '').trim();
   if (!raw) return false;
-  const set = new Set(
-    raw
-      .split(',')
-      .map((x) => x.trim())
-      .filter(Boolean)
-  );
+  const set = new Set(raw.split(',').map((x) => x.trim()).filter(Boolean));
   return set.has(id);
 }
 
 export default function ProfilePage() {
   const router = useRouter();
 
-  const [tgUser, setTgUser] = useState<TgUser | null>(null);
+  const [tgUser, setTgUser] = useState<Partial<TgUser> | null>(null);
   const [doctorStatus, setDoctorStatus] = useState<string | null>(null);
+  const [warn, setWarn] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authHint, setAuthHint] = useState<string | null>(null);
 
   useEffect(() => {
-    // Мгновенно показываем то, что есть локально
-    const local = normalizeUnsafe(getTgUserUnsafe());
-    if (local) setTgUser(local);
-
     try {
       (window as any)?.Telegram?.WebApp?.ready?.();
     } catch {}
 
-    const initData = getTelegramInitData().trim() || getInitDataFromUrl().trim();
+    const unsafe = getUnsafeUser();
+    if (unsafe) {
+      // Быстрый UI сразу
+      setTgUser({
+        id: unsafe.id ? String(unsafe.id) : '',
+        username: unsafe.username ? String(unsafe.username) : null,
+        first_name: unsafe.first_name ? String(unsafe.first_name) : null,
+        last_name: unsafe.last_name ? String(unsafe.last_name) : null,
+      });
+    }
 
+    const initData = getTelegramInitData();
+
+    // Если initData пустой — сервер ничего не сможет проверить
     if (!initData) {
-      setAuthHint('Нет initData от Telegram. Откройте приложение через кнопку WebApp в боте (BotFather preview часто не отдаёт initData).');
       setLoading(false);
+      setWarn('Нет initData от Telegram. Открой приложение через кнопку WebApp в твоём боте (не через preview/прямую ссылку).');
       return;
     }
 
@@ -128,24 +98,31 @@ export default function ProfilePage() {
         const j = (await res.json().catch(() => null)) as MeResponse | null;
 
         if (!res.ok || !j || (j as any).ok !== true) {
-          setAuthHint((j as any)?.hint || (j as any)?.error || 'Не удалось загрузить профиль');
+          const hint = (j as any)?.hint || (j as any)?.error || 'Не удалось загрузить профиль';
+          setWarn(String(hint));
           setLoading(false);
           return;
         }
 
-        setTgUser(j.user);
+        if (j.user) setTgUser(j.user);
         setDoctorStatus(j.doctor?.status ?? null);
+        setWarn(null);
         setLoading(false);
       } catch (e) {
         console.error(e);
-        setAuthHint('Сеть/сервер недоступны');
+        setWarn('Сеть/сервер недоступны');
         setLoading(false);
       }
     })();
   }, []);
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
-  const telegramId = useMemo(() => (tgUser?.id ? String(tgUser.id) : ''), [tgUser]);
+
+  const telegramId = useMemo(() => {
+    const anyId = (tgUser as any)?.id;
+    return anyId ? String(anyId) : '';
+  }, [tgUser]);
+
   const isAdmin = useMemo(() => (telegramId ? isAdminTelegramId(telegramId) : false), [telegramId]);
 
   const go = (path: string) => {
@@ -160,10 +137,10 @@ export default function ProfilePage() {
       <h1 className="profile-title">Мой профиль</h1>
 
       <p className="profile-hello">
-        Здравствуйте <span className="profile-name">{loading && !tgUser ? '...' : displayName}</span>
+        Здравствуйте <span className="profile-name">{loading ? '...' : displayName}</span>
       </p>
 
-      {authHint && <p className="profile-hint">{authHint}</p>}
+      {warn && <p className="profile-warn">{warn}</p>}
 
       {doctorStatus && (
         <p className="profile-status">
@@ -233,7 +210,7 @@ export default function ProfilePage() {
           color: #111827;
         }
 
-        .profile-hint {
+        .profile-warn {
           margin: 0 0 12px;
           font-size: 12px;
           color: #ef4444;
