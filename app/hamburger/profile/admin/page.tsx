@@ -1,4 +1,3 @@
-/* path: app/hamburger/profile/admin/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -11,7 +10,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-/* -------- cookie helpers (как в профиле) -------- */
+/* -------- cookie helpers -------- */
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
@@ -35,7 +34,7 @@ function getCookie(name: string): string {
 function getInitDataFromCookie(): string {
   return getCookie('tg_init_data');
 }
-/* ---------------------------------------------- */
+/* -------------------------------- */
 
 type TgUser = {
   id: string;
@@ -72,20 +71,20 @@ export default function AdminMenuPage() {
       WebApp?.ready?.();
     } catch {}
 
-    // UI-источник (быстрое имя)
+    // UI-имя сразу
     const unsafe = WebApp?.initDataUnsafe?.user || null;
     if (unsafe) {
       setTgUser({
         id: unsafe?.id ? String(unsafe.id) : '',
-        username: unsafe?.username ? String(unsafe.username) : null,
-        first_name: unsafe?.first_name ? String(unsafe.first_name) : null,
-        last_name: unsafe?.last_name ? String(unsafe.last_name) : null,
+        username: unsafe?.username ?? null,
+        first_name: unsafe?.first_name ?? null,
+        last_name: unsafe?.last_name ?? null,
       });
     }
 
     const initData = (WebApp?.initData as string) || getInitDataFromCookie();
 
-    if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+    if (WebApp?.initData) {
       setCookie('tg_init_data', WebApp.initData, 3);
     }
 
@@ -94,7 +93,7 @@ export default function AdminMenuPage() {
         setLoading(true);
 
         if (!initData) {
-          setWarn('Нет initData от Telegram — админ-меню недоступно в этом режиме.');
+          setWarn('Нет initData от Telegram — админ-меню недоступно.');
           setIsAdmin(false);
           return;
         }
@@ -110,18 +109,16 @@ export default function AdminMenuPage() {
 
         const j = (await res.json().catch(() => null)) as MeResponse | null;
 
-        if (!res.ok || !j || (j as any).ok !== true) {
-          setWarn((j as any)?.hint || (j as any)?.error || 'Не удалось определить пользователя');
+        if (!res.ok || !j || j.ok !== true) {
+          setWarn((j as any)?.hint || (j as any)?.error || 'Ошибка авторизации');
           setIsAdmin(false);
           return;
         }
 
-        const ok = j as MeOk;
-        setTgUser(ok.user);
-        setIsAdmin(!!ok.isAdmin);
-        setWarn(ok.isAdmin ? '' : 'У вас нет прав администратора.');
-      } catch (e) {
-        console.error(e);
+        setTgUser(j.user);
+        setIsAdmin(j.isAdmin);
+        setWarn(j.isAdmin ? '' : 'У вас нет прав администратора.');
+      } catch {
         setWarn('Ошибка запроса /api/me');
         setIsAdmin(false);
       } finally {
@@ -145,32 +142,39 @@ export default function AdminMenuPage() {
 
       <p className="admin-sub">
         {loading ? (
-          <>
-            Проверка доступа… <span className="admin-name">...</span>
-          </>
+          <>Проверка доступа… <b>...</b></>
         ) : (
-          <>
-            Вы вошли как <span className="admin-name">{displayName}</span>
-          </>
+          <>Вы вошли как <b>{displayName}</b></>
         )}
       </p>
 
       {warn && <p className="warn">{warn}</p>}
 
-      {/* Показываем пункты только админу */}
       {isAdmin && (
         <section className="card">
-          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/doctor')}
+          <button
+            type="button"
+            className="item"
+            onClick={() => go('/hamburger/profile/admin/doctor')}
+          >
             <span className="item-title">Врачи</span>
             <span className="item-sub">Анкеты, статусы, модерация</span>
           </button>
 
-          <button type="button" className="item" onClick={() => go('/hamburger/admin/users')}>
+          <button
+            type="button"
+            className="item"
+            onClick={() => go('/hamburger/profile/admin/users')}
+          >
             <span className="item-title">Пользователи</span>
-            <span className="item-sub">Список, поиск, доступы</span>
+            <span className="item-sub">Поиск, роли, блокировки</span>
           </button>
 
-          <button type="button" className="item" onClick={() => go('/hamburger/admin/transactions')}>
+          <button
+            type="button"
+            className="item"
+            onClick={() => go('/hamburger/profile/admin/transactions')}
+          >
             <span className="item-title">Транзакции</span>
             <span className="item-sub">Платежи, списания, история</span>
           </button>
@@ -193,30 +197,21 @@ export default function AdminMenuPage() {
         .admin-sub {
           margin: 6px 0 12px;
           font-size: 13px;
-          line-height: 1.45;
           color: #374151;
-        }
-
-        .admin-name {
-          font-weight: 900;
-          color: #111827;
         }
 
         .warn {
           margin: 0 0 12px;
           font-size: 12px;
-          line-height: 1.35;
           color: #ef4444;
         }
 
         .card {
-          background: #ffffff;
+          background: #fff;
           border-radius: 18px;
           padding: 12px;
           box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
           border: 1px solid rgba(15, 23, 42, 0.04);
-          width: 100%;
-          box-sizing: border-box;
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -224,21 +219,12 @@ export default function AdminMenuPage() {
 
         .item {
           width: 100%;
-          text-align: left;
           border: 1px solid rgba(156, 163, 175, 0.45);
-          background: #ffffff;
+          background: #fff;
           border-radius: 14px;
-          padding: 12px 12px;
+          padding: 12px;
+          text-align: left;
           cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .item:active {
-          transform: scale(0.99);
-          opacity: 0.95;
         }
 
         .item-title {
