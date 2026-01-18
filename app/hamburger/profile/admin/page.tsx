@@ -1,3 +1,4 @@
+/* path: app/hamburger/profile/admin/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -116,7 +117,7 @@ export default function AdminMenuPage() {
         }
 
         setTgUser(j.user);
-        setIsAdmin(j.isAdmin);
+        setIsAdmin(!!j.isAdmin);
         setWarn(j.isAdmin ? '' : 'У вас нет прав администратора.');
       } catch {
         setWarn('Ошибка запроса /api/me');
@@ -142,9 +143,9 @@ export default function AdminMenuPage() {
 
       <p className="admin-sub">
         {loading ? (
-          <>Проверка доступа… <b>...</b></>
+          <>Проверка доступа… <span className="admin-name">...</span></>
         ) : (
-          <>Вы вошли как <b>{displayName}</b></>
+          <>Вы вошли как <span className="admin-name">{displayName}</span></>
         )}
       </p>
 
@@ -152,29 +153,17 @@ export default function AdminMenuPage() {
 
       {isAdmin && (
         <section className="card">
-          <button
-            type="button"
-            className="item"
-            onClick={() => go('/hamburger/profile/admin/doctor')}
-          >
+          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/doctor')}>
             <span className="item-title">Врачи</span>
             <span className="item-sub">Анкеты, статусы, модерация</span>
           </button>
 
-          <button
-            type="button"
-            className="item"
-            onClick={() => go('/hamburger/profile/admin/users')}
-          >
+          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/users')}>
             <span className="item-title">Пользователи</span>
             <span className="item-sub">Поиск, роли, блокировки</span>
           </button>
 
-          <button
-            type="button"
-            className="item"
-            onClick={() => go('/hamburger/profile/admin/transactions')}
-          >
+          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/transactions')}>
             <span className="item-title">Транзакции</span>
             <span className="item-sub">Платежи, списания, история</span>
           </button>
@@ -198,12 +187,19 @@ export default function AdminMenuPage() {
           margin: 6px 0 12px;
           font-size: 13px;
           color: #374151;
+          line-height: 1.35;
+        }
+
+        .admin-name {
+          font-weight: 900;
+          color: #111827;
         }
 
         .warn {
           margin: 0 0 12px;
           font-size: 12px;
           color: #ef4444;
+          line-height: 1.35;
         }
 
         .card {
@@ -217,25 +213,41 @@ export default function AdminMenuPage() {
           gap: 10px;
         }
 
+        /* ВАЖНО: фикс “в одну строку” */
         .item {
           width: 100%;
           border: 1px solid rgba(156, 163, 175, 0.45);
           background: #fff;
           border-radius: 14px;
-          padding: 12px;
+          padding: 14px 14px;
           text-align: left;
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .item:active {
+          transform: scale(0.99);
+          opacity: 0.95;
         }
 
         .item-title {
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 900;
           color: #111827;
+          line-height: 1.15;
         }
 
         .item-sub {
+          display: block;
           font-size: 12px;
           color: #6b7280;
+          line-height: 1.25;
+          margin: 0;
         }
       `}</style>
     </main>
