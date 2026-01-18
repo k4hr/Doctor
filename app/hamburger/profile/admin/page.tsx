@@ -160,7 +160,7 @@ export default function AdminMenuPage() {
       {/* Показываем пункты только админу */}
       {isAdmin && (
         <section className="card">
-          <button type="button" className="item" onClick={() => go('/hamburger/admin/doctors')}>
+          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/doctor')}
             <span className="item-title">Врачи</span>
             <span className="item-sub">Анкеты, статусы, модерация</span>
           </button>
