@@ -1,13 +1,13 @@
 /* path: lib/auth/verifyInitData.ts */
 import crypto from 'node:crypto';
+import type { NextRequest } from 'next/server';
 
 /** secret = HMAC_SHA256(key="WebAppData", data=BOT_TOKEN) */
 function buildSecret(botToken: string): Buffer {
-  const serviceKey = Buffer.from('WebAppData', 'utf8');
-  return crypto.createHmac('sha256', serviceKey).update(botToken).digest();
+  return crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
 }
 
-/** Data Check String из всех пар (кроме hash), отсортированных по ключу */
+/** Data Check String: все пары кроме hash, сортировка по ключу */
 function buildDataCheckString(params: URLSearchParams): string {
   const pairs: string[] = [];
   params.forEach((value, key) => {
@@ -18,7 +18,7 @@ function buildDataCheckString(params: URLSearchParams): string {
   return pairs.join('\n');
 }
 
-/** Строгая boolean-валидация initData */
+/** Строгая boolean-валидация initData (HMAC) */
 export function verifyInitData(initData: string, botToken: string): boolean {
   try {
     if (!initData || !botToken) return false;
@@ -31,30 +31,27 @@ export function verifyInitData(initData: string, botToken: string): boolean {
     const secret = buildSecret(botToken);
     const expected = crypto.createHmac('sha256', secret).update(dcs).digest('hex');
 
-    // timing-safe
     return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(gotHash, 'hex'));
   } catch {
     return false;
   }
 }
 
-export function getTelegramUserUnsafe(initData: string): any | null {
+/** Возвращает Telegram ID или null */
+export function getTelegramId(initData: string): string | null {
   try {
     const params = new URLSearchParams(initData);
     const userStr = params.get('user');
     if (!userStr) return null;
-    return JSON.parse(userStr);
+    const user = JSON.parse(userStr) as { id?: number | string };
+    if (!user?.id) return null;
+    return String(user.id);
   } catch {
     return null;
   }
 }
 
-export function getTelegramId(initData: string): string | null {
-  const u = getTelegramUserUnsafe(initData);
-  if (!u?.id) return null;
-  return String(u.id);
-}
-
+/** Жёсткая версия — бросает, если ID не найден */
 export function getTelegramIdStrict(initData: string): string {
   const id = getTelegramId(initData);
   if (!id) throw new Error('NO_TELEGRAM_ID');
@@ -63,66 +60,58 @@ export function getTelegramIdStrict(initData: string): string {
 
 /**
  * Достаём initData из:
- *  - headers: x-telegram-init-data / x-tg-init-data / x-init-data
- *  - query: ?initData= / ?tgInitData=
+ *  - headers: x-telegram-init-data / x-init-data / x-tg-init-data (любой регистр)
+ *  - query: ?initData=
  *  - cookie: tg_init_data
+ *  - body json: { initData }
  */
-export function getInitDataFrom(req: Request | { headers?: any; url?: string }): string {
+export async function getInitDataFrom(req: NextRequest): Promise<string> {
   try {
-    const headersAny: any = (req as any)?.headers;
-
-    const getHeader = (name: string) => {
-      if (!headersAny) return '';
-      if (typeof headersAny.get === 'function') {
-        const v = headersAny.get(name);
-        if (typeof v === 'string' && v) return v;
-        const lower = headersAny.get(name.toLowerCase());
-        if (typeof lower === 'string' && lower) return lower;
-      } else {
-        const keys = Object.keys(headersAny);
-        const found = keys.find(k => k.toLowerCase() === name.toLowerCase());
-        if (found) {
-          const v = headersAny[found];
-          if (typeof v === 'string' && v) return v;
-        }
-      }
-      return '';
-    };
-
     // 1) Headers
     const headerCandidates = [
       'x-telegram-init-data',
       'x-tg-init-data',
       'x-init-data',
+      'X-Telegram-Init-Data',
+      'X-Tg-Init-Data',
+      'X-Init-Data',
     ];
+
     for (const h of headerCandidates) {
-      const v = getHeader(h);
+      const v = req.headers.get(h);
       if (v) return v;
+      const v2 = req.headers.get(h.toLowerCase());
+      if (v2) return v2;
     }
 
     // 2) Query
-    const urlStr = (req as any)?.url;
-    if (typeof urlStr === 'string' && urlStr) {
-      const u = new URL(urlStr);
-      const q1 = u.searchParams.get('initData');
-      if (q1) return q1;
-      const q2 = u.searchParams.get('tgInitData');
-      if (q2) return q2;
-    }
+    try {
+      const url = new URL(req.url);
+      const q = url.searchParams.get('initData') || '';
+      if (q) return q;
+    } catch {}
 
     // 3) Cookie
     try {
-      const cookieHeader = getHeader('cookie');
-      if (cookieHeader) {
-        const m = cookieHeader.match(/(?:^|;\s*)tg_init_data=([^;]+)/i);
-        if (m?.[1]) return decodeURIComponent(m[1]);
+      const c = req.cookies.get('tg_init_data')?.value || '';
+      if (c) return c;
+    } catch {}
+
+    // 4) JSON body { initData }
+    try {
+      const ct = req.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const body = await req.clone().json().catch(() => null);
+        const initData = body?.initData;
+        if (typeof initData === 'string' && initData) return initData;
       }
-    } catch {
-      /* ignore */
-    }
-  } catch {
-    /* ignore */
-  }
+    } catch {}
+  } catch {}
 
   return '';
+}
+
+/** алиас совместимости */
+export function extractTelegramId(initData: string): string {
+  return getTelegramId(initData) ?? '';
 }
