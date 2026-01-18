@@ -22,18 +22,47 @@ type MeOk = { ok: true; user: TgUser; isAdmin: boolean; via: string };
 type MeErr = { ok: false; error: string; hint?: string };
 type MeResponse = MeOk | MeErr;
 
-function getTelegramInitData(): string {
+/* -------- cookie helpers (как в старом кабинете) -------- */
+function setCookie(name: string, value: string, days = 3) {
   try {
-    return (window as any)?.Telegram?.WebApp?.initData || '';
+    const maxAge = days * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  } catch {}
+}
+
+function getCookie(name: string): string {
+  try {
+    const rows = document.cookie ? document.cookie.split('; ') : [];
+    for (const row of rows) {
+      const [k, ...rest] = row.split('=');
+      if (decodeURIComponent(k) === name) return decodeURIComponent(rest.join('='));
+    }
+  } catch {}
+  return '';
+}
+
+function parseUserFromInitCookie(): any | null {
+  try {
+    const raw = getCookie('tg_init_data');
+    if (!raw) return null;
+    const sp = new URLSearchParams(raw);
+    const u = sp.get('user');
+    return u ? JSON.parse(u) : null;
   } catch {
-    return '';
+    return null;
   }
 }
+
+function getInitDataFromCookie(): string {
+  return getCookie('tg_init_data');
+}
+/* ------------------------------------------------------- */
 
 function getDisplayName(u: TgUser | null): string {
   const first = (u?.first_name || '').trim();
   const last = (u?.last_name || '').trim();
   const user = (u?.username || '').trim();
+
   if (first || last) return [first, last].filter(Boolean).join(' ');
   if (user) return `@${user}`;
   return 'пользователь';
@@ -45,65 +74,94 @@ export default function ProfilePage() {
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [noInitData, setNoInitData] = useState(false);
+  const [warn, setWarn] = useState<string>('');
 
   useEffect(() => {
+    const WebApp: any = (window as any)?.Telegram?.WebApp;
+
     try {
-      (window as any)?.Telegram?.WebApp?.ready?.();
+      WebApp?.ready?.();
     } catch {}
 
-    const initData = getTelegramInitData();
+    // 1) Сразу показываем имя из initDataUnsafe (это UI-источник №1)
+    let unsafe = WebApp?.initDataUnsafe?.user || null;
+    if (!unsafe) unsafe = parseUserFromInitCookie();
+    if (unsafe) {
+      const u: TgUser = {
+        id: unsafe?.id ? String(unsafe.id) : '',
+        username: unsafe?.username ? String(unsafe.username) : null,
+        first_name: unsafe?.first_name ? String(unsafe.first_name) : null,
+        last_name: unsafe?.last_name ? String(unsafe.last_name) : null,
+      };
+      setTgUser((prev) => prev ?? u);
+    }
 
-    // Если initData реально нет — это 99% BotFather preview / неверный запуск
-    if (!initData) {
-      setNoInitData(true);
-      setLoading(false);
+    // 2) initData (для сервера) — WebApp.initData, иначе cookie
+    const initData = (WebApp?.initData as string) || getInitDataFromCookie();
 
-      // OPTIONAL: debug для разработки, чтобы можно было тестить админку
-      // открыть страницу так: /hamburger/profile?debug=1&id=123456
-      // и на сервере env: ALLOW_BROWSER_DEBUG=1
-      const url = new URL(window.location.href);
-      const debug = url.searchParams.get('debug') === '1';
-      const id = url.searchParams.get('id');
-
-      if (debug && id) {
-        (async () => {
-          try {
-            const res = await fetch(`/api/me?debug=1&id=${encodeURIComponent(id)}`, {
-              method: 'GET',
-            });
-            const j = (await res.json().catch(() => null)) as MeResponse | null;
-            if (j && (j as any).ok === true) {
-              setTgUser((j as MeOk).user);
-              setIsAdmin((j as MeOk).isAdmin);
-            }
-          } catch {}
-        })();
-      }
-
-      return;
+    // ВАЖНО: если Telegram дал initData — сохраняем в cookie,
+    // чтобы оно было доступно на других страницах и после навигации
+    if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+      setCookie('tg_init_data', WebApp.initData, 3);
     }
 
     (async () => {
       try {
+        setLoading(true);
+
+        // Если initData вообще нет — покажем понятное предупреждение
+        if (!initData) {
+          setWarn(
+            'Нет initData от Telegram. Обычно это BotFather preview/неправильный запуск. ' +
+              'Но если ты открываешь из бота кнопкой "Открыть" и всё равно пусто — значит Telegram не передаёт initData в этом окружении.'
+          );
+
+          // dev-фолбэк: ?id=123 при ALLOW_BROWSER_DEBUG=1
+          try {
+            const u = new URL(window.location.href);
+            const id = u.searchParams.get('id');
+            const debug = u.searchParams.get('debug') === '1';
+            if (debug && id) {
+              const r = await fetch(`/api/me?id=${encodeURIComponent(id)}`, {
+                method: 'GET',
+                cache: 'no-store',
+              });
+              const j = (await r.json().catch(() => null)) as MeResponse | null;
+              if (j && (j as any).ok === true) {
+                setTgUser((j as MeOk).user);
+                setIsAdmin((j as MeOk).isAdmin);
+                setWarn('');
+              }
+            }
+          } catch {}
+
+          return;
+        }
+
+        // 3) Как в старом проекте: отправляем initData ЗАГОЛОВКАМИ (без body)
         const res = await fetch('/api/me', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData }),
+          headers: {
+            'X-Telegram-Init-Data': initData,
+            'X-Init-Data': initData,
+          },
+          cache: 'no-store',
         });
 
         const j = (await res.json().catch(() => null)) as MeResponse | null;
 
         if (!res.ok || !j || (j as any).ok !== true) {
-          setLoading(false);
+          setWarn((j as any)?.hint || (j as any)?.error || 'Не удалось определить пользователя');
           return;
         }
 
         setTgUser((j as MeOk).user);
         setIsAdmin((j as MeOk).isAdmin);
-        setLoading(false);
+        setWarn('');
       } catch (e) {
         console.error(e);
+        setWarn('Ошибка запроса /api/me');
+      } finally {
         setLoading(false);
       }
     })();
@@ -126,16 +184,7 @@ export default function ProfilePage() {
         Здравствуйте <span className="profile-name">{loading ? '...' : displayName}</span>
       </p>
 
-      {noInitData && (
-        <p className="warn">
-          Нет initData от Telegram. <br />
-          Это бывает в BotFather preview/«Open App». Для реальной авторизации нужно открывать WebApp из кнопки <b>в твоём боте</b> (reply keyboard с <code>web_app</code>).
-          <br />
-          <span className="warnSmall">
-            Для dev-теста админки можно открыть: <code>/hamburger/profile?debug=1&id=123456</code> (и включить <code>ALLOW_BROWSER_DEBUG=1</code>).
-          </span>
-        </p>
-      )}
+      {warn && <p className="warn">{warn}</p>}
 
       <section className="profile-card">
         <button type="button" className="profile-btn" onClick={() => go('/hamburger/questions')}>
@@ -200,12 +249,6 @@ export default function ProfilePage() {
           font-size: 12px;
           line-height: 1.35;
           color: #ef4444;
-        }
-
-        .warnSmall {
-          display: inline-block;
-          margin-top: 6px;
-          color: #6b7280;
         }
 
         .profile-card {
