@@ -26,7 +26,9 @@ type MeResponse = MeOk | MeErr;
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+      value
+    )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
 
@@ -83,7 +85,7 @@ export default function ProfilePage() {
       WebApp?.ready?.();
     } catch {}
 
-    // 1) Сразу показываем имя из initDataUnsafe (это UI-источник №1)
+    // 1) Сразу показываем имя из initDataUnsafe (UI-источник №1)
     let unsafe = WebApp?.initDataUnsafe?.user || null;
     if (!unsafe) unsafe = parseUserFromInitCookie();
     if (unsafe) {
@@ -99,8 +101,7 @@ export default function ProfilePage() {
     // 2) initData (для сервера) — WebApp.initData, иначе cookie
     const initData = (WebApp?.initData as string) || getInitDataFromCookie();
 
-    // ВАЖНО: если Telegram дал initData — сохраняем в cookie,
-    // чтобы оно было доступно на других страницах и после навигации
+    // если Telegram дал initData — сохраняем в cookie
     if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
       setCookie('tg_init_data', WebApp.initData, 3);
     }
@@ -109,11 +110,11 @@ export default function ProfilePage() {
       try {
         setLoading(true);
 
-        // Если initData вообще нет — покажем понятное предупреждение
+        // Если initData вообще нет — покажем предупреждение + dev-фолбэк
         if (!initData) {
           setWarn(
-            'Нет initData от Telegram. Обычно это BotFather preview/неправильный запуск. ' +
-              'Но если ты открываешь из бота кнопкой "Открыть" и всё равно пусто — значит Telegram не передаёт initData в этом окружении.'
+            'Нет initData от Telegram. Обычно это preview/неправильный запуск. ' +
+              'Если открываешь из бота кнопкой и всё равно пусто — значит в этом окружении initData не приходит.'
           );
 
           // dev-фолбэк: ?id=123 при ALLOW_BROWSER_DEBUG=1
@@ -138,7 +139,7 @@ export default function ProfilePage() {
           return;
         }
 
-        // 3) Как в старом проекте: отправляем initData ЗАГОЛОВКАМИ (без body)
+        // 3) Как в старом проекте: отправляем initData ЗАГОЛОВКАМИ
         const res = await fetch('/api/me', {
           method: 'POST',
           headers: {
@@ -206,18 +207,18 @@ export default function ProfilePage() {
           <span className="profile-btn-title">Редактирование профиля</span>
           <span className="profile-btn-sub">Данные и настройки</span>
         </button>
-      </section>
 
-      {isAdmin && (
-        <section className="profile-card admin">
-          <h2 className="profile-card-title">Админ-меню</h2>
-
-          <button type="button" className="profile-btn adminBtn" onClick={() => go('/hamburger/admin/doctors')}>
-            <span className="profile-btn-title">Анкеты врачей на проверку</span>
-            <span className="profile-btn-sub">Модерация и статусы</span>
+        {/* ОДНА кнопка админ-меню */}
+        {isAdmin && (
+          <button
+            type="button"
+            className="adminMainBtn"
+            onClick={() => go('/hamburger/profile/admin')}
+          >
+            Админ-меню
           </button>
-        </section>
-      )}
+        )}
+      </section>
 
       <style jsx>{`
         .profile {
@@ -264,18 +265,6 @@ export default function ProfilePage() {
           gap: 10px;
         }
 
-        .profile-card.admin {
-          margin-top: 14px;
-          padding: 14px 12px 12px;
-        }
-
-        .profile-card-title {
-          margin: 0 0 4px;
-          font-size: 16px;
-          font-weight: 900;
-          color: #111827;
-        }
-
         .profile-btn {
           width: 100%;
           text-align: left;
@@ -306,8 +295,28 @@ export default function ProfilePage() {
           color: #6b7280;
         }
 
-        .adminBtn {
-          border-color: rgba(37, 99, 235, 0.35);
+        /* Зеленая кнопка админки */
+        .adminMainBtn {
+          margin-top: 6px;
+          width: 100%;
+          border: none;
+          border-radius: 14px;
+          padding: 14px 12px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+
+          background: #24c768;
+          color: #ffffff;
+          font-size: 15px;
+          font-weight: 900;
+          text-align: center;
+
+          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.28);
+        }
+
+        .adminMainBtn:active {
+          transform: scale(0.99);
+          opacity: 0.95;
         }
       `}</style>
     </main>
