@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 type TgUser = {
   id: string;
@@ -12,54 +14,67 @@ type TgUser = {
   last_name: string | null;
 };
 
-function verifyTelegramWebAppInitData(initData: string, botToken: string) {
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
-
-  params.delete('hash');
-
-  const dataCheckString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('\n');
-
-  const secretKey = crypto
-    .createHmac('sha256', 'WebAppData')
-    .update(botToken)
-    .digest();
-
-  const computedHash = crypto
-    .createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex');
-
-  if (computedHash !== hash) return { ok: false as const, error: 'BAD_HASH' as const };
-
-  const userStr = params.get('user');
-  if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
-
-  let userJson: any;
+function timingSafeEqualHex(a: string, b: string) {
   try {
-    userJson = JSON.parse(userStr);
+    const ab = Buffer.from(a, 'hex');
+    const bb = Buffer.from(b, 'hex');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
   } catch {
-    return { ok: false as const, error: 'BAD_USER_JSON' as const };
+    return false;
   }
+}
 
-  if (!userJson?.id) return { ok: false as const, error: 'NO_USER_ID' as const };
+function verifyTelegramWebAppInitData(initData: string, botToken: string) {
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
 
-  const user: TgUser = {
-    id: String(userJson.id),
-    username: userJson.username ? String(userJson.username) : null,
-    first_name: userJson.first_name ? String(userJson.first_name) : null,
-    last_name: userJson.last_name ? String(userJson.last_name) : null,
-  };
+    params.delete('hash');
 
-  return { ok: true as const, user };
+    const dataCheckString = [...params.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+
+    const computedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    if (!timingSafeEqualHex(computedHash, hash)) {
+      return { ok: false as const, error: 'BAD_HASH' as const };
+    }
+
+    const userStr = params.get('user');
+    if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
+
+    let userJson: any;
+    try {
+      userJson = JSON.parse(userStr);
+    } catch {
+      return { ok: false as const, error: 'BAD_USER_JSON' as const };
+    }
+
+    if (!userJson?.id) return { ok: false as const, error: 'NO_USER_ID' as const };
+
+    const user: TgUser = {
+      id: String(userJson.id),
+      username: userJson.username ? String(userJson.username) : null,
+      first_name: userJson.first_name ? String(userJson.first_name) : null,
+      last_name: userJson.last_name ? String(userJson.last_name) : null,
+    };
+
+    return { ok: true as const, user };
+  } catch {
+    return { ok: false as const, error: 'BAD_INITDATA' as const };
+  }
 }
 
 function safeExt(mime: string) {
-  // ✅ фикс: НИКАКИХ "рынка" и прочей дичи :)
   if (mime === 'image/jpeg') return 'jpg';
   if (mime === 'image/png') return 'png';
   if (mime === 'image/webp') return 'webp';
@@ -88,11 +103,29 @@ function makeS3() {
   });
 }
 
-/**
- * POST /api/doctor/upload
- * body: { initData, kind: "avatar" | "diploma", mime: "image/jpeg", size: number }
- * return: { ok, uploadUrl, key, publicUrl }
- */
+async function putObjectToR2(opts: {
+  bucket: string;
+  key: string;
+  contentType: string;
+  bytes: Uint8Array;
+}) {
+  const s3 = makeS3();
+  const cmd = new PutObjectCommand({
+    Bucket: opts.bucket,
+    Key: opts.key,
+    Body: opts.bytes,
+    ContentType: opts.contentType,
+    CacheControl: 'public, max-age=31536000, immutable',
+  });
+  await s3.send(cmd);
+}
+
+function publicUrlFor(key: string) {
+  const base = process.env.R2_PUBLIC_BASE_URL || '';
+  if (!base) return null;
+  return `${base.replace(/\/$/, '')}/${key}`;
+}
+
 export async function POST(req: Request) {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -103,66 +136,60 @@ export async function POST(req: Request) {
       );
     }
 
-    const r2AccountId = process.env.R2_ACCOUNT_ID;
     const r2Bucket = process.env.R2_BUCKET;
-    const r2PublicBaseUrl = process.env.R2_PUBLIC_BASE_URL; // например: https://cdn.yoursite.com (или прямой r2.dev)
+    const r2AccountId = process.env.R2_ACCOUNT_ID;
     const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
     const r2Secret = process.env.R2_SECRET_ACCESS_KEY;
 
-    if (!r2AccountId || !r2Bucket || !r2AccessKeyId || !r2Secret) {
+    if (!r2Bucket || !r2AccountId || !r2AccessKeyId || !r2Secret) {
       return NextResponse.json(
         {
           ok: false,
           error: 'NO_R2_ENV',
           hint:
-            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and optionally R2_PUBLIC_BASE_URL)',
+            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and R2_PUBLIC_BASE_URL)',
         },
         { status: 500 }
       );
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
-    }
+    const fd = await req.formData();
+    const initData = String(fd.get('initData') || '').trim();
+    const profileFile = fd.get('profilePhoto');
+    const diplomaFile = fd.get('diplomaPhoto');
 
-    const initData = typeof body.initData === 'string' ? body.initData : '';
-    if (!initData) {
-      return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
-    }
+    if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
 
     const telegramId = v.user.id;
 
-    const kind = body.kind === 'avatar' || body.kind === 'diploma' ? body.kind : null;
-    const mime = typeof body.mime === 'string' ? body.mime : '';
-    const size = Number(body.size);
-
-    if (!kind) {
-      return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: 'kind' }, { status: 400 });
-    }
-    if (!mime || !isAllowedMime(mime)) {
-      return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: 'mime' }, { status: 400 });
-    }
-    if (!Number.isFinite(size) || size <= 0) {
-      return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: 'size' }, { status: 400 });
-    }
-
-    // лимиты (можешь поменять)
-    const maxBytes = kind === 'avatar' ? 8 * 1024 * 1024 : 25 * 1024 * 1024;
-    if (size > maxBytes) {
+    if (!(profileFile instanceof File) || !(diplomaFile instanceof File)) {
       return NextResponse.json(
-        { ok: false, error: 'FILE_TOO_LARGE', maxBytes },
+        { ok: false, error: 'FILES_REQUIRED', hint: 'Need profilePhoto and diplomaPhoto' },
         { status: 400 }
       );
     }
 
-    // врач должен существовать (создан на шаге анкеты)
+    if (!isAllowedMime(profileFile.type) || !isAllowedMime(diplomaFile.type)) {
+      return NextResponse.json({ ok: false, error: 'BAD_MIME' }, { status: 400 });
+    }
+
+    // лимиты (можешь поменять)
+    const maxProfile = 8 * 1024 * 1024;
+    const maxDiploma = 25 * 1024 * 1024;
+
+    if (profileFile.size > maxProfile) {
+      return NextResponse.json({ ok: false, error: 'PROFILE_TOO_LARGE', maxBytes: maxProfile }, { status: 400 });
+    }
+    if (diplomaFile.size > maxDiploma) {
+      return NextResponse.json({ ok: false, error: 'DIPLOMA_TOO_LARGE', maxBytes: maxDiploma }, { status: 400 });
+    }
+
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
 
     if (!doctor) {
@@ -172,34 +199,50 @@ export async function POST(req: Request) {
       );
     }
 
-    const ext = safeExt(mime);
-    const key = `doctors/${doctor.id}/${kind}-${Date.now()}.${ext}`;
+    const now = Date.now();
 
-    const s3 = makeS3();
+    const profileKey = `doctors/${doctor.id}/profile-${now}.${safeExt(profileFile.type)}`;
+    const diplomaKey = `doctors/${doctor.id}/diploma-${now}.${safeExt(diplomaFile.type)}`;
 
-    const cmd = new PutObjectCommand({
-      Bucket: r2Bucket,
-      Key: key,
-      ContentType: mime,
-      ContentLength: size,
-      // можно включить кеширование
-      CacheControl: 'public, max-age=31536000, immutable',
+    const profileBytes = new Uint8Array(await profileFile.arrayBuffer());
+    const diplomaBytes = new Uint8Array(await diplomaFile.arrayBuffer());
+
+    await putObjectToR2({
+      bucket: r2Bucket,
+      key: profileKey,
+      contentType: profileFile.type,
+      bytes: profileBytes,
     });
 
-    // подписываем PUT на 10 минут
-    const uploadUrl = await getSignedUrl(s3, cmd, { expiresIn: 60 * 10 });
+    await putObjectToR2({
+      bucket: r2Bucket,
+      key: diplomaKey,
+      contentType: diplomaFile.type,
+      bytes: diplomaBytes,
+    });
 
-    const publicUrl = r2PublicBaseUrl ? `${r2PublicBaseUrl.replace(/\/$/, '')}/${key}` : null;
+    const profileUrl = publicUrlFor(profileKey);
+    const diplomaUrl = publicUrlFor(diplomaKey);
+
+    // отметим как отправлено на модерацию
+    await prisma.doctor.update({
+      where: { telegramId },
+      data: {
+        profilePhotoUrl: profileUrl,
+        diplomaPhotoUrl: diplomaUrl,
+        submittedAt: new Date(),
+        status: 'PENDING',
+      },
+    });
 
     return NextResponse.json({
       ok: true,
-      kind,
-      key,
-      uploadUrl,
-      publicUrl,
+      profilePhotoUrl: profileUrl,
+      diplomaPhotoUrl: diplomaUrl,
+      status: 'PENDING',
     });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ ok: false, error: 'UPLOAD_URL_FAILED' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED' }, { status: 500 });
   }
 }
