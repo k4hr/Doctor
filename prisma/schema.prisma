@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,6 +10,7 @@ datasource db {
 
 enum DoctorStatus {
   PENDING
+  NEED_FIX
   APPROVED
   REJECTED
 }
@@ -17,6 +19,7 @@ model Doctor {
   id        String       @id @default(cuid())
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+  submittedAt DateTime?  // когда реально отправлено на модерацию (после загрузки доков)
   status    DoctorStatus @default(PENDING)
 
   // Telegram
@@ -56,6 +59,10 @@ model Doctor {
   courses           String?
   achievements      String?
   publications      String?
+
+  // Документы (после шага docs)
+  profilePhotoUrl String?
+  diplomaPhotoUrl String?
 
   @@index([status])
   @@index([speciality1])
