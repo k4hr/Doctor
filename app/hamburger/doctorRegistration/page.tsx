@@ -1,7 +1,7 @@
 /* path: app/hamburger/doctorRegistration/page.tsx */
 'use client';
 
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../components/TopBarBack';
 import { VRACHI_LIST } from '../../lib/vrachi';
@@ -12,6 +12,14 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
+function tgAlert(msg: string) {
+  try {
+    (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
+  } catch {
+    alert(msg);
+  }
+}
+
 function getTelegramInitData(): string {
   try {
     return (window as any)?.Telegram?.WebApp?.initData || '';
@@ -20,31 +28,72 @@ function getTelegramInitData(): string {
   }
 }
 
+function niceFieldName(name: string) {
+  const map: Record<string, string> = {
+    lastName: 'Фамилия',
+    firstName: 'Имя',
+    gender: 'Пол',
+    speciality1: 'Основная специализация',
+    education: 'Образование',
+    experienceYears: 'Стаж работы',
+    email: 'E-mail',
+    about: 'О себе',
+    specialityDetails: 'Специализация подробно',
+    experienceDetails: 'Опыт работы',
+  };
+  return map[name] || name;
+}
+
 export default function DoctorRegistrationPage() {
   const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    haptic('medium');
+    if (submitting) return;
 
     const form = e.currentTarget;
-    const data = Object.fromEntries(new FormData(form).entries());
 
-    // Берём initData (это НЕ файл, а строка, которую Telegram передаёт WebApp)
-    const initData = getTelegramInitData();
+    // ✅ Главное: если форма не валидна — Telegram часто не покажет подсказку, поэтому показываем сами.
+    // reportValidity() подсветит поле (где возможно) и вернёт false.
+    const ok = form.reportValidity();
+    if (!ok) {
+      haptic('light');
 
-    if (!initData) {
-      const msg =
-        'Не удалось получить данные Telegram. Откройте анкету именно через Telegram (WebApp).';
-      try {
-        (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
-      } catch {
-        alert(msg);
+      const firstInvalid = form.querySelector(':invalid') as
+        | HTMLInputElement
+        | HTMLSelectElement
+        | HTMLTextAreaElement
+        | null;
+
+      if (firstInvalid) {
+        firstInvalid.focus?.();
+        const field = (firstInvalid.getAttribute('name') || '').trim();
+        const msg =
+          field
+            ? `Проверьте поле: «${niceFieldName(field)}». Оно заполнено неверно или не заполнено.`
+            : 'Проверьте обязательные поля — некоторые заполнены неверно.';
+        tgAlert(msg);
+      } else {
+        tgAlert('Проверьте обязательные поля — некоторые заполнены неверно.');
       }
       return;
     }
 
+    haptic('medium');
+
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    // Берём initData (строка Telegram WebApp)
+    const initData = getTelegramInitData();
+    if (!initData) {
+      tgAlert('Не удалось получить данные Telegram. Откройте анкету именно через Telegram (WebApp).');
+      return;
+    }
+
     try {
+      setSubmitting(true);
+
       const res = await fetch('/api/doctor/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,36 +105,22 @@ export default function DoctorRegistrationPage() {
         const msg =
           j?.error === 'BAD_HASH'
             ? 'Ошибка проверки Telegram (BAD_HASH). Проверь TELEGRAM_BOT_TOKEN на сервере.'
-            : 'Ошибка сохранения анкеты. Попробуйте ещё раз.';
-        try {
-          (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
-        } catch {
-          alert(msg);
-        }
+            : j?.error === 'VALIDATION_ERROR'
+              ? `Ошибка в поле: ${niceFieldName(j?.field || '')}`
+              : 'Ошибка сохранения анкеты. Попробуйте ещё раз.';
+        tgAlert(msg);
         return;
       }
 
-      // ✅ УСПЕХ: идём на следующий шаг (загрузка фото/диплома)
-      // (doctorId можно вытащить из ответа, если понадобится позже)
       await res.json().catch(() => ({}));
 
-      try {
-        (window as any)?.Telegram?.WebApp?.showAlert?.(
-          'Анкета сохранена. Теперь загрузите фото и диплом.'
-        );
-      } catch {
-        alert('Анкета сохранена. Теперь загрузите фото и диплом.');
-      }
-
+      tgAlert('Анкета сохранена. Теперь загрузите фото и диплом.');
       router.push('/hamburger/doctorRegistration/docs');
     } catch (err) {
       console.error(err);
-      const msg = 'Сеть/сервер недоступны. Попробуйте позже.';
-      try {
-        (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
-      } catch {
-        alert(msg);
-      }
+      tgAlert('Сеть/сервер недоступны. Попробуйте позже.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -95,7 +130,6 @@ export default function DoctorRegistrationPage() {
 
       <h1 className="docreg-title">Анкета врача</h1>
 
-      {/* ✅ НОВОЕ: ссылка на требования */}
       <button
         type="button"
         className="docreg-treb-link"
@@ -108,8 +142,7 @@ export default function DoctorRegistrationPage() {
       </button>
 
       <p className="docreg-sub">
-        Заполните основные данные. Эти сведения помогут пациентам найти вас в
-        сервисе{' '}
+        Заполните основные данные. Эти сведения помогут пациентам найти вас в сервисе{' '}
         <span className="brand-black">ВРАЧИ.</span>
         <span className="brand-green">ТУТ</span>.
       </p>
@@ -123,36 +156,19 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input
-              name="lastName"
-              type="text"
-              required
-              placeholder="Иванов"
-              className="docreg-input"
-            />
+            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input
-              name="firstName"
-              type="text"
-              required
-              placeholder="Иван"
-              className="docreg-input"
-            />
+            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Отчество</span>
-            <input
-              name="middleName"
-              type="text"
-              placeholder="Отчество (по желанию)"
-              className="docreg-input"
-            />
+            <input name="middleName" type="text" placeholder="Отчество (по желанию)" className="docreg-input" />
           </label>
 
           <div className="docreg-field">
@@ -161,13 +177,7 @@ export default function DoctorRegistrationPage() {
             </span>
             <div className="docreg-radio-row">
               <label className="docreg-radio">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="male"
-                  required
-                  defaultChecked
-                />
+                <input type="radio" name="gender" value="male" required defaultChecked />
                 <span>Мужской</span>
               </label>
               <label className="docreg-radio">
@@ -180,38 +190,15 @@ export default function DoctorRegistrationPage() {
           <div className="docreg-field">
             <span className="docreg-label">Дата рождения</span>
             <div className="docreg-dob-row">
-              <input
-                name="birthDay"
-                type="number"
-                inputMode="numeric"
-                placeholder="День"
-                className="docreg-input"
-              />
-              <input
-                name="birthMonth"
-                type="number"
-                inputMode="numeric"
-                placeholder="Месяц"
-                className="docreg-input"
-              />
-              <input
-                name="birthYear"
-                type="number"
-                inputMode="numeric"
-                placeholder="Год"
-                className="docreg-input"
-              />
+              <input name="birthDay" type="number" inputMode="numeric" placeholder="День" className="docreg-input" />
+              <input name="birthMonth" type="number" inputMode="numeric" placeholder="Месяц" className="docreg-input" />
+              <input name="birthYear" type="number" inputMode="numeric" placeholder="Год" className="docreg-input" />
             </div>
           </div>
 
           <label className="docreg-field">
             <span className="docreg-label">Город</span>
-            <input
-              name="city"
-              type="text"
-              placeholder="Город работы/приёма"
-              className="docreg-input"
-            />
+            <input name="city" type="text" placeholder="Город работы/приёма" className="docreg-input" />
           </label>
         </section>
 
@@ -224,12 +211,7 @@ export default function DoctorRegistrationPage() {
               Специализации<span className="req">*</span>
             </span>
 
-            <select
-              name="speciality1"
-              required
-              className="docreg-input docreg-select"
-              defaultValue=""
-            >
+            <select name="speciality1" required className="docreg-input docreg-select" defaultValue="">
               <option value="" disabled>
                 Основная специализация
               </option>
@@ -240,11 +222,7 @@ export default function DoctorRegistrationPage() {
               ))}
             </select>
 
-            <select
-              name="speciality2"
-              className="docreg-input docreg-select docreg-select-second"
-              defaultValue=""
-            >
+            <select name="speciality2" className="docreg-input docreg-select docreg-select-second" defaultValue="">
               <option value="" disabled>
                 Дополнительная специализация (по желанию)
               </option>
@@ -255,11 +233,7 @@ export default function DoctorRegistrationPage() {
               ))}
             </select>
 
-            <select
-              name="speciality3"
-              className="docreg-input docreg-select docreg-select-third"
-              defaultValue=""
-            >
+            <select name="speciality3" className="docreg-input docreg-select docreg-select-third" defaultValue="">
               <option value="" disabled>
                 Ещё одна специализация (по желанию)
               </option>
@@ -271,8 +245,7 @@ export default function DoctorRegistrationPage() {
             </select>
 
             <span className="docreg-hint">
-              Выберите до трёх специальностей, по которым у вас есть профильное
-              образование и по которым вы сможете консультировать и подтвердить
+              Выберите до трёх специальностей, по которым у вас есть профильное образование и по которым вы сможете консультировать и подтвердить
               квалификацию документами.
             </span>
           </div>
@@ -292,11 +265,7 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Научная степень</span>
-            <select
-              name="degree"
-              className="docreg-input docreg-select"
-              defaultValue="none"
-            >
+            <select name="degree" className="docreg-input docreg-select" defaultValue="none">
               <option value="none">Нет</option>
               <option value="specialist">Специалист</option>
               <option value="candidate">Кандидат наук</option>
@@ -306,48 +275,24 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Место работы</span>
-            <input
-              name="workplace"
-              type="text"
-              placeholder="Клиника, медицинский центр"
-              className="docreg-input"
-            />
+            <input name="workplace" type="text" placeholder="Клиника, медицинский центр" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Должность</span>
-            <input
-              name="position"
-              type="text"
-              placeholder="Занимаемая должность"
-              className="docreg-input"
-            />
+            <input name="position" type="text" placeholder="Занимаемая должность" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Стаж работы, лет<span className="req">*</span>
             </span>
-            <input
-              name="experienceYears"
-              type="number"
-              required
-              min={0}
-              max={70}
-              inputMode="numeric"
-              placeholder="Общий стаж"
-              className="docreg-input"
-            />
+            <input name="experienceYears" type="number" required min={0} max={70} inputMode="numeric" placeholder="Общий стаж" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Награды</span>
-            <textarea
-              name="awards"
-              placeholder="Какие награды и благодарности вы получали."
-              className="docreg-textarea"
-              rows={2}
-            />
+            <textarea name="awards" placeholder="Какие награды и благодарности вы получали." className="docreg-textarea" rows={2} />
           </label>
         </section>
 
@@ -359,13 +304,7 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               E-mail<span className="req">*</span>
             </span>
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="doctor@example.com"
-              className="docreg-input"
-            />
+            <input name="email" type="email" required placeholder="doctor@example.com" className="docreg-input" />
           </label>
         </section>
 
@@ -377,16 +316,8 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea
-              name="about"
-              required
-              placeholder="Кратко расскажите о себе, стиле работы, подходе к пациентам."
-              className="docreg-textarea"
-              rows={3}
-            />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <textarea name="about" required placeholder="Кратко расскажите о себе, стиле работы, подходе к пациентам." className="docreg-textarea" rows={3} />
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
@@ -400,74 +331,41 @@ export default function DoctorRegistrationPage() {
               className="docreg-textarea"
               rows={3}
             />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea
-              name="experienceDetails"
-              required
-              placeholder="Опишите более подробно свой опыт работы."
-              className="docreg-textarea"
-              rows={3}
-            />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <textarea name="experienceDetails" required placeholder="Опишите более подробно свой опыт работы." className="docreg-textarea" rows={3} />
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Повышение квалификации</span>
-            <textarea
-              name="courses"
-              placeholder="Курсы, стажировки, доп. образование."
-              className="docreg-textarea"
-              rows={2}
-            />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <textarea name="courses" placeholder="Курсы, стажировки, доп. образование." className="docreg-textarea" rows={2} />
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Достижения и награды</span>
-            <textarea
-              name="achievements"
-              placeholder="Расскажите о профессиональных достижениях и наградах."
-              className="docreg-textarea"
-              rows={2}
-            />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <textarea name="achievements" placeholder="Расскажите о профессиональных достижениях и наградах." className="docreg-textarea" rows={2} />
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Научные труды</span>
-            <textarea
-              name="publications"
-              placeholder="Публикации, участие в конференциях, научная деятельность."
-              className="docreg-textarea"
-              rows={2}
-            />
-            <span className="docreg-hint">
-              Это поле будет отображаться в вашем профиле.
-            </span>
+            <textarea name="publications" placeholder="Публикации, участие в конференциях, научная деятельность." className="docreg-textarea" rows={2} />
+            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
         </section>
 
-        <button type="submit" className="docreg-submit">
-          Далее
+        <button type="submit" className="docreg-submit" disabled={submitting}>
+          {submitting ? 'Сохранение…' : 'Далее'}
         </button>
 
-        <p className="docreg-footnote">
-          Нажимая «Далее», вы подтверждаете корректность указанных данных.
-        </p>
+        <p className="docreg-footnote">Нажимая «Далее», вы подтверждаете корректность указанных данных.</p>
       </form>
 
       <style jsx>{`
@@ -483,7 +381,6 @@ export default function DoctorRegistrationPage() {
           color: #111827;
         }
 
-        /* ✅ НОВОЕ: стили ссылки */
         .docreg-treb-link {
           margin: 6px 0 0;
           padding: 0;
@@ -642,6 +539,11 @@ export default function DoctorRegistrationPage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
+        }
+
+        .docreg-submit:disabled {
+          opacity: 0.65;
+          cursor: default;
         }
 
         .docreg-submit:active {
