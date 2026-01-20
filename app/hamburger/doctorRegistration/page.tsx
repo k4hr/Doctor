@@ -44,7 +44,7 @@ function niceFieldName(name: string) {
   return map[name] || name;
 }
 
-function focusAndExplainInvalid(form: HTMLFormElement) {
+function focusFirstInvalid(form: HTMLFormElement) {
   const firstInvalid = form.querySelector(':invalid') as
     | HTMLInputElement
     | HTMLSelectElement
@@ -56,12 +56,9 @@ function focusAndExplainInvalid(form: HTMLFormElement) {
     firstInvalid.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
 
     const field = (firstInvalid.getAttribute('name') || '').trim();
-    const msg = field
-      ? `Проверьте поле: «${niceFieldName(field)}». Оно заполнено неверно или не заполнено.`
-      : 'Проверьте обязательные поля — некоторые заполнены неверно.';
-    tgAlert(msg);
+    if (field) tgAlert(`Проверьте поле: «${niceFieldName(field)}».`);
   } else {
-    tgAlert('Проверьте обязательные поля — некоторые заполнены неверно.');
+    tgAlert('Проверьте обязательные поля.');
   }
 }
 
@@ -75,21 +72,20 @@ export default function DoctorRegistrationPage() {
 
     const form = e.currentTarget;
 
-    // Если форма не валидна — покажем свою подсказку (в Telegram WebApp часто не видно native подсказок)
+    // В Telegram WebView native подсказки иногда не видны — но submit должен работать.
     const ok = form.reportValidity();
     if (!ok) {
       haptic('light');
-      focusAndExplainInvalid(form);
+      focusFirstInvalid(form);
       return;
     }
 
     haptic('medium');
 
     const data = Object.fromEntries(new FormData(form).entries());
-
     const initData = getTelegramInitData();
     if (!initData) {
-      tgAlert('Не удалось получить данные Telegram. Откройте анкету именно через Telegram (WebApp).');
+      tgAlert('Откройте анкету через Telegram (WebApp).');
       return;
     }
 
@@ -115,7 +111,6 @@ export default function DoctorRegistrationPage() {
         return;
       }
 
-      tgAlert('Анкета сохранена. Теперь загрузите фото и диплом.');
       router.push('/hamburger/doctorRegistration/docs');
     } catch (err) {
       console.error(err);
@@ -157,14 +152,28 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" />
+            <input
+              name="lastName"
+              type="text"
+              required
+              placeholder="Иванов"
+              className="docreg-input"
+              autoComplete="family-name"
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" />
+            <input
+              name="firstName"
+              type="text"
+              required
+              placeholder="Иван"
+              className="docreg-input"
+              autoComplete="given-name"
+            />
           </label>
 
           <label className="docreg-field">
@@ -191,9 +200,33 @@ export default function DoctorRegistrationPage() {
           <div className="docreg-field">
             <span className="docreg-label">Дата рождения</span>
             <div className="docreg-dob-row">
-              <input name="birthDay" type="number" inputMode="numeric" placeholder="День" className="docreg-input" />
-              <input name="birthMonth" type="number" inputMode="numeric" placeholder="Месяц" className="docreg-input" />
-              <input name="birthYear" type="number" inputMode="numeric" placeholder="Год" className="docreg-input" />
+              <input
+                name="birthDay"
+                type="number"
+                inputMode="numeric"
+                placeholder="День"
+                className="docreg-input"
+                min={1}
+                max={31}
+              />
+              <input
+                name="birthMonth"
+                type="number"
+                inputMode="numeric"
+                placeholder="Месяц"
+                className="docreg-input"
+                min={1}
+                max={12}
+              />
+              <input
+                name="birthYear"
+                type="number"
+                inputMode="numeric"
+                placeholder="Год"
+                className="docreg-input"
+                min={1900}
+                max={2100}
+              />
             </div>
           </div>
 
@@ -302,7 +335,12 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Награды</span>
-            <textarea name="awards" placeholder="Какие награды и благодарности вы получали." className="docreg-textarea" rows={2} />
+            <textarea
+              name="awards"
+              placeholder="Какие награды и благодарности вы получали."
+              className="docreg-textarea"
+              rows={2}
+            />
           </label>
         </section>
 
@@ -314,7 +352,14 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               E-mail<span className="req">*</span>
             </span>
-            <input name="email" type="email" required placeholder="doctor@example.com" className="docreg-input" />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="doctor@example.com"
+              className="docreg-input"
+              autoComplete="email"
+            />
           </label>
         </section>
 
@@ -372,27 +417,30 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Достижения и награды</span>
-            <textarea name="achievements" placeholder="Расскажите о профессиональных достижениях и наградах." className="docreg-textarea" rows={2} />
+            <textarea
+              name="achievements"
+              placeholder="Расскажите о профессиональных достижениях и наградах."
+              className="docreg-textarea"
+              rows={2}
+            />
             <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Научные труды</span>
-            <textarea name="publications" placeholder="Публикации, участие в конференциях, научная деятельность." className="docreg-textarea" rows={2} />
+            <textarea
+              name="publications"
+              placeholder="Публикации, участие в конференциях, научная деятельность."
+              className="docreg-textarea"
+              rows={2}
+            />
             <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
         </section>
 
-        {/* ✅ КНОПКА закреплена поверх всего, чтобы никакие слои/хедеры Telegram не перекрывали тап */}
+        {/* ✅ Кнопка закреплена снизу. Без алертов/дебага. */}
         <div className="docreg-submit-wrap">
-          <button
-            type="submit"
-            className="docreg-submit"
-            disabled={submitting}
-            onPointerDown={() => {
-              tgAlert('tap ok');
-            }}
-          >
+          <button type="submit" className="docreg-submit" disabled={submitting}>
             {submitting ? 'Сохранение…' : 'Далее'}
           </button>
 
@@ -400,29 +448,21 @@ export default function DoctorRegistrationPage() {
         </div>
       </form>
 
-      {/* ✅ DEBUG OVERLAY: показывает верхний элемент под пальцем */}
-      <div
-        onPointerDown={(e) => {
-          const x = (e as any).clientX ?? 0;
-          const y = (e as any).clientY ?? 0;
-          const el = document.elementFromPoint(x, y) as HTMLElement | null;
-          alert(`TOP ELEMENT: ${el?.tagName || 'none'}.${el?.className || ''}#${el?.id || ''}`);
-        }}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 999999,
-          background: 'rgba(255,0,0,0.03)',
-          pointerEvents: 'auto',
-        }}
-      />
-
       <style jsx>{`
+        /* Убираем горизонтальные скроллы и "дрожание" ширины */
         .docreg {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           position: relative;
           z-index: 1;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+
+        /* На всякий пожарный: любые дети тоже не должны расширять вбок */
+        .docreg :global(*) {
+          max-width: 100%;
         }
 
         .docreg-title {
@@ -472,9 +512,9 @@ export default function DoctorRegistrationPage() {
           flex-direction: column;
           gap: 14px;
           margin-top: 4px;
-
-          /* важно: место под закреплённую кнопку */
-          padding-bottom: 160px;
+          padding-bottom: 160px; /* место под фикс-кнопку */
+          width: 100%;
+          max-width: 100%;
         }
 
         .docreg-card {
@@ -485,6 +525,7 @@ export default function DoctorRegistrationPage() {
           border: 1px solid rgba(15, 23, 42, 0.04);
           width: 100%;
           box-sizing: border-box;
+          max-width: 100%;
         }
 
         .docreg-card-title {
@@ -499,6 +540,8 @@ export default function DoctorRegistrationPage() {
           flex-direction: column;
           gap: 4px;
           margin-bottom: 10px;
+          width: 100%;
+          max-width: 100%;
         }
 
         .docreg-label {
@@ -516,6 +559,7 @@ export default function DoctorRegistrationPage() {
         .docreg-textarea,
         .docreg-select {
           width: 100%;
+          max-width: 100%;
           border-radius: 12px;
           border: 1px solid rgba(156, 163, 175, 0.7);
           padding: 9px 11px;
@@ -523,7 +567,6 @@ export default function DoctorRegistrationPage() {
           outline: none;
           background: #ffffff;
           box-sizing: border-box;
-          max-width: 100%;
         }
 
         .docreg-input:focus,
@@ -556,6 +599,7 @@ export default function DoctorRegistrationPage() {
           display: flex;
           gap: 16px;
           margin-top: 2px;
+          flex-wrap: wrap;
         }
 
         .docreg-radio {
@@ -573,20 +617,22 @@ export default function DoctorRegistrationPage() {
         .docreg-dob-row {
           display: flex;
           gap: 8px;
+          width: 100%;
+          max-width: 100%;
         }
 
         .docreg-dob-row .docreg-input {
           flex: 1;
+          min-width: 0; /* 🔥 чтобы flex-дети не распирали вбок */
         }
 
-        /* ✅ закреплённый блок кнопки */
+        /* ✅ фикс-блок кнопки */
         .docreg-submit-wrap {
           position: fixed;
           left: 0;
           right: 0;
           bottom: 0;
           z-index: 9999;
-
           padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
           background: rgba(255, 255, 255, 0.92);
           backdrop-filter: blur(10px);
@@ -605,7 +651,6 @@ export default function DoctorRegistrationPage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
-          pointer-events: auto;
         }
 
         .docreg-submit:disabled {
