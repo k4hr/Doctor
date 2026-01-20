@@ -65,35 +65,41 @@ function isAdmin(telegramId: string) {
   const set = new Set(
     raw
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean)
   );
   return set.has(String(telegramId));
 }
 
+function toPublicUrlMaybe(value: string | null) {
+  if (!value) return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return v;
+
+  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
+  if (!base) return v; // оставим как key (на случай, если ты позже сделаешь прокси)
+  return `${base.replace(/\/$/, '')}/${v}`;
+}
+
 export async function GET(req: Request) {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
-    }
+    if (!botToken) return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
 
     const initData = getInitDataFromRequest(req);
-    if (!initData) {
-      return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
-    }
+    if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
 
     const telegramId = verifyAndExtractTelegramId(initData, botToken);
-    if (!telegramId) {
-      return NextResponse.json({ ok: false, error: 'BAD_INITDATA' }, { status: 401 });
-    }
+    if (!telegramId) return NextResponse.json({ ok: false, error: 'BAD_INITDATA' }, { status: 401 });
 
-    if (!isAdmin(telegramId)) {
-      return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 });
-    }
+    if (!isAdmin(telegramId)) return NextResponse.json({ ok: false, error: 'FORBIDDEN' }, { status: 403 });
 
     const list = await prisma.doctor.findMany({
-      where: { status: { in: ['PENDING', 'NEED_FIX'] } },
+      where: {
+        status: { in: ['PENDING', 'NEED_FIX'] },
+        submittedAt: { not: null }, // реально отправленные
+      },
       orderBy: { updatedAt: 'desc' },
       take: 100,
       select: {
@@ -115,7 +121,13 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, items: list });
+    const items = list.map((d) => ({
+      ...d,
+      profilePhotoUrl: toPublicUrlMaybe(d.profilePhotoUrl),
+      diplomaPhotoUrl: toPublicUrlMaybe(d.diplomaPhotoUrl),
+    }));
+
+    return NextResponse.json({ ok: true, items });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ ok: false, error: 'SERVER_ERROR' }, { status: 500 });
