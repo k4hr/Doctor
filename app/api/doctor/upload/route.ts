@@ -4,9 +4,6 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 type TgUser = {
   id: string;
   username: string | null;
@@ -14,64 +11,50 @@ type TgUser = {
   last_name: string | null;
 };
 
-function timingSafeEqualHex(a: string, b: string) {
-  try {
-    const ab = Buffer.from(a, 'hex');
-    const bb = Buffer.from(b, 'hex');
-    if (ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch {
-    return false;
-  }
-}
-
 function verifyTelegramWebAppInitData(initData: string, botToken: string) {
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
+
+  params.delete('hash');
+
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n');
+
+  const secretKey = crypto
+    .createHmac('sha256', 'WebAppData')
+    .update(botToken)
+    .digest();
+
+  const computedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
+
+  if (computedHash !== hash) return { ok: false as const, error: 'BAD_HASH' as const };
+
+  const userStr = params.get('user');
+  if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
+
+  let userJson: any;
   try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
-
-    params.delete('hash');
-
-    const dataCheckString = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-
-    const computedHash = crypto
-      .createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
-
-    if (!timingSafeEqualHex(computedHash, hash)) {
-      return { ok: false as const, error: 'BAD_HASH' as const };
-    }
-
-    const userStr = params.get('user');
-    if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
-
-    let userJson: any;
-    try {
-      userJson = JSON.parse(userStr);
-    } catch {
-      return { ok: false as const, error: 'BAD_USER_JSON' as const };
-    }
-
-    if (!userJson?.id) return { ok: false as const, error: 'NO_USER_ID' as const };
-
-    const user: TgUser = {
-      id: String(userJson.id),
-      username: userJson.username ? String(userJson.username) : null,
-      first_name: userJson.first_name ? String(userJson.first_name) : null,
-      last_name: userJson.last_name ? String(userJson.last_name) : null,
-    };
-
-    return { ok: true as const, user };
+    userJson = JSON.parse(userStr);
   } catch {
-    return { ok: false as const, error: 'BAD_INITDATA' as const };
+    return { ok: false as const, error: 'BAD_USER_JSON' as const };
   }
+
+  if (!userJson?.id) return { ok: false as const, error: 'NO_USER_ID' as const };
+
+  const user: TgUser = {
+    id: String(userJson.id),
+    username: userJson.username ? String(userJson.username) : null,
+    first_name: userJson.first_name ? String(userJson.first_name) : null,
+    last_name: userJson.last_name ? String(userJson.last_name) : null,
+  };
+
+  return { ok: true as const, user };
 }
 
 function safeExt(mime: string) {
@@ -103,27 +86,15 @@ function makeS3() {
   });
 }
 
-async function putObjectToR2(opts: {
-  bucket: string;
-  key: string;
-  contentType: string;
-  bytes: Uint8Array;
-}) {
-  const s3 = makeS3();
-  const cmd = new PutObjectCommand({
-    Bucket: opts.bucket,
-    Key: opts.key,
-    Body: opts.bytes,
-    ContentType: opts.contentType,
-    CacheControl: 'public, max-age=31536000, immutable',
-  });
-  await s3.send(cmd);
-}
-
-function publicUrlFor(key: string) {
-  const base = process.env.R2_PUBLIC_BASE_URL || '';
+function publicUrlForKey(key: string) {
+  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
   if (!base) return null;
   return `${base.replace(/\/$/, '')}/${key}`;
+}
+
+async function fileToBuffer(file: File) {
+  const ab = await file.arrayBuffer();
+  return Buffer.from(ab);
 }
 
 export async function POST(req: Request) {
@@ -136,56 +107,38 @@ export async function POST(req: Request) {
       );
     }
 
-    const r2Bucket = process.env.R2_BUCKET;
     const r2AccountId = process.env.R2_ACCOUNT_ID;
+    const r2Bucket = process.env.R2_BUCKET;
     const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
     const r2Secret = process.env.R2_SECRET_ACCESS_KEY;
 
-    if (!r2Bucket || !r2AccountId || !r2AccessKeyId || !r2Secret) {
+    if (!r2AccountId || !r2Bucket || !r2AccessKeyId || !r2Secret) {
       return NextResponse.json(
         {
           ok: false,
           error: 'NO_R2_ENV',
           hint:
-            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and R2_PUBLIC_BASE_URL)',
+            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and optionally R2_PUBLIC_BASE_URL)',
         },
         { status: 500 }
       );
     }
 
-    const fd = await req.formData();
-    const initData = String(fd.get('initData') || '').trim();
-    const profileFile = fd.get('profilePhoto');
-    const diplomaFile = fd.get('diplomaPhoto');
+    const form = await req.formData();
+    const initData = String(form.get('initData') || '').trim();
+
+    const profileFile = form.get('profilePhoto');
+    const diplomaFile = form.get('diplomaPhoto');
 
     if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
+    if (!(profileFile instanceof File) || !(diplomaFile instanceof File)) {
+      return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
+    }
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
 
     const telegramId = v.user.id;
-
-    if (!(profileFile instanceof File) || !(diplomaFile instanceof File)) {
-      return NextResponse.json(
-        { ok: false, error: 'FILES_REQUIRED', hint: 'Need profilePhoto and diplomaPhoto' },
-        { status: 400 }
-      );
-    }
-
-    if (!isAllowedMime(profileFile.type) || !isAllowedMime(diplomaFile.type)) {
-      return NextResponse.json({ ok: false, error: 'BAD_MIME' }, { status: 400 });
-    }
-
-    // лимиты (можешь поменять)
-    const maxProfile = 8 * 1024 * 1024;
-    const maxDiploma = 25 * 1024 * 1024;
-
-    if (profileFile.size > maxProfile) {
-      return NextResponse.json({ ok: false, error: 'PROFILE_TOO_LARGE', maxBytes: maxProfile }, { status: 400 });
-    }
-    if (diplomaFile.size > maxDiploma) {
-      return NextResponse.json({ ok: false, error: 'DIPLOMA_TOO_LARGE', maxBytes: maxDiploma }, { status: 400 });
-    }
 
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
@@ -199,46 +152,69 @@ export async function POST(req: Request) {
       );
     }
 
-    const now = Date.now();
+    const profileMime = profileFile.type || '';
+    const diplomaMime = diplomaFile.type || '';
 
-    const profileKey = `doctors/${doctor.id}/profile-${now}.${safeExt(profileFile.type)}`;
-    const diplomaKey = `doctors/${doctor.id}/diploma-${now}.${safeExt(diplomaFile.type)}`;
+    if (!isAllowedMime(profileMime)) {
+      return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhoto' }, { status: 400 });
+    }
+    if (!isAllowedMime(diplomaMime)) {
+      return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'diplomaPhoto' }, { status: 400 });
+    }
 
-    const profileBytes = new Uint8Array(await profileFile.arrayBuffer());
-    const diplomaBytes = new Uint8Array(await diplomaFile.arrayBuffer());
+    // лимиты
+    const maxAvatar = 8 * 1024 * 1024;
+    const maxDiploma = 25 * 1024 * 1024;
+    if (profileFile.size > maxAvatar) return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhoto', maxBytes: maxAvatar }, { status: 400 });
+    if (diplomaFile.size > maxDiploma) return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'diplomaPhoto', maxBytes: maxDiploma }, { status: 400 });
 
-    await putObjectToR2({
-      bucket: r2Bucket,
-      key: profileKey,
-      contentType: profileFile.type,
-      bytes: profileBytes,
-    });
+    const s3 = makeS3();
 
-    await putObjectToR2({
-      bucket: r2Bucket,
-      key: diplomaKey,
-      contentType: diplomaFile.type,
-      bytes: diplomaBytes,
-    });
+    const profileKey = `doctors/${doctor.id}/avatar-${Date.now()}.${safeExt(profileMime)}`;
+    const diplomaKey = `doctors/${doctor.id}/diploma-${Date.now()}.${safeExt(diplomaMime)}`;
 
-    const profileUrl = publicUrlFor(profileKey);
-    const diplomaUrl = publicUrlFor(diplomaKey);
+    // upload profile
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: r2Bucket,
+        Key: profileKey,
+        Body: await fileToBuffer(profileFile),
+        ContentType: profileMime,
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    );
 
-    // отметим как отправлено на модерацию
+    // upload diploma
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: r2Bucket,
+        Key: diplomaKey,
+        Body: await fileToBuffer(diplomaFile),
+        ContentType: diplomaMime,
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    );
+
+    const profileUrl = publicUrlForKey(profileKey);
+    const diplomaUrl = publicUrlForKey(diplomaKey);
+
+    // если public base url не задан — сохраняем хотя бы ключи (можно потом сделать /api/file?key=... signed GET)
     await prisma.doctor.update({
-      where: { telegramId },
+      where: { id: doctor.id },
       data: {
-        profilePhotoUrl: profileUrl,
-        diplomaPhotoUrl: diplomaUrl,
+        profilePhotoUrl: profileUrl || profileKey,
+        diplomaPhotoUrl: diplomaUrl || diplomaKey,
         submittedAt: new Date(),
-        status: 'PENDING',
+        status: 'PENDING', // если было NEED_FIX — снова на модерацию
       },
     });
 
     return NextResponse.json({
       ok: true,
-      profilePhotoUrl: profileUrl,
-      diplomaPhotoUrl: diplomaUrl,
+      doctorId: doctor.id,
+      profilePhotoUrl: profileUrl || profileKey,
+      diplomaPhotoUrl: diplomaUrl || diplomaKey,
+      submittedAt: new Date().toISOString(),
       status: 'PENDING',
     });
   } catch (e) {
