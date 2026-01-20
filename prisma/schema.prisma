@@ -9,50 +9,63 @@ datasource db {
 }
 
 enum DoctorStatus {
-  PENDING
-  NEED_FIX
-  APPROVED
-  REJECTED
+  PENDING     // анкета создана, но не отправлена / или ожидает модерацию
+  NEED_FIX    // модератор запросил правки
+  APPROVED    // одобрен
+  REJECTED    // отклонён окончательно
 }
 
 model Doctor {
-  id        String       @id @default(cuid())
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  submittedAt DateTime?  // когда реально отправлено на модерацию (после загрузки доков)
-  status    DoctorStatus @default(PENDING)
+  // --------------------
+  // Системные поля
+  // --------------------
+  id          String       @id @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  submittedAt DateTime?    // реально отправлено на модерацию (после загрузки доков)
+  status      DoctorStatus @default(PENDING)
 
+  // --------------------
   // Telegram
+  // --------------------
   telegramId        String  @unique
   telegramUsername  String?
   telegramFirstName String?
   telegramLastName  String?
 
+  // --------------------
   // Личные данные
+  // --------------------
   lastName   String
   firstName  String
   middleName String?
-  gender     String
+  gender     String        // male / female (строка, без enum — гибче)
   birthDay   Int?
   birthMonth Int?
   birthYear  Int?
   city       String?
 
+  // --------------------
   // Профессиональные данные
+  // --------------------
   speciality1     String
   speciality2     String?
   speciality3     String?
   education       String
-  degree          String?
+  degree          String?  // none / specialist / candidate / doctor
   workplace       String?
   position        String?
   experienceYears Int
   awards          String?
 
+  // --------------------
   // Контакты
+  // --------------------
   email String
 
-  // Дополнительно
+  // --------------------
+  // Описание профиля
+  // --------------------
   about             String
   specialityDetails String
   experienceDetails String
@@ -60,11 +73,17 @@ model Doctor {
   achievements      String?
   publications      String?
 
+  // --------------------
   // Документы (после шага docs)
+  // --------------------
   profilePhotoUrl String?
   diplomaPhotoUrl String?
 
+  // --------------------
+  // Индексы
+  // --------------------
   @@index([status])
   @@index([speciality1])
   @@index([city])
+  @@index([submittedAt])
 }
