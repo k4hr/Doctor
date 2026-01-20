@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type TgUser = {
   id: string;
   username: string | null;
@@ -22,16 +25,35 @@ function toStr(v: any): string | null {
   return s.length ? s : null;
 }
 
-/**
- * Telegram WebApp initData verification (official algorithm):
- * - data_check_string: sorted params (except hash) joined with \n
- * - secret_key = HMAC_SHA256("WebAppData", bot_token)
- * - computed_hash = HMAC_SHA256(secret_key, data_check_string)
- */
-function verifyTelegramWebAppInitData(initData: string, botToken: string) {
+function timingSafeEqualHex(a: string, b: string) {
+  try {
+    const ab = Buffer.from(a, 'hex');
+    const bb = Buffer.from(b, 'hex');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
+function verifyTelegramWebAppInitData(
+  initData: string,
+  botToken: string,
+  maxAgeSec = 60 * 60 * 24 // 24 часа, можешь сделать 1 час
+) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
+
+  const authDateStr = params.get('auth_date');
+  if (!authDateStr) return { ok: false as const, error: 'NO_AUTH_DATE' as const };
+
+  const authDate = Number(authDateStr);
+  if (!Number.isFinite(authDate)) return { ok: false as const, error: 'BAD_AUTH_DATE' as const };
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (authDate > nowSec + 60) return { ok: false as const, error: 'AUTH_DATE_IN_FUTURE' as const };
+  if (nowSec - authDate > maxAgeSec) return { ok: false as const, error: 'INITDATA_EXPIRED' as const };
 
   params.delete('hash');
 
@@ -40,17 +62,14 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
     .map(([k, v]) => `${k}=${v}`)
     .join('\n');
 
-  const secretKey = crypto
-    .createHmac('sha256', 'WebAppData')
-    .update(botToken)
-    .digest();
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
 
   const computedHash = crypto
     .createHmac('sha256', secretKey)
     .update(dataCheckString)
     .digest('hex');
 
-  if (computedHash !== hash) {
+  if (!timingSafeEqualHex(computedHash, hash)) {
     return { ok: false as const, error: 'BAD_HASH' as const };
   }
 
@@ -91,7 +110,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
     }
 
-    const initData = typeof body.initData === 'string' ? body.initData : '';
+    const initData = typeof (body as any).initData === 'string' ? (body as any).initData : '';
     if (!initData) {
       return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
     }
@@ -103,7 +122,6 @@ export async function POST(req: Request) {
 
     const telegramId = v.user.id;
 
-    // обязательные поля
     const required = [
       'lastName',
       'firstName',
@@ -120,22 +138,20 @@ export async function POST(req: Request) {
     for (const k of required) {
       const val = (body as any)[k];
       if (val === undefined || val === null || String(val).trim() === '') {
-        return NextResponse.json(
-          { ok: false, error: 'VALIDATION_ERROR', field: k },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: k }, { status: 400 });
       }
+    }
+
+    const genderRaw = String((body as any).gender).trim().toLowerCase();
+    if (genderRaw !== 'male' && genderRaw !== 'female') {
+      return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: 'gender' }, { status: 400 });
     }
 
     const experienceYears = Number((body as any).experienceYears);
     if (!Number.isFinite(experienceYears) || experienceYears < 0 || experienceYears > 70) {
-      return NextResponse.json(
-        { ok: false, error: 'VALIDATION_ERROR', field: 'experienceYears' },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'VALIDATION_ERROR', field: 'experienceYears' }, { status: 400 });
     }
 
-    // создаём/обновляем анкету по telegramId
     const doctor = await prisma.doctor.upsert({
       where: { telegramId },
       create: {
@@ -147,7 +163,7 @@ export async function POST(req: Request) {
         lastName: String((body as any).lastName).trim(),
         firstName: String((body as any).firstName).trim(),
         middleName: toStr((body as any).middleName),
-        gender: String((body as any).gender).trim(),
+        gender: genderRaw,
         birthDay: toInt((body as any).birthDay),
         birthMonth: toInt((body as any).birthMonth),
         birthYear: toInt((body as any).birthYear),
@@ -171,8 +187,6 @@ export async function POST(req: Request) {
         courses: toStr((body as any).courses),
         achievements: toStr((body as any).achievements),
         publications: toStr((body as any).publications),
-
-        // статус по умолчанию PENDING (в схеме)
       },
       update: {
         telegramUsername: v.user.username,
@@ -182,7 +196,7 @@ export async function POST(req: Request) {
         lastName: String((body as any).lastName).trim(),
         firstName: String((body as any).firstName).trim(),
         middleName: toStr((body as any).middleName),
-        gender: String((body as any).gender).trim(),
+        gender: genderRaw,
         birthDay: toInt((body as any).birthDay),
         birthMonth: toInt((body as any).birthMonth),
         birthYear: toInt((body as any).birthYear),
@@ -206,18 +220,10 @@ export async function POST(req: Request) {
         courses: toStr((body as any).courses),
         achievements: toStr((body as any).achievements),
         publications: toStr((body as any).publications),
-
-        // хочешь при каждом редактировании снова на модерацию — раскомментируй:
-        // status: 'PENDING',
       },
     });
 
-    return NextResponse.json({
-      ok: true,
-      id: doctor.id,
-      telegramId,
-      status: doctor.status,
-    });
+    return NextResponse.json({ ok: true, id: doctor.id, telegramId, status: doctor.status });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ ok: false, error: 'FAILED_TO_SAVE' }, { status: 500 });
