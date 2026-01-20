@@ -4,6 +4,9 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type TgUser = {
   id: string;
   username: string | null;
@@ -23,15 +26,8 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
     .map(([k, v]) => `${k}=${v}`)
     .join('\n');
 
-  const secretKey = crypto
-    .createHmac('sha256', 'WebAppData')
-    .update(botToken)
-    .digest();
-
-  const computedHash = crypto
-    .createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex');
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
   if (computedHash !== hash) return { ok: false as const, error: 'BAD_HASH' as const };
 
@@ -66,12 +62,7 @@ function safeExt(mime: string) {
 }
 
 function isAllowedMime(mime: string) {
-  return (
-    mime === 'image/jpeg' ||
-    mime === 'image/png' ||
-    mime === 'image/webp' ||
-    mime === 'application/pdf'
-  );
+  return mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp' || mime === 'application/pdf';
 }
 
 function makeS3() {
@@ -101,10 +92,7 @@ export async function POST(req: Request) {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' }, { status: 500 });
     }
 
     const r2AccountId = process.env.R2_ACCOUNT_ID;
@@ -118,7 +106,7 @@ export async function POST(req: Request) {
           ok: false,
           error: 'NO_R2_ENV',
           hint:
-            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and optionally R2_PUBLIC_BASE_URL)',
+            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and R2_PUBLIC_BASE_URL for public links)',
         },
         { status: 500 }
       );
@@ -142,14 +130,11 @@ export async function POST(req: Request) {
 
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
-      select: { id: true, status: true },
+      select: { id: true },
     });
 
     if (!doctor) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' }, { status: 404 });
     }
 
     const profileMime = profileFile.type || '';
@@ -162,18 +147,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'diplomaPhoto' }, { status: 400 });
     }
 
-    // лимиты
     const maxAvatar = 8 * 1024 * 1024;
     const maxDiploma = 25 * 1024 * 1024;
-    if (profileFile.size > maxAvatar) return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhoto', maxBytes: maxAvatar }, { status: 400 });
-    if (diplomaFile.size > maxDiploma) return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'diplomaPhoto', maxBytes: maxDiploma }, { status: 400 });
+    if (profileFile.size > maxAvatar)
+      return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhoto', maxBytes: maxAvatar }, { status: 400 });
+    if (diplomaFile.size > maxDiploma)
+      return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'diplomaPhoto', maxBytes: maxDiploma }, { status: 400 });
 
     const s3 = makeS3();
 
     const profileKey = `doctors/${doctor.id}/avatar-${Date.now()}.${safeExt(profileMime)}`;
     const diplomaKey = `doctors/${doctor.id}/diploma-${Date.now()}.${safeExt(diplomaMime)}`;
 
-    // upload profile
     await s3.send(
       new PutObjectCommand({
         Bucket: r2Bucket,
@@ -184,7 +169,6 @@ export async function POST(req: Request) {
       })
     );
 
-    // upload diploma
     await s3.send(
       new PutObjectCommand({
         Bucket: r2Bucket,
@@ -195,17 +179,17 @@ export async function POST(req: Request) {
       })
     );
 
+    // делаем публичные ссылки (если задан base)
     const profileUrl = publicUrlForKey(profileKey);
     const diplomaUrl = publicUrlForKey(diplomaKey);
 
-    // если public base url не задан — сохраняем хотя бы ключи (можно потом сделать /api/file?key=... signed GET)
     await prisma.doctor.update({
       where: { id: doctor.id },
       data: {
         profilePhotoUrl: profileUrl || profileKey,
         diplomaPhotoUrl: diplomaUrl || diplomaKey,
         submittedAt: new Date(),
-        status: 'PENDING', // если было NEED_FIX — снова на модерацию
+        status: 'PENDING',
       },
     });
 
