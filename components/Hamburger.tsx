@@ -1,6 +1,7 @@
 /* path: components/Hamburger.tsx */
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 function haptic(type: 'light' | 'medium' = 'light') {
@@ -9,9 +10,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-/**
- * Лочим скролл
- */
+/** Лочим скролл */
 function lockBodyScroll() {
   try {
     const scrollY =
@@ -48,30 +47,64 @@ function unlockBodyScroll() {
   } catch {}
 }
 
+function isMenuOpen() {
+  try {
+    return document.body.classList.contains('menu-open');
+  } catch {
+    return false;
+  }
+}
+
 export default function Hamburger() {
   const router = useRouter();
 
-  const openMenu = () => {
-    haptic('light');
-    document.body.classList.add('menu-open');
-    lockBodyScroll();
+  const closeMenu = () => {
+    try {
+      document.body.classList.remove('menu-open');
+    } catch {}
+    unlockBodyScroll();
   };
 
-  const closeMenu = () => {
-    document.body.classList.remove('menu-open');
-    unlockBodyScroll();
+  const openMenu = () => {
+    haptic('light');
+    try {
+      document.body.classList.add('menu-open');
+    } catch {}
+    lockBodyScroll();
   };
 
   const go = (path: string, h: 'light' | 'medium' = 'light') => {
     haptic(h);
-    closeMenu();
+    closeMenu();          // важно закрыть ДО push
     router.push(path);
   };
+
+  // ✅ КЛЮЧЕВОЕ: очистка при монтировании/размонтировании
+  useEffect(() => {
+    // если класс уже "залип" откуда-то — лечим сразу
+    if (isMenuOpen()) closeMenu();
+
+    // при размонтировании страницы (route change) — гарантированно убираем оверлей/лок
+    return () => {
+      closeMenu();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ закрытие по Escape (удобно в браузере)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
       {/* Кнопка три полоски */}
-      <button type="button" className="menu-btn" onClick={openMenu}>
+      <button type="button" className="menu-btn" onClick={openMenu} aria-label="Меню">
         <span />
         <span />
         <span />
@@ -81,13 +114,12 @@ export default function Hamburger() {
       <div className="menu-overlay" onClick={closeMenu} />
 
       {/* Шторка */}
-      <aside className="side-menu">
-        <button type="button" className="side-close" onClick={closeMenu}>
+      <aside className="side-menu" aria-hidden={!isMenuOpen()}>
+        <button type="button" className="side-close" onClick={closeMenu} aria-label="Закрыть">
           ✕
         </button>
 
         <div className="side-inner">
-          {/* Основная кнопка */}
           <button
             type="button"
             className="side-primary-btn"
@@ -96,34 +128,15 @@ export default function Hamburger() {
             Задать вопрос
           </button>
 
-          {/* Меню */}
           <nav className="side-items">
-            <button onClick={() => go('/hamburger/profile')}>
-              Мой профиль
-            </button>
-
-            <button onClick={() => go('/hamburger/consultations')}>
-              Консультации
-            </button>
-
-            <button onClick={() => go('/hamburger/vrachi')}>
-              Врачи
-            </button>
-
-            <button onClick={() => go('/hamburger/help')}>
-              Помощь
-            </button>
-
-            <button onClick={() => go('/hamburger/about')}>
-              О нас
-            </button>
-
-            <button onClick={() => go('/hamburger/contacts')}>
-              Контакты
-            </button>
+            <button type="button" onClick={() => go('/hamburger/profile')}>Мой профиль</button>
+            <button type="button" onClick={() => go('/hamburger/consultations')}>Консультации</button>
+            <button type="button" onClick={() => go('/hamburger/vrachi')}>Врачи</button>
+            <button type="button" onClick={() => go('/hamburger/help')}>Помощь</button>
+            <button type="button" onClick={() => go('/hamburger/about')}>О нас</button>
+            <button type="button" onClick={() => go('/hamburger/contacts')}>Контакты</button>
           </nav>
 
-          {/* Кнопка врачам */}
           <button
             type="button"
             className="side-doctor-btn"
@@ -144,6 +157,7 @@ export default function Hamburger() {
           flex-direction: column;
           justify-content: space-between;
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .menu-btn span {
