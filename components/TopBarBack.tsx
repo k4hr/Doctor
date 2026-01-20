@@ -9,7 +9,7 @@ export default function TopBarBack() {
     <>
       <div className="app-topbar app-topbar--back">
         <div className="app-topbar-row app-topbar-row--back">
-          {/* Слева — текст "Назад" */}
+          {/* Слева — "Назад" */}
           <div className="topbar-left">
             <BackBtn fallback="/" label="Назад" />
           </div>
@@ -31,7 +31,8 @@ export default function TopBarBack() {
       <style jsx>{`
         .app-topbar {
           position: sticky;
-          top: calc(env(safe-area-inset-top, 0px) + 52px);
+          /* ✅ sticky должен быть "вверху", без +52px (это часто ломает клики/слои в WebView) */
+          top: env(safe-area-inset-top, 0px);
           z-index: 1000;
 
           margin: 0 -16px 8px;
@@ -39,11 +40,17 @@ export default function TopBarBack() {
 
           background: #ffffff;
           box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+
+          /* ✅ КЛЮЧЕВОЕ: сам контейнер НЕ ловит клики */
+          pointer-events: none;
         }
 
         .app-topbar-row {
           display: flex;
           align-items: center;
+
+          /* ✅ а вот содержимое ловит клики */
+          pointer-events: auto;
         }
 
         /* Три колонки: левый текст, центр-логотип, правый бургер */
@@ -53,9 +60,12 @@ export default function TopBarBack() {
 
         .topbar-left,
         .topbar-right {
-          min-width: 64px; /* одинаковая ширина слева/справа для идеального центра */
+          min-width: 64px;
           display: flex;
           align-items: center;
+
+          /* ✅ кликабельные зоны */
+          pointer-events: auto;
         }
 
         .topbar-left {
@@ -70,11 +80,11 @@ export default function TopBarBack() {
           display: inline-flex;
           align-items: baseline;
           gap: 4px;
-          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
-            sans-serif;
+          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
           font-weight: 900;
           font-size: 26px;
           letter-spacing: -0.02em;
+          pointer-events: none; /* логотип не должен мешать кликам */
         }
 
         .app-logo--center {
@@ -89,20 +99,6 @@ export default function TopBarBack() {
 
         .app-logo-accent {
           color: #24c768;
-        }
-
-        /* Аккуратный левый текст "Назад" */
-        .back-text {
-          font-size: 10px;
-          font-weight: 250;
-          color: rgba(11, 12, 16, 0.85);
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .back-text:active {
-          opacity: 0.7;
-          transform: translateX(-1px);
         }
       `}</style>
     </>
