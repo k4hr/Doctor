@@ -38,6 +38,7 @@ function verifyAndExtractTelegramId(initData: string, botToken: string): string 
 
     const userStr = params.get('user');
     if (!userStr) return null;
+
     const user = JSON.parse(userStr);
     if (!user?.id) return null;
 
@@ -53,18 +54,29 @@ function isAdmin(telegramId: string) {
   const set = new Set(
     raw
       .split(',')
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean)
   );
   return set.has(String(telegramId));
 }
 
+function toPublicUrlMaybe(value: string | null) {
+  if (!value) return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return v;
+
+  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
+  if (!base) return v;
+  return `${base.replace(/\/$/, '')}/${v}`;
+}
+
 export default async function DoctorAdminCardPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = await params;
+  const { id } = params;
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
   const initData = cookies().get('tg_init_data')?.value || '';
@@ -82,9 +94,7 @@ export default async function DoctorAdminCardPage({
     );
   }
 
-  const doctor = await prisma.doctor.findUnique({
-    where: { id },
-  });
+  const doctor = await prisma.doctor.findUnique({ where: { id } });
 
   if (!doctor) {
     return (
@@ -102,12 +112,23 @@ export default async function DoctorAdminCardPage({
     (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
     doctor.telegramId;
 
+  const profileUrl = toPublicUrlMaybe(doctor.profilePhotoUrl);
+  const diplomaUrl = toPublicUrlMaybe(doctor.diplomaPhotoUrl);
+
   return (
     <main style={{ padding: 16 }}>
       <TopBarBack />
       <h1 style={{ marginTop: 8 }}>Анкета врача</h1>
 
-      <div style={{ marginTop: 10, padding: 12, borderRadius: 14, border: '1px solid #e5e7eb', background: '#fff' }}>
+      <div
+        style={{
+          marginTop: 10,
+          padding: 12,
+          borderRadius: 14,
+          border: '1px solid #e5e7eb',
+          background: '#fff',
+        }}
+      >
         <div style={{ fontWeight: 900, fontSize: 16 }}>{fullName}</div>
         <div style={{ opacity: 0.7, marginTop: 4 }}>Telegram: {tgName}</div>
         <div style={{ marginTop: 6, fontWeight: 800 }}>
@@ -115,11 +136,24 @@ export default async function DoctorAdminCardPage({
         </div>
 
         <div style={{ marginTop: 10, display: 'grid', gap: 8, fontSize: 13 }}>
-          <div><b>Специализация:</b> {doctor.speciality1}{doctor.speciality2 ? `, ${doctor.speciality2}` : ''}{doctor.speciality3 ? `, ${doctor.speciality3}` : ''}</div>
-          <div><b>Город:</b> {doctor.city || '—'}</div>
-          <div><b>Стаж:</b> {doctor.experienceYears} лет</div>
-          <div><b>Email:</b> {doctor.email}</div>
-          <div><b>SubmittedAt:</b> {doctor.submittedAt ? new Date(doctor.submittedAt).toLocaleString() : '—'}</div>
+          <div>
+            <b>Специализация:</b> {doctor.speciality1}
+            {doctor.speciality2 ? `, ${doctor.speciality2}` : ''}
+            {doctor.speciality3 ? `, ${doctor.speciality3}` : ''}
+          </div>
+          <div>
+            <b>Город:</b> {doctor.city || '—'}
+          </div>
+          <div>
+            <b>Стаж:</b> {doctor.experienceYears} лет
+          </div>
+          <div>
+            <b>Email:</b> {doctor.email}
+          </div>
+          <div>
+            <b>SubmittedAt:</b>{' '}
+            {doctor.submittedAt ? new Date(doctor.submittedAt).toLocaleString() : '—'}
+          </div>
         </div>
 
         <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
@@ -127,9 +161,13 @@ export default async function DoctorAdminCardPage({
         <div style={{ display: 'grid', gap: 10 }}>
           <div>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>Фото профиля</div>
-            {doctor.profilePhotoUrl ? (
+            {profileUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={doctor.profilePhotoUrl} alt="profile" style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }} />
+              <img
+                src={profileUrl}
+                alt="profile"
+                style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }}
+              />
             ) : (
               <div style={{ opacity: 0.7 }}>Не загружено</div>
             )}
@@ -137,9 +175,13 @@ export default async function DoctorAdminCardPage({
 
           <div>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>Диплом</div>
-            {doctor.diplomaPhotoUrl ? (
+            {diplomaUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={doctor.diplomaPhotoUrl} alt="diploma" style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }} />
+              <img
+                src={diplomaUrl}
+                alt="diploma"
+                style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }}
+              />
             ) : (
               <div style={{ opacity: 0.7 }}>Не загружено</div>
             )}
@@ -149,10 +191,26 @@ export default async function DoctorAdminCardPage({
         <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
 
         <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
-          <div><b>Образование:</b><br />{doctor.education}</div>
-          <div><b>О себе:</b><br />{doctor.about}</div>
-          <div><b>Специализация подробно:</b><br />{doctor.specialityDetails}</div>
-          <div><b>Опыт подробно:</b><br />{doctor.experienceDetails}</div>
+          <div>
+            <b>Образование:</b>
+            <br />
+            {doctor.education}
+          </div>
+          <div>
+            <b>О себе:</b>
+            <br />
+            {doctor.about}
+          </div>
+          <div>
+            <b>Специализация подробно:</b>
+            <br />
+            {doctor.specialityDetails}
+          </div>
+          <div>
+            <b>Опыт подробно:</b>
+            <br />
+            {doctor.experienceDetails}
+          </div>
         </div>
 
         <p style={{ marginTop: 12, fontSize: 12, opacity: 0.6 }}>
