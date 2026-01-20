@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -16,7 +16,7 @@ function lockBodyScroll() {
     const scrollY =
       window.scrollY ||
       document.documentElement.scrollTop ||
-      document.body.scrollTop ||
+      (document.body as any).scrollTop ||
       0;
 
     (document.body as any).dataset.scrollY = String(scrollY);
@@ -26,6 +26,7 @@ function lockBodyScroll() {
     document.body.style.left = '0';
     document.body.style.right = '0';
     document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
   } catch {}
 }
 
@@ -38,6 +39,7 @@ function unlockBodyScroll() {
     document.body.style.left = '';
     document.body.style.right = '';
     document.body.style.width = '';
+    document.body.style.overflow = '';
     delete (document.body as any).dataset.scrollY;
 
     if (scrollYStr) {
@@ -47,16 +49,9 @@ function unlockBodyScroll() {
   } catch {}
 }
 
-function isMenuOpen() {
-  try {
-    return document.body.classList.contains('menu-open');
-  } catch {
-    return false;
-  }
-}
-
 export default function Hamburger() {
   const router = useRouter();
+  const pathname = usePathname();
 
   const closeMenu = () => {
     try {
@@ -67,64 +62,45 @@ export default function Hamburger() {
 
   const openMenu = () => {
     haptic('light');
-    try {
-      document.body.classList.add('menu-open');
-    } catch {}
+    document.body.classList.add('menu-open');
     lockBodyScroll();
   };
 
   const go = (path: string, h: 'light' | 'medium' = 'light') => {
     haptic(h);
-    closeMenu();          // важно закрыть ДО push
+    closeMenu();
     router.push(path);
   };
 
-  // ✅ КЛЮЧЕВОЕ: очистка при монтировании/размонтировании
+  // ✅ Ключевой фикс: при любом переходе роутов меню должно закрываться
   useEffect(() => {
-    // если класс уже "залип" откуда-то — лечим сразу
-    if (isMenuOpen()) closeMenu();
-
-    // при размонтировании страницы (route change) — гарантированно убираем оверлей/лок
-    return () => {
-      closeMenu();
-    };
+    closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pathname]);
 
-  // ✅ закрытие по Escape (удобно в браузере)
+  // ✅ И на размонтировании тоже всё чистим
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeMenu();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => closeMenu();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <>
-      {/* Кнопка три полоски */}
       <button type="button" className="menu-btn" onClick={openMenu} aria-label="Меню">
         <span />
         <span />
         <span />
       </button>
 
-      {/* Затемнение */}
       <div className="menu-overlay" onClick={closeMenu} />
 
-      {/* Шторка */}
-      <aside className="side-menu" aria-hidden={!isMenuOpen()}>
+      <aside className="side-menu" aria-label="Меню">
         <button type="button" className="side-close" onClick={closeMenu} aria-label="Закрыть">
           ✕
         </button>
 
         <div className="side-inner">
-          <button
-            type="button"
-            className="side-primary-btn"
-            onClick={() => go('/vopros', 'medium')}
-          >
+          <button type="button" className="side-primary-btn" onClick={() => go('/vopros', 'medium')}>
             Задать вопрос
           </button>
 
@@ -137,11 +113,7 @@ export default function Hamburger() {
             <button type="button" onClick={() => go('/hamburger/contacts')}>Контакты</button>
           </nav>
 
-          <button
-            type="button"
-            className="side-doctor-btn"
-            onClick={() => go('/hamburger/vracham', 'medium')}
-          >
+          <button type="button" className="side-doctor-btn" onClick={() => go('/hamburger/vracham', 'medium')}>
             Я врач
           </button>
         </div>
@@ -199,6 +171,7 @@ export default function Hamburger() {
           border: none;
           font-size: 20px;
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .side-inner {
@@ -219,6 +192,7 @@ export default function Hamburger() {
           font-weight: 700;
           border: none;
           margin-bottom: 32px;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .side-items {
@@ -236,6 +210,7 @@ export default function Hamburger() {
           font-size: 16px;
           color: #374151;
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .side-doctor-btn {
@@ -249,6 +224,7 @@ export default function Hamburger() {
           color: #22c55e;
           font-weight: 800;
           text-transform: uppercase;
+          -webkit-tap-highlight-color: transparent;
         }
 
         body.menu-open .menu-overlay {
