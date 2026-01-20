@@ -44,6 +44,27 @@ function niceFieldName(name: string) {
   return map[name] || name;
 }
 
+function focusAndExplainInvalid(form: HTMLFormElement) {
+  const firstInvalid = form.querySelector(':invalid') as
+    | HTMLInputElement
+    | HTMLSelectElement
+    | HTMLTextAreaElement
+    | null;
+
+  if (firstInvalid) {
+    firstInvalid.focus?.();
+    firstInvalid.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+
+    const field = (firstInvalid.getAttribute('name') || '').trim();
+    const msg = field
+      ? `Проверьте поле: «${niceFieldName(field)}». Оно заполнено неверно или не заполнено.`
+      : 'Проверьте обязательные поля — некоторые заполнены неверно.';
+    tgAlert(msg);
+  } else {
+    tgAlert('Проверьте обязательные поля — некоторые заполнены неверно.');
+  }
+}
+
 export default function DoctorRegistrationPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -54,29 +75,11 @@ export default function DoctorRegistrationPage() {
 
     const form = e.currentTarget;
 
-    // ✅ Главное: если форма не валидна — Telegram часто не покажет подсказку, поэтому показываем сами.
-    // reportValidity() подсветит поле (где возможно) и вернёт false.
+    // Если форма не валидна — покажем свою подсказку (в Telegram WebApp часто не видно native подсказок)
     const ok = form.reportValidity();
     if (!ok) {
       haptic('light');
-
-      const firstInvalid = form.querySelector(':invalid') as
-        | HTMLInputElement
-        | HTMLSelectElement
-        | HTMLTextAreaElement
-        | null;
-
-      if (firstInvalid) {
-        firstInvalid.focus?.();
-        const field = (firstInvalid.getAttribute('name') || '').trim();
-        const msg =
-          field
-            ? `Проверьте поле: «${niceFieldName(field)}». Оно заполнено неверно или не заполнено.`
-            : 'Проверьте обязательные поля — некоторые заполнены неверно.';
-        tgAlert(msg);
-      } else {
-        tgAlert('Проверьте обязательные поля — некоторые заполнены неверно.');
-      }
+      focusAndExplainInvalid(form);
       return;
     }
 
@@ -84,7 +87,6 @@ export default function DoctorRegistrationPage() {
 
     const data = Object.fromEntries(new FormData(form).entries());
 
-    // Берём initData (строка Telegram WebApp)
     const initData = getTelegramInitData();
     if (!initData) {
       tgAlert('Не удалось получить данные Telegram. Откройте анкету именно через Telegram (WebApp).');
@@ -100,8 +102,9 @@ export default function DoctorRegistrationPage() {
         body: JSON.stringify({ ...data, initData }),
       });
 
+      const j = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
         const msg =
           j?.error === 'BAD_HASH'
             ? 'Ошибка проверки Telegram (BAD_HASH). Проверь TELEGRAM_BOT_TOKEN на сервере.'
@@ -111,8 +114,6 @@ export default function DoctorRegistrationPage() {
         tgAlert(msg);
         return;
       }
-
-      await res.json().catch(() => ({}));
 
       tgAlert('Анкета сохранена. Теперь загрузите фото и диплом.');
       router.push('/hamburger/doctorRegistration/docs');
@@ -245,8 +246,8 @@ export default function DoctorRegistrationPage() {
             </select>
 
             <span className="docreg-hint">
-              Выберите до трёх специальностей, по которым у вас есть профильное образование и по которым вы сможете консультировать и подтвердить
-              квалификацию документами.
+              Выберите до трёх специальностей, по которым у вас есть профильное образование и по которым вы сможете
+              консультировать и подтвердить квалификацию документами.
             </span>
           </div>
 
@@ -287,7 +288,16 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Стаж работы, лет<span className="req">*</span>
             </span>
-            <input name="experienceYears" type="number" required min={0} max={70} inputMode="numeric" placeholder="Общий стаж" className="docreg-input" />
+            <input
+              name="experienceYears"
+              type="number"
+              required
+              min={0}
+              max={70}
+              inputMode="numeric"
+              placeholder="Общий стаж"
+              className="docreg-input"
+            />
           </label>
 
           <label className="docreg-field">
@@ -316,7 +326,13 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea name="about" required placeholder="Кратко расскажите о себе, стиле работы, подходе к пациентам." className="docreg-textarea" rows={3} />
+            <textarea
+              name="about"
+              required
+              placeholder="Кратко расскажите о себе, стиле работы, подходе к пациентам."
+              className="docreg-textarea"
+              rows={3}
+            />
             <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
@@ -338,7 +354,13 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea name="experienceDetails" required placeholder="Опишите более подробно свой опыт работы." className="docreg-textarea" rows={3} />
+            <textarea
+              name="experienceDetails"
+              required
+              placeholder="Опишите более подробно свой опыт работы."
+              className="docreg-textarea"
+              rows={3}
+            />
             <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
           </label>
 
@@ -361,17 +383,30 @@ export default function DoctorRegistrationPage() {
           </label>
         </section>
 
-        <button type="submit" className="docreg-submit" disabled={submitting}>
-          {submitting ? 'Сохранение…' : 'Далее'}
-        </button>
+        {/* ✅ КНОПКА закреплена поверх всего, чтобы никакие слои/хедеры Telegram не перекрывали тап */}
+        <div className="docreg-submit-wrap">
+          <button
+            type="submit"
+            className="docreg-submit"
+            disabled={submitting}
+            onPointerDown={() => {
+              // Если даже этот алерт не появляется — кнопку перекрывает другой элемент (скорее TopBarBack)
+              tgAlert('tap ok');
+            }}
+          >
+            {submitting ? 'Сохранение…' : 'Далее'}
+          </button>
 
-        <p className="docreg-footnote">Нажимая «Далее», вы подтверждаете корректность указанных данных.</p>
+          <p className="docreg-footnote">Нажимая «Далее», вы подтверждаете корректность указанных данных.</p>
+        </div>
       </form>
 
       <style jsx>{`
         .docreg {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          position: relative;
+          z-index: 1;
         }
 
         .docreg-title {
@@ -421,7 +456,9 @@ export default function DoctorRegistrationPage() {
           flex-direction: column;
           gap: 14px;
           margin-top: 4px;
-          padding-bottom: 72px;
+
+          /* важно: место под закреплённую кнопку */
+          padding-bottom: 160px;
         }
 
         .docreg-card {
@@ -526,8 +563,21 @@ export default function DoctorRegistrationPage() {
           flex: 1;
         }
 
+        /* ✅ закреплённый блок кнопки */
+        .docreg-submit-wrap {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 9999;
+
+          padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+          background: rgba(255, 255, 255, 0.92);
+          backdrop-filter: blur(10px);
+          border-top: 1px solid rgba(15, 23, 42, 0.06);
+        }
+
         .docreg-submit {
-          margin-top: 4px;
           width: 100%;
           padding: 14px 16px;
           border-radius: 999px;
@@ -535,10 +585,11 @@ export default function DoctorRegistrationPage() {
           background: #24c768;
           color: #ffffff;
           font-size: 16px;
-          font-weight: 700;
+          font-weight: 800;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
+          pointer-events: auto;
         }
 
         .docreg-submit:disabled {
@@ -552,9 +603,9 @@ export default function DoctorRegistrationPage() {
         }
 
         .docreg-footnote {
-          margin: 6px 4px 0;
+          margin: 8px 4px 0;
           font-size: 11px;
-          color: #9ca3af;
+          color: #6b7280;
           text-align: left;
         }
       `}</style>
