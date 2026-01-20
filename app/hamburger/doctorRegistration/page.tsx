@@ -390,7 +390,6 @@ export default function DoctorRegistrationPage() {
             className="docreg-submit"
             disabled={submitting}
             onPointerDown={() => {
-              // Если даже этот алерт не появляется — кнопку перекрывает другой элемент (скорее TopBarBack)
               tgAlert('tap ok');
             }}
           >
@@ -400,6 +399,23 @@ export default function DoctorRegistrationPage() {
           <p className="docreg-footnote">Нажимая «Далее», вы подтверждаете корректность указанных данных.</p>
         </div>
       </form>
+
+      {/* ✅ DEBUG OVERLAY: показывает верхний элемент под пальцем */}
+      <div
+        onPointerDown={(e) => {
+          const x = (e as any).clientX ?? 0;
+          const y = (e as any).clientY ?? 0;
+          const el = document.elementFromPoint(x, y) as HTMLElement | null;
+          alert(`TOP ELEMENT: ${el?.tagName || 'none'}.${el?.className || ''}#${el?.id || ''}`);
+        }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 999999,
+          background: 'rgba(255,0,0,0.03)',
+          pointerEvents: 'auto',
+        }}
+      />
 
       <style jsx>{`
         .docreg {
