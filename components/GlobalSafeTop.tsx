@@ -13,11 +13,13 @@ export default function GlobalSafeTop() {
         content: '';
         display: block;
         height: var(--lm-safe-top);
-        pointer-events: none; /* ✅ важно */
+        pointer-events: none; /* 🔥 КРИТИЧЕСКИ ВАЖНО */
       }
 
       @media (min-width: 1024px) {
-        :root { --lm-header-offset: 40px; }
+        :root {
+          --lm-header-offset: 40px;
+        }
       }
     `}</style>
   );
