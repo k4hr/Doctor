@@ -13,7 +13,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
 
 type Item = {
   id: string;
-  status: 'PENDING' | 'NEED_FIX' | 'APPROVED' | 'REJECTED';
+  status: 'DRAFT' | 'PENDING' | 'NEED_FIX' | 'APPROVED' | 'REJECTED';
   updatedAt: string;
   submittedAt: string | null;
 
@@ -28,11 +28,9 @@ type Item = {
   speciality1: string;
   experienceYears: number;
 
-  // совместимость
-  profilePhotoUrl: string | null;
-  diplomaPhotoUrl: string | null;
+  profilePhotoUrl: string | null; // совместимость
+  diplomaPhotoUrl: string | null; // совместимость
 
-  // новый формат
   profilePhotoUrls: string[];
   diplomaPhotoUrls: string[];
 };
