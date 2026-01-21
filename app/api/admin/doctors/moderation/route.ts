@@ -78,8 +78,26 @@ function toPublicUrlMaybe(value: string | null) {
   if (/^https?:\/\//i.test(v)) return v;
 
   const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
-  if (!base) return v; // оставим как key (на случай, если ты позже сделаешь прокси)
+  if (!base) return v; // оставим как key
   return `${base.replace(/\/$/, '')}/${v}`;
+}
+
+function parseMaybeJsonArray(value: string | null): string[] {
+  if (!value) return [];
+  const v = String(value).trim();
+  if (!v) return [];
+  // если это JSON-массив строк (как мы пишем при множественной загрузке)
+  if (v.startsWith('[')) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr)) {
+        return arr.map((x) => String(x)).filter(Boolean);
+      }
+    } catch {
+      // игнор
+    }
+  }
+  return [v];
 }
 
 export async function GET(req: Request) {
@@ -98,7 +116,7 @@ export async function GET(req: Request) {
     const list = await prisma.doctor.findMany({
       where: {
         status: { in: ['PENDING', 'NEED_FIX'] },
-        submittedAt: { not: null }, // реально отправленные
+        submittedAt: { not: null },
       },
       orderBy: { updatedAt: 'desc' },
       take: 100,
@@ -121,11 +139,22 @@ export async function GET(req: Request) {
       },
     });
 
-    const items = list.map((d) => ({
-      ...d,
-      profilePhotoUrl: toPublicUrlMaybe(d.profilePhotoUrl),
-      diplomaPhotoUrl: toPublicUrlMaybe(d.diplomaPhotoUrl),
-    }));
+    const items = list.map((d) => {
+      const profileArr = parseMaybeJsonArray(d.profilePhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
+      const docsArr = parseMaybeJsonArray(d.diplomaPhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
+
+      return {
+        ...d,
+
+        // ✅ совместимость со старым UI/типами (одно превью)
+        profilePhotoUrl: profileArr[0] || null,
+        diplomaPhotoUrl: docsArr[0] || null,
+
+        // ✅ новый формат (мульти)
+        profilePhotoUrls: profileArr,
+        diplomaPhotoUrls: docsArr,
+      };
+    });
 
     return NextResponse.json({ ok: true, items });
   } catch (e) {
