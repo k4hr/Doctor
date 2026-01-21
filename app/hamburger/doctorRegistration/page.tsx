@@ -92,17 +92,33 @@ function focusFirstInvalid(form: HTMLFormElement) {
 
 export default function DoctorRegistrationPage() {
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+
+  const [profile, setProfile] = useState<File | null>(null);
+  const [diploma, setDiploma] = useState<File | null>(null);
+
+  const [submitting, setSubmitting] = useState(false);
 
   const inTwa = useMemo(() => (typeof window !== 'undefined' ? isTWA() : false), []);
 
-  const submitFromForm = async () => {
+  const profileUrl = useMemo(() => (profile ? URL.createObjectURL(profile) : ''), [profile]);
+  const diplomaUrl = useMemo(() => (diploma ? URL.createObjectURL(diploma) : ''), [diploma]);
+
+  const validateFiles = () => {
+    if (!profile || !diploma) {
+      tgAlert('Загрузите фото профиля и фото диплома.');
+      return false;
+    }
+    return true;
+  };
+
+  const submitAll = async () => {
     if (submitting) return;
 
     const form = formRef.current;
     if (!form) return;
 
+    // 1) валидируем поля
     const ok = form.reportValidity();
     if (!ok) {
       haptic('light');
@@ -110,40 +126,70 @@ export default function DoctorRegistrationPage() {
       return;
     }
 
-    haptic('medium');
-
-    const data = Object.fromEntries(new FormData(form).entries());
-    const initData = getTelegramInitData();
-    if (!initData) {
-      tgAlert('Откройте анкету через Telegram (WebApp).');
+    // 2) валидируем файлы
+    if (!validateFiles()) {
+      haptic('light');
       return;
     }
+
+    // 3) initData
+    const initData = getTelegramInitData();
+    if (!initData) {
+      tgAlert('Откройте страницу через Telegram (WebApp).');
+      return;
+    }
+
+    haptic('medium');
 
     try {
       setSubmitting(true);
 
-      const res = await fetch('/api/doctor/register', {
+      // A) register (json)
+      const data = Object.fromEntries(new FormData(form).entries());
+
+      const resReg = await fetch('/api/doctor/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, initData }),
       });
 
-      const j = await res.json().catch(() => ({}));
+      const jReg = await resReg.json().catch(() => ({}));
 
-      if (!res.ok) {
+      if (!resReg.ok) {
         const msg =
-          j?.error === 'BAD_HASH'
+          jReg?.error === 'BAD_HASH'
             ? 'Ошибка проверки Telegram (BAD_HASH). Проверь TELEGRAM_BOT_TOKEN на сервере.'
-            : j?.error === 'VALIDATION_ERROR'
-              ? `Ошибка в поле: ${niceFieldName(j?.field || '')}`
+            : jReg?.error === 'VALIDATION_ERROR'
+              ? `Ошибка в поле: ${niceFieldName(jReg?.field || '')}`
               : 'Ошибка сохранения анкеты. Попробуйте ещё раз.';
         tgAlert(msg);
         return;
       }
 
-      router.push('/hamburger/doctorRegistration/docs');
-    } catch (err) {
-      console.error(err);
+      // B) upload (multipart)
+      const fd = new FormData();
+      fd.append('initData', initData);
+      fd.append('profilePhoto', profile as File);
+      fd.append('diplomaPhoto', diploma as File);
+
+      const resUp = await fetch('/api/doctor/upload', { method: 'POST', body: fd });
+      const jUp = await resUp.json().catch(() => ({}));
+
+      if (!resUp.ok) {
+        const msg =
+          jUp?.error === 'BAD_HASH'
+            ? 'Ошибка проверки Telegram (BAD_HASH). Проверь TELEGRAM_BOT_TOKEN на сервере.'
+            : 'Ошибка загрузки документов. Попробуйте ещё раз.';
+        tgAlert(msg);
+        return;
+      }
+
+      tgAlert('Анкета и документы отправлены. Профиль ушёл на модерацию.');
+
+      // куда вести после успеха — поменяй если нужно
+      router.push('/hamburger/profile');
+    } catch (e) {
+      console.error(e);
       tgAlert('Сеть/сервер недоступны. Попробуйте позже.');
     } finally {
       setSubmitting(false);
@@ -152,27 +198,26 @@ export default function DoctorRegistrationPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await submitFromForm();
+    await submitAll();
   };
 
-  // ✅ ГЛАВНЫЙ ФИКС: в Telegram используем НАТИВНУЮ кнопку MainButton (она точно кликается)
+  // Telegram MainButton: делаем её "Отправить на модерацию"
   useEffect(() => {
     const wa = tg();
     if (!wa?.MainButton) return;
 
     const onMain = () => {
-      submitFromForm();
+      submitAll();
     };
 
     try {
-      wa.MainButton.setText?.(submitting ? 'Сохранение…' : 'Далее');
+      wa.MainButton.setText?.(submitting ? 'Отправка…' : 'Отправить на модерацию');
       wa.MainButton.setParams?.({
         is_visible: true,
         color: '#24c768',
         text_color: '#ffffff',
         is_active: !submitting,
       });
-
       wa.MainButton.show?.();
 
       if (submitting) {
@@ -183,7 +228,7 @@ export default function DoctorRegistrationPage() {
         wa.MainButton.enable?.();
       }
 
-      wa.MainButton.offClick?.(); // на всякий случай чистим старые
+      wa.MainButton.offClick?.();
       wa.MainButton.onClick?.(onMain);
     } catch {}
 
@@ -195,10 +240,10 @@ export default function DoctorRegistrationPage() {
       } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitting]);
+  }, [submitting, profile, diploma]);
 
   return (
-    <main className="docreg">
+    <main className="docreg" onPointerDownCapture={() => { /* намеренно пусто */ }}>
       <TopBarBack />
 
       <h1 className="docreg-title">Анкета врача</h1>
@@ -206,18 +251,13 @@ export default function DoctorRegistrationPage() {
       <button
         type="button"
         className="docreg-treb-link"
-        onClick={() => {
-          haptic('light');
-          router.push('/hamburger/doctorRegistration/treb');
-        }}
+        onClick={() => router.push('/hamburger/doctorRegistration/treb')}
       >
         Требования по заполнению профиля
       </button>
 
       <p className="docreg-sub">
-        Заполните основные данные. Эти сведения помогут пациентам найти вас в сервисе{' '}
-        <span className="brand-black">ВРАЧИ.</span>
-        <span className="brand-green">ТУТ</span>.
+        Заполните данные и прикрепите документы. После отправки профиль попадёт на модерацию.
       </p>
 
       <form ref={formRef} className="docreg-form" onSubmit={handleSubmit}>
@@ -229,28 +269,14 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input
-              name="lastName"
-              type="text"
-              required
-              placeholder="Иванов"
-              className="docreg-input"
-              autoComplete="family-name"
-            />
+            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" autoComplete="family-name" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input
-              name="firstName"
-              type="text"
-              required
-              placeholder="Иван"
-              className="docreg-input"
-              autoComplete="given-name"
-            />
+            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" autoComplete="given-name" />
           </label>
 
           <label className="docreg-field">
@@ -299,40 +325,28 @@ export default function DoctorRegistrationPage() {
             </span>
 
             <select name="speciality1" required className="docreg-input docreg-select" defaultValue="">
-              <option value="" disabled>
-                Основная специализация
-              </option>
+              <option value="" disabled>Основная специализация</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
             <select name="speciality2" className="docreg-input docreg-select docreg-select-second" defaultValue="">
-              <option value="" disabled>
-                Дополнительная специализация (по желанию)
-              </option>
+              <option value="" disabled>Дополнительная специализация (по желанию)</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
             <select name="speciality3" className="docreg-input docreg-select docreg-select-third" defaultValue="">
-              <option value="" disabled>
-                Ещё одна специализация (по желанию)
-              </option>
+              <option value="" disabled>Ещё одна специализация (по желанию)</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
             <span className="docreg-hint">
-              Выберите до трёх специальностей, по которым у вас есть профильное образование и по которым вы сможете консультировать и подтвердить квалификацию документами.
+              Выберите до трёх специальностей, по которым у вас есть профильное образование.
             </span>
           </div>
 
@@ -340,13 +354,7 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Образование<span className="req">*</span>
             </span>
-            <textarea
-              name="education"
-              required
-              placeholder="Укажите ВУЗ, годы обучения, факультет, квалификацию."
-              className="docreg-textarea"
-              rows={3}
-            />
+            <textarea name="education" required placeholder="ВУЗ, годы обучения, факультет, квалификация." className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
@@ -361,12 +369,12 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Место работы</span>
-            <input name="workplace" type="text" placeholder="Клиника, медицинский центр" className="docreg-input" />
+            <input name="workplace" type="text" placeholder="Клиника, медцентр" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Должность</span>
-            <input name="position" type="text" placeholder="Занимаемая должность" className="docreg-input" />
+            <input name="position" type="text" placeholder="Должность" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
@@ -378,7 +386,7 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Награды</span>
-            <textarea name="awards" placeholder="Какие награды и благодарности вы получали." className="docreg-textarea" rows={2} />
+            <textarea name="awards" placeholder="Награды, благодарности" className="docreg-textarea" rows={2} />
           </label>
         </section>
 
@@ -402,68 +410,94 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea name="about" required placeholder="Кратко расскажите о себе, стиле работы, подходе к пациентам." className="docreg-textarea" rows={3} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="about" required placeholder="Коротко о себе и подходе к пациентам" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Специализация подробно<span className="req">*</span>
             </span>
-            <textarea name="specialityDetails" required placeholder="С какими запросами чаще всего работаете, какие методы используете." className="docreg-textarea" rows={3} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="specialityDetails" required placeholder="С какими запросами работаете" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea name="experienceDetails" required placeholder="Опишите более подробно свой опыт работы." className="docreg-textarea" rows={3} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="experienceDetails" required placeholder="Опишите опыт работы" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Повышение квалификации</span>
-            <textarea name="courses" placeholder="Курсы, стажировки, доп. образование." className="docreg-textarea" rows={2} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="courses" placeholder="Курсы, стажировки" className="docreg-textarea" rows={2} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Достижения и награды</span>
-            <textarea name="achievements" placeholder="Расскажите о профессиональных достижениях и наградах." className="docreg-textarea" rows={2} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="achievements" placeholder="Достижения" className="docreg-textarea" rows={2} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Научные труды</span>
-            <textarea name="publications" placeholder="Публикации, участие в конференциях, научная деятельность." className="docreg-textarea" rows={2} />
-            <span className="docreg-hint">Это поле будет отображаться в вашем профиле.</span>
+            <textarea name="publications" placeholder="Публикации" className="docreg-textarea" rows={2} />
           </label>
         </section>
 
-        {/* HTML-кнопку оставляем ТОЛЬКО НЕ в Telegram (в Telegram кликаем MainButton) */}
+        {/* БЛОК 5 — Документы */}
+        <section className="docreg-card">
+          <h2 className="docreg-card-title">Документы</h2>
+
+          <div className="docs-grid">
+            <div className="docs-item">
+              <div className="docs-title">Фото профиля<span className="req">*</span></div>
+              {profileUrl ? (
+                <img className="preview" src={profileUrl} alt="preview profile" />
+              ) : (
+                <div className="placeholder">Фото не выбрано</div>
+              )}
+              <input
+                className="file"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setProfile(e.target.files?.[0] || null)}
+              />
+              <div className="hint">Портрет, хорошее освещение.</div>
+            </div>
+
+            <div className="docs-item">
+              <div className="docs-title">Фото диплома<span className="req">*</span></div>
+              {diplomaUrl ? (
+                <img className="preview" src={diplomaUrl} alt="preview diploma" />
+              ) : (
+                <div className="placeholder">Диплом не выбран</div>
+              )}
+              <input
+                className="file"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setDiploma(e.target.files?.[0] || null)}
+              />
+              <div className="hint">Фото читаемое: ФИО, ВУЗ, дата.</div>
+            </div>
+          </div>
+        </section>
+
+        {/* Фолбек-кнопка для НЕ Telegram (в Telegram жмём MainButton) */}
         {!inTwa && (
           <div className="docreg-submit-wrap">
             <button type="submit" className="docreg-submit" disabled={submitting}>
-              {submitting ? 'Сохранение…' : 'Далее'}
+              {submitting ? 'Отправка…' : 'Отправить на модерацию'}
             </button>
-            <p className="docreg-footnote">Нажимая «Далее», вы подтверждаете корректность указанных данных.</p>
+            <p className="docreg-footnote">
+              Нажимая «Отправить», вы подтверждаете корректность данных и согласны на модерацию.
+            </p>
           </div>
         )}
       </form>
 
       <style jsx global>{`
-        /* Жёстко вырубаем горизонтальный скролл (в т.ч. из-за отрицательных маргинов хедера) */
-        html,
-        body {
-          overflow-x: hidden !important;
-          overscroll-behavior-x: none;
-        }
-
-        /* Если твой GlobalSafeTop через body::before вдруг перехватывает события — глушим */
-        body::before {
-          pointer-events: none !important;
-        }
+        html, body { overflow-x: hidden !important; overscroll-behavior-x: none; }
+        body::before { pointer-events: none !important; }
       `}</style>
 
       <style jsx>{`
@@ -473,6 +507,8 @@ export default function DoctorRegistrationPage() {
           width: 100%;
           max-width: 100%;
           overflow-x: hidden;
+          position: relative;
+          z-index: 1;
         }
 
         .docreg-title {
@@ -494,26 +530,14 @@ export default function DoctorRegistrationPage() {
           text-align: left;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-        }
-
-        .docreg-treb-link:active {
-          opacity: 0.7;
+          touch-action: manipulation;
         }
 
         .docreg-sub {
-          margin: 4px 0 4px;
+          margin: 6px 0 12px;
           font-size: 13px;
           line-height: 1.5;
           color: #6b7280;
-        }
-
-        .brand-black {
-          font-weight: 800;
-          color: #111827;
-        }
-        .brand-green {
-          font-weight: 800;
-          color: #24c768;
         }
 
         .docreg-form {
@@ -523,7 +547,6 @@ export default function DoctorRegistrationPage() {
           margin-top: 4px;
           width: 100%;
           max-width: 100%;
-          padding-bottom: 24px;
         }
 
         .docreg-card {
@@ -557,14 +580,9 @@ export default function DoctorRegistrationPage() {
           color: #374151;
         }
 
-        .req {
-          color: #ef4444;
-          margin-left: 2px;
-        }
+        .req { color: #ef4444; margin-left: 2px; }
 
-        .docreg-input,
-        .docreg-textarea,
-        .docreg-select {
+        .docreg-input, .docreg-textarea, .docreg-select {
           width: 100%;
           border-radius: 12px;
           border: 1px solid rgba(156, 163, 175, 0.7);
@@ -576,63 +594,54 @@ export default function DoctorRegistrationPage() {
           max-width: 100%;
         }
 
-        .docreg-input:focus,
-        .docreg-textarea:focus,
-        .docreg-select:focus {
+        .docreg-textarea { resize: vertical; min-height: 72px; }
+        .docreg-select { padding-right: 28px; }
+        .docreg-select-second, .docreg-select-third { margin-top: 6px; }
+
+        .docreg-input:focus, .docreg-textarea:focus, .docreg-select:focus {
           border-color: #22c55e;
           box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
         }
 
-        .docreg-textarea {
-          resize: vertical;
-          min-height: 72px;
-        }
+        .docreg-hint { font-size: 11px; color: #9ca3af; }
 
-        .docreg-select {
-          padding-right: 28px;
-        }
+        .docreg-radio-row { display: flex; gap: 16px; margin-top: 2px; flex-wrap: wrap; }
+        .docreg-radio { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #4b5563; }
+        .docreg-radio input { accent-color: #22c55e; }
 
-        .docreg-select-second,
-        .docreg-select-third {
-          margin-top: 6px;
-        }
+        .docreg-dob-row { display: flex; gap: 8px; width: 100%; }
+        .docreg-dob-row .docreg-input { flex: 1; min-width: 0; }
 
-        .docreg-hint {
-          font-size: 11px;
-          color: #9ca3af;
-        }
+        .docs-grid { display: grid; gap: 12px; }
+        .docs-item { width: 100%; }
+        .docs-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 8px; }
 
-        .docreg-radio-row {
-          display: flex;
-          gap: 16px;
-          margin-top: 2px;
-          flex-wrap: wrap;
-        }
-
-        .docreg-radio {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          color: #4b5563;
-        }
-
-        .docreg-radio input {
-          accent-color: #22c55e;
-        }
-
-        .docreg-dob-row {
-          display: flex;
-          gap: 8px;
+        .preview {
           width: 100%;
+          height: auto;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          display: block;
+          margin-bottom: 10px;
         }
 
-        .docreg-dob-row .docreg-input {
-          flex: 1;
-          min-width: 0;
+        .placeholder {
+          width: 100%;
+          height: 180px;
+          border-radius: 14px;
+          border: 1px dashed rgba(156, 163, 175, 0.8);
+          display: grid;
+          place-items: center;
+          color: #6b7280;
+          font-size: 13px;
+          margin-bottom: 10px;
+          background: #fafafa;
         }
 
-        /* HTML-кнопка (только не-Telegram) */
+        .file { width: 100%; max-width: 100%; }
+
+        .hint { margin-top: 8px; font-size: 11px; color: #9ca3af; }
+
         .docreg-submit-wrap {
           position: sticky;
           bottom: 0;
@@ -655,18 +664,11 @@ export default function DoctorRegistrationPage() {
           font-weight: 800;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.35);
         }
 
-        .docreg-submit:disabled {
-          opacity: 0.65;
-          cursor: default;
-        }
-
-        .docreg-submit:active {
-          transform: scale(0.98);
-          box-shadow: 0 6px 16px rgba(36, 199, 104, 0.45);
-        }
+        .docreg-submit:disabled { opacity: 0.65; cursor: default; }
 
         .docreg-footnote {
           margin: 8px 4px 0;
