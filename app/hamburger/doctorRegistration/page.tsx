@@ -508,6 +508,7 @@ export default function DoctorRegistrationPage() {
                 <div className="thumbs">
                   {profileUrls.map((u, idx) => (
                     <div className="thumb" key={u}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img className="thumbImg" src={u} alt={`profile-${idx + 1}`} />
                     </div>
                   ))}
@@ -549,6 +550,7 @@ export default function DoctorRegistrationPage() {
                 <div className="thumbs">
                   {docUrls.map((u, idx) => (
                     <div className="thumb" key={u}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img className="thumbImg" src={u} alt={`doc-${idx + 1}`} />
                     </div>
                   ))}
