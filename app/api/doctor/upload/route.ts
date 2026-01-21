@@ -1,5 +1,6 @@
 /* path: app/api/doctor/upload/route.ts */
-/* ОБНОВЛЁН: принимает profilePhotos (до 3) и docPhotos (до 10), плюс совместимость со старыми profilePhoto/diplomaPhoto */
+/* ОБНОВЛЁН: принимает profilePhotos (до 3) и docPhotos (до 10), плюс совместимость со старыми profilePhoto/diplomaPhoto
+   Выровнял под "фото" (без PDF), чтобы превью (img) в UI не ломалось. */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -85,22 +86,11 @@ function safeExt(mime: string) {
   if (mime === 'image/jpeg') return 'jpg';
   if (mime === 'image/png') return 'png';
   if (mime === 'image/webp') return 'webp';
-  if (mime === 'application/pdf') return 'pdf';
   return 'bin';
 }
 
-function isProfileMime(mime: string) {
+function isImageMime(mime: string) {
   return mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp';
-}
-
-function isDocMime(mime: string) {
-  // Документы — можно фото + pdf
-  return (
-    mime === 'image/jpeg' ||
-    mime === 'image/png' ||
-    mime === 'image/webp' ||
-    mime === 'application/pdf'
-  );
 }
 
 function makeS3() {
@@ -127,7 +117,7 @@ async function fileToBuffer(file: File) {
 }
 
 function asFiles(v: unknown): File[] {
-  return Array.isArray(v) ? v.filter((x) => x instanceof File) as File[] : [];
+  return Array.isArray(v) ? (v.filter((x) => x instanceof File) as File[]) : [];
 }
 
 function rand() {
@@ -222,12 +212,12 @@ export async function POST(req: Request) {
     }
 
     // Валидация mime + размер
-    const maxAvatar = 8 * 1024 * 1024;   // 8MB на файл профиля
-    const maxDoc = 25 * 1024 * 1024;     // 25MB на документ
+    const maxAvatar = 8 * 1024 * 1024; // 8MB на файл профиля
+    const maxDoc = 25 * 1024 * 1024; // 25MB на документ
 
     for (const f of finalProfile) {
       const mime = f.type || '';
-      if (!isProfileMime(mime)) {
+      if (!isImageMime(mime)) {
         return NextResponse.json(
           { ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime },
           { status: 400 }
@@ -243,7 +233,7 @@ export async function POST(req: Request) {
 
     for (const f of finalDocs) {
       const mime = f.type || '';
-      if (!isDocMime(mime)) {
+      if (!isImageMime(mime)) {
         return NextResponse.json(
           { ok: false, error: 'BAD_MIME', field: 'docPhotos', mime },
           { status: 400 }
@@ -259,7 +249,7 @@ export async function POST(req: Request) {
 
     const s3 = makeS3();
 
-    // Грузим по очереди (надёжнее по памяти, чем Promise.all на 13 файлов сразу)
+    // Грузим по очереди (надёжнее по памяти)
     const uploadedProfile: string[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
       const f = finalProfile[i];
@@ -298,11 +288,10 @@ export async function POST(req: Request) {
       uploadedDocs.push(publicUrlForKey(key) || key);
     }
 
-    // ВАЖНО ПРО СХЕМУ:
-    // У тебя в Doctor сейчас, судя по коду, есть ТОЛЬКО profilePhotoUrl и diplomaPhotoUrl (строки).
-    // Поэтому делаем так:
-    // - если 1 файл — сохраняем строкой как раньше
-    // - если много — сохраняем JSON-строкой массива (чтобы ничего не потерять)
+    // СХЕМА: profilePhotoUrl/diplomaPhotoUrl — строки.
+    // Поэтому:
+    // - 1 файл => строка
+    // - много => JSON-строка массива
     const profileValue = uploadedProfile.length === 1 ? uploadedProfile[0] : JSON.stringify(uploadedProfile);
     const docsValue = uploadedDocs.length === 1 ? uploadedDocs[0] : JSON.stringify(uploadedDocs);
 
