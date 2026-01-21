@@ -121,8 +121,13 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
     (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
     doctor.telegramId;
 
-  const profileUrls = parseMaybeJsonArray(doctor.profilePhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
-  const docsUrls = parseMaybeJsonArray(doctor.diplomaPhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
+  const profileUrls = parseMaybeJsonArray(doctor.profilePhotoUrl)
+    .map((x) => toPublicUrlMaybe(x))
+    .filter(Boolean) as string[];
+
+  const docsUrls = parseMaybeJsonArray(doctor.diplomaPhotoUrl)
+    .map((x) => toPublicUrlMaybe(x))
+    .filter(Boolean) as string[];
 
   return (
     <main style={{ padding: 16 }}>
@@ -180,7 +185,13 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                     key={u}
                     src={u}
                     alt="profile"
-                    style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 14, border: '1px solid #e5e7eb' }}
+                    style={{
+                      width: '100%',
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 14,
+                      border: '1px solid #e5e7eb',
+                    }}
                   />
                 ))}
               </div>
@@ -202,7 +213,13 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                     key={u}
                     src={u}
                     alt="doc"
-                    style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 14, border: '1px solid #e5e7eb' }}
+                    style={{
+                      width: '100%',
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 14,
+                      border: '1px solid #e5e7eb',
+                    }}
                   />
                 ))}
               </div>
