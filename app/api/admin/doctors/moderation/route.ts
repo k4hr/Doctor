@@ -82,21 +82,6 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function parseMaybeJsonArray(value: string | null): string[] {
-  if (!value) return [];
-  const v = String(value).trim();
-  if (!v) return [];
-  if (v.startsWith('[')) {
-    try {
-      const arr = JSON.parse(v);
-      if (Array.isArray(arr)) return arr.map((x) => String(x)).filter(Boolean);
-    } catch {
-      // ignore
-    }
-  }
-  return [v];
-}
-
 export async function GET(req: Request) {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -115,46 +100,63 @@ export async function GET(req: Request) {
         status: { in: ['PENDING', 'NEED_FIX'] },
         submittedAt: { not: null },
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
       take: 100,
       select: {
         id: true,
         status: true,
         updatedAt: true,
         submittedAt: true,
+
         telegramId: true,
         telegramUsername: true,
         telegramFirstName: true,
         telegramLastName: true,
+
         firstName: true,
         lastName: true,
         city: true,
         speciality1: true,
         experienceYears: true,
-        profilePhotoUrl: true,
-        diplomaPhotoUrl: true,
+
+        files: {
+          where: { kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] } },
+          orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+          select: {
+            kind: true,
+            url: true,
+            sortOrder: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
     const items = list.map((d) => {
-      const profileArr = parseMaybeJsonArray(d.profilePhotoUrl)
-        .map((x) => toPublicUrlMaybe(x))
+      const profile = d.files
+        .filter((f) => f.kind === 'PROFILE_PHOTO')
+        .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+        .map((f) => toPublicUrlMaybe(f.url))
         .filter(Boolean) as string[];
 
-      const docsArr = parseMaybeJsonArray(d.diplomaPhotoUrl)
-        .map((x) => toPublicUrlMaybe(x))
+      const docs = d.files
+        .filter((f) => f.kind === 'DIPLOMA_PHOTO')
+        .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+        .map((f) => toPublicUrlMaybe(f.url))
         .filter(Boolean) as string[];
 
       return {
         ...d,
+        // убираем "files" из ответа, чтобы не тащить лишнее
+        files: undefined,
 
-        // совместимость (одно превью)
-        profilePhotoUrl: profileArr[0] || null,
-        diplomaPhotoUrl: docsArr[0] || null,
+        // ✅ новый формат
+        profilePhotoUrls: profile,
+        diplomaPhotoUrls: docs,
 
-        // новый формат (мульти)
-        profilePhotoUrls: profileArr,
-        diplomaPhotoUrls: docsArr,
+        // ✅ совместимость со старым UI
+        profilePhotoUrl: profile[0] || null,
+        diplomaPhotoUrl: docs[0] || null,
       };
     });
 
