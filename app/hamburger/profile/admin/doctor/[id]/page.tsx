@@ -71,19 +71,6 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function parseMaybeJsonArray(value: string | null): string[] {
-  if (!value) return [];
-  const v = String(value).trim();
-  if (!v) return [];
-  if (v.startsWith('[')) {
-    try {
-      const arr = JSON.parse(v);
-      if (Array.isArray(arr)) return arr.map((x) => String(x)).filter(Boolean);
-    } catch {}
-  }
-  return [v];
-}
-
 export default async function DoctorAdminCardPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
@@ -103,7 +90,15 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
     );
   }
 
-  const doctor = await prisma.doctor.findUnique({ where: { id } });
+  const doctor = await prisma.doctor.findUnique({
+    where: { id },
+    include: {
+      files: {
+        where: { kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] } },
+        orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      },
+    },
+  });
 
   if (!doctor) {
     return (
@@ -121,12 +116,16 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
     (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
     doctor.telegramId;
 
-  const profileUrls = parseMaybeJsonArray(doctor.profilePhotoUrl)
-    .map((x) => toPublicUrlMaybe(x))
+  const profileUrls = doctor.files
+    .filter((f) => f.kind === 'PROFILE_PHOTO')
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
-  const docsUrls = parseMaybeJsonArray(doctor.diplomaPhotoUrl)
-    .map((x) => toPublicUrlMaybe(x))
+  const docsUrls = doctor.files
+    .filter((f) => f.kind === 'DIPLOMA_PHOTO')
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
   return (
@@ -191,6 +190,7 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                       objectFit: 'cover',
                       borderRadius: 14,
                       border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
                     }}
                   />
                 ))}
@@ -219,6 +219,7 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                       objectFit: 'cover',
                       borderRadius: 14,
                       border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
                     }}
                   />
                 ))}
