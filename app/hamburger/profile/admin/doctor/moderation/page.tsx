@@ -28,11 +28,11 @@ type Item = {
   speciality1: string;
   experienceYears: number;
 
-  // ✅ совместимость
+  // совместимость
   profilePhotoUrl: string | null;
   diplomaPhotoUrl: string | null;
 
-  // ✅ новый формат
+  // новый формат
   profilePhotoUrls: string[];
   diplomaPhotoUrls: string[];
 };
