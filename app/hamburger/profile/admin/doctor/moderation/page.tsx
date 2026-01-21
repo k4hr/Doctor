@@ -28,8 +28,13 @@ type Item = {
   speciality1: string;
   experienceYears: number;
 
+  // ✅ совместимость
   profilePhotoUrl: string | null;
   diplomaPhotoUrl: string | null;
+
+  // ✅ новый формат
+  profilePhotoUrls: string[];
+  diplomaPhotoUrls: string[];
 };
 
 type ApiOk = { ok: true; items: Item[] };
@@ -63,10 +68,7 @@ export default function DoctorModerationPage() {
         const res = await fetch('/api/admin/doctors/moderation', {
           method: 'GET',
           cache: 'no-store',
-          headers: {
-            // на всякий случай продублируем: но основное всё равно через cookie tg_init_data
-            'X-Requested-With': 'fetch',
-          },
+          headers: { 'X-Requested-With': 'fetch' },
         });
 
         const j = (await res.json().catch(() => null)) as ApiResp | null;
@@ -100,15 +102,11 @@ export default function DoctorModerationPage() {
       <TopBarBack />
 
       <h1 className="title">Анкеты на модерацию</h1>
-      <p className="sub">
-        {loading ? 'Загрузка…' : `Найдено: ${count}`}
-      </p>
+      <p className="sub">{loading ? 'Загрузка…' : `Найдено: ${count}`}</p>
 
       {warn && <p className="warn">{warn}</p>}
 
-      {!loading && !warn && items.length === 0 && (
-        <div className="empty">Пока нет анкет на проверку.</div>
-      )}
+      {!loading && !warn && items.length === 0 && <div className="empty">Пока нет анкет на проверку.</div>}
 
       <section className="list">
         {items.map((it) => (
@@ -126,20 +124,40 @@ export default function DoctorModerationPage() {
 
             <div className="photos">
               <div className="ph">
-                <div className="phTitle">Профиль</div>
-                {it.profilePhotoUrl ? (
+                <div className="phTitle">
+                  Профиль {it.profilePhotoUrls?.length ? <span className="cnt">({it.profilePhotoUrls.length})</span> : null}
+                </div>
+
+                {it.profilePhotoUrls?.length ? (
+                  <div className="grid">
+                    {it.profilePhotoUrls.slice(0, 3).map((u) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={u} className="img" src={u} alt="profile" />
+                    ))}
+                  </div>
+                ) : it.profilePhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="img" src={it.profilePhotoUrl} alt="profile" />
+                  <img className="imgOne" src={it.profilePhotoUrl} alt="profile" />
                 ) : (
                   <div className="phEmpty">нет</div>
                 )}
               </div>
 
               <div className="ph">
-                <div className="phTitle">Диплом</div>
-                {it.diplomaPhotoUrl ? (
+                <div className="phTitle">
+                  Документы {it.diplomaPhotoUrls?.length ? <span className="cnt">({it.diplomaPhotoUrls.length})</span> : null}
+                </div>
+
+                {it.diplomaPhotoUrls?.length ? (
+                  <div className="grid">
+                    {it.diplomaPhotoUrls.slice(0, 3).map((u) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={u} className="img" src={u} alt="doc" />
+                    ))}
+                  </div>
+                ) : it.diplomaPhotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="img" src={it.diplomaPhotoUrl} alt="diploma" />
+                  <img className="imgOne" src={it.diplomaPhotoUrl} alt="doc" />
                 ) : (
                   <div className="phEmpty">нет</div>
                 )}
@@ -223,12 +241,7 @@ export default function DoctorModerationPage() {
           color: #111827;
         }
 
-        .meta {
-          margin-top: 4px;
-          font-size: 12px;
-          color: #6b7280;
-        }
-
+        .meta,
         .meta2 {
           margin-top: 4px;
           font-size: 12px;
@@ -256,19 +269,44 @@ export default function DoctorModerationPage() {
 
         .phTitle {
           font-size: 12px;
-          font-weight: 800;
+          font-weight: 900;
           color: #111827;
           margin-bottom: 6px;
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+        }
+
+        .cnt {
+          font-size: 11px;
+          color: #6b7280;
+          font-weight: 800;
+        }
+
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 6px;
         }
 
         .img {
+          width: 100%;
+          height: 86px;
+          object-fit: cover;
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: #f3f4f6;
+          display: block;
+        }
+
+        .imgOne {
           width: 100%;
           height: 160px;
           object-fit: cover;
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.08);
-          display: block;
           background: #f3f4f6;
+          display: block;
         }
 
         .phEmpty {
