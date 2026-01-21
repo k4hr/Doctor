@@ -90,23 +90,65 @@ function focusFirstInvalid(form: HTMLFormElement) {
   }
 }
 
+const MAX_PROFILE = 3;
+const MAX_DOCS = 10;
+
+function clampFiles(files: FileList | null | undefined, max: number): File[] {
+  if (!files || files.length === 0) return [];
+  return Array.from(files).slice(0, max);
+}
+
+function revokeUrls(urls: string[]) {
+  try {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+  } catch {}
+}
+
 export default function DoctorRegistrationPage() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const [profile, setProfile] = useState<File | null>(null);
-  const [diploma, setDiploma] = useState<File | null>(null);
-
+  const [profilePhotos, setProfilePhotos] = useState<File[]>([]);
+  const [docPhotos, setDocPhotos] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const inTwa = useMemo(() => (typeof window !== 'undefined' ? isTWA() : false), []);
 
-  const profileUrl = useMemo(() => (profile ? URL.createObjectURL(profile) : ''), [profile]);
-  const diplomaUrl = useMemo(() => (diploma ? URL.createObjectURL(diploma) : ''), [diploma]);
+  const profileUrls = useMemo(() => profilePhotos.map((f) => URL.createObjectURL(f)), [profilePhotos]);
+  const docUrls = useMemo(() => docPhotos.map((f) => URL.createObjectURL(f)), [docPhotos]);
+
+  // чистим objectURL
+  useEffect(() => {
+    return () => {
+      revokeUrls(profileUrls);
+      revokeUrls(docUrls);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => revokeUrls(profileUrls);
+  }, [profileUrls]);
+
+  useEffect(() => {
+    return () => revokeUrls(docUrls);
+  }, [docUrls]);
 
   const validateFiles = () => {
-    if (!profile || !diploma) {
-      tgAlert('Загрузите фото профиля и фото диплома.');
+    if (profilePhotos.length === 0) {
+      tgAlert(`Загрузите фото профиля (1–${MAX_PROFILE}).`);
+      return false;
+    }
+    if (docPhotos.length === 0) {
+      tgAlert(`Загрузите документы/диплом (1–${MAX_DOCS}).`);
+      return false;
+    }
+    if (profilePhotos.length > MAX_PROFILE) {
+      tgAlert(`Фото профиля: максимум ${MAX_PROFILE}.`);
+      return false;
+    }
+    if (docPhotos.length > MAX_DOCS) {
+      tgAlert(`Документы: максимум ${MAX_DOCS}.`);
       return false;
     }
     return true;
@@ -118,7 +160,7 @@ export default function DoctorRegistrationPage() {
     const form = formRef.current;
     if (!form) return;
 
-    // 1) валидируем поля
+    // 1) поля
     const ok = form.reportValidity();
     if (!ok) {
       haptic('light');
@@ -126,7 +168,7 @@ export default function DoctorRegistrationPage() {
       return;
     }
 
-    // 2) валидируем файлы
+    // 2) файлы
     if (!validateFiles()) {
       haptic('light');
       return;
@@ -144,7 +186,7 @@ export default function DoctorRegistrationPage() {
     try {
       setSubmitting(true);
 
-      // A) register (json)
+      // A) register
       const data = Object.fromEntries(new FormData(form).entries());
 
       const resReg = await fetch('/api/doctor/register', {
@@ -166,11 +208,13 @@ export default function DoctorRegistrationPage() {
         return;
       }
 
-      // B) upload (multipart)
+      // B) upload (мультифайлы)
       const fd = new FormData();
       fd.append('initData', initData);
-      fd.append('profilePhoto', profile as File);
-      fd.append('diplomaPhoto', diploma as File);
+
+      // ключи ДОЛЖНЫ совпадать с upload/route.ts
+      profilePhotos.forEach((f) => fd.append('profilePhotos', f, f.name));
+      docPhotos.forEach((f) => fd.append('docPhotos', f, f.name));
 
       const resUp = await fetch('/api/doctor/upload', { method: 'POST', body: fd });
       const jUp = await resUp.json().catch(() => ({}));
@@ -185,8 +229,6 @@ export default function DoctorRegistrationPage() {
       }
 
       tgAlert('Анкета и документы отправлены. Профиль ушёл на модерацию.');
-
-      // куда вести после успеха — поменяй если нужно
       router.push('/hamburger/profile');
     } catch (e) {
       console.error(e);
@@ -201,7 +243,7 @@ export default function DoctorRegistrationPage() {
     await submitAll();
   };
 
-  // Telegram MainButton: делаем её "Отправить на модерацию"
+  // Telegram MainButton
   useEffect(() => {
     const wa = tg();
     if (!wa?.MainButton) return;
@@ -240,10 +282,10 @@ export default function DoctorRegistrationPage() {
       } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitting, profile, diploma]);
+  }, [submitting, profilePhotos.length, docPhotos.length]);
 
   return (
-    <main className="docreg" onPointerDownCapture={() => { /* намеренно пусто */ }}>
+    <main className="docreg">
       <TopBarBack />
 
       <h1 className="docreg-title">Анкета врача</h1>
@@ -445,44 +487,102 @@ export default function DoctorRegistrationPage() {
 
         {/* БЛОК 5 — Документы */}
         <section className="docreg-card">
-          <h2 className="docreg-card-title">Документы</h2>
+          <div className="docs-head">
+            <h2 className="docreg-card-title docs-h2">Документы</h2>
+            <button
+              type="button"
+              className="docs-req-link"
+              onClick={() => router.push('/hamburger/doctorRegistration/treb')}
+            >
+              Перед загрузкой документов еще раз ознакомьтесь с требованиями
+            </button>
+          </div>
 
           <div className="docs-grid">
             <div className="docs-item">
-              <div className="docs-title">Фото профиля<span className="req">*</span></div>
-              {profileUrl ? (
-                <img className="preview" src={profileUrl} alt="preview profile" />
+              <div className="docs-title">
+                Фото профиля<span className="req">*</span> <span className="docs-limit">(до {MAX_PROFILE})</span>
+              </div>
+
+              {profileUrls.length > 0 ? (
+                <div className="thumbs">
+                  {profileUrls.map((u, idx) => (
+                    <div className="thumb" key={u}>
+                      <img className="thumbImg" src={u} alt={`profile-${idx + 1}`} />
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="placeholder">Фото не выбрано</div>
               )}
+
               <input
                 className="file"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setProfile(e.target.files?.[0] || null)}
+                multiple
+                onChange={(e) => {
+                  const next = clampFiles(e.target.files, MAX_PROFILE);
+                  if (e.target.files && e.target.files.length > MAX_PROFILE) {
+                    tgAlert(`Можно выбрать максимум ${MAX_PROFILE} фото профиля.`);
+                  }
+                  setProfilePhotos(next);
+                  e.currentTarget.value = '';
+                }}
               />
+
               <div className="hint">Портрет, хорошее освещение.</div>
+
+              {profilePhotos.length > 0 && (
+                <button type="button" className="miniDanger" onClick={() => setProfilePhotos([])}>
+                  Очистить
+                </button>
+              )}
             </div>
 
             <div className="docs-item">
-              <div className="docs-title">Фото диплома<span className="req">*</span></div>
-              {diplomaUrl ? (
-                <img className="preview" src={diplomaUrl} alt="preview diploma" />
+              <div className="docs-title">
+                Фото диплома/документов<span className="req">*</span> <span className="docs-limit">(до {MAX_DOCS})</span>
+              </div>
+
+              {docUrls.length > 0 ? (
+                <div className="thumbs">
+                  {docUrls.map((u, idx) => (
+                    <div className="thumb" key={u}>
+                      <img className="thumbImg" src={u} alt={`doc-${idx + 1}`} />
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="placeholder">Диплом не выбран</div>
+                <div className="placeholder">Документы не выбраны</div>
               )}
+
               <input
                 className="file"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setDiploma(e.target.files?.[0] || null)}
+                multiple
+                onChange={(e) => {
+                  const next = clampFiles(e.target.files, MAX_DOCS);
+                  if (e.target.files && e.target.files.length > MAX_DOCS) {
+                    tgAlert(`Можно выбрать максимум ${MAX_DOCS} фото документов.`);
+                  }
+                  setDocPhotos(next);
+                  e.currentTarget.value = '';
+                }}
               />
-              <div className="hint">Фото читаемое: ФИО, ВУЗ, дата.</div>
+
+              <div className="hint">Фото читаемое: ФИО, ВУЗ, дата. Можно несколько страниц.</div>
+
+              {docPhotos.length > 0 && (
+                <button type="button" className="miniDanger" onClick={() => setDocPhotos([])}>
+                  Очистить
+                </button>
+              )}
             </div>
           </div>
         </section>
 
-        {/* Фолбек-кнопка для НЕ Telegram (в Telegram жмём MainButton) */}
         {!inTwa && (
           <div className="docreg-submit-wrap">
             <button type="submit" className="docreg-submit" disabled={submitting}>
@@ -612,17 +712,52 @@ export default function DoctorRegistrationPage() {
         .docreg-dob-row { display: flex; gap: 8px; width: 100%; }
         .docreg-dob-row .docreg-input { flex: 1; min-width: 0; }
 
+        .docs-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .docs-h2 { margin-bottom: 0; }
+
+        .docs-req-link {
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 700;
+          text-align: left;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+        .docs-req-link:active { opacity: 0.7; }
+
         .docs-grid { display: grid; gap: 12px; }
         .docs-item { width: 100%; }
-        .docs-title { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 8px; }
 
-        .preview {
-          width: 100%;
-          height: auto;
-          border-radius: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          display: block;
+        .docs-title { font-size: 13px; font-weight: 800; color: #111827; margin-bottom: 8px; }
+        .docs-limit { font-weight: 700; color: #6b7280; font-size: 12px; margin-left: 6px; }
+
+        .thumbs {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
           margin-bottom: 10px;
+          width: 100%;
+        }
+
+        .thumb {
+          width: 100%;
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          overflow: hidden;
+          background: #fafafa;
+          aspect-ratio: 1 / 1;
+          display: block;
+        }
+
+        .thumbImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         .placeholder {
@@ -639,8 +774,22 @@ export default function DoctorRegistrationPage() {
         }
 
         .file { width: 100%; max-width: 100%; }
-
         .hint { margin-top: 8px; font-size: 11px; color: #9ca3af; }
+
+        .miniDanger {
+          margin-top: 10px;
+          border: 1px solid rgba(239, 68, 68, 0.35);
+          background: rgba(239, 68, 68, 0.06);
+          color: #b91c1c;
+          font-weight: 800;
+          border-radius: 12px;
+          padding: 10px 12px;
+          width: 100%;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+        .miniDanger:active { transform: scale(0.99); }
 
         .docreg-submit-wrap {
           position: sticky;
@@ -661,7 +810,7 @@ export default function DoctorRegistrationPage() {
           background: #24c768;
           color: #ffffff;
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 900;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           touch-action: manipulation;
