@@ -1,4 +1,5 @@
 /* path: app/api/doctor/register/route.ts */
+/* НЕ МЕНЯЛ. Оставь как есть. (Если хочешь — могу дать версию, которая принимает всё одним multipart и без /upload) */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -39,7 +40,7 @@ function timingSafeEqualHex(a: string, b: string) {
 function verifyTelegramWebAppInitData(
   initData: string,
   botToken: string,
-  maxAgeSec = 60 * 60 * 24 // 24 часа, можешь сделать 1 час
+  maxAgeSec = 60 * 60 * 24
 ) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
