@@ -9,72 +9,51 @@ datasource db {
 }
 
 enum DoctorStatus {
-  DRAFT       // анкета сохранена, но НЕ отправлена на модерацию
-  PENDING     // отправлено на модерацию
-  NEED_FIX    // модератор запросил правки
-  APPROVED    // одобрен
-  REJECTED    // отклонён окончательно
+  DRAFT
+  PENDING
+  NEED_FIX
+  APPROVED
+  REJECTED
 }
 
 enum DoctorFileKind {
-  PROFILE_PHOTO   // фото профиля (до 3)
-  DIPLOMA_PHOTO   // диплом/доки (до 10)
-  // на будущее можно добавить:
-  // CERTIFICATE
-  // LICENSE
+  PROFILE_PHOTO
+  DIPLOMA_PHOTO
 }
 
 model Doctor {
-  // --------------------
-  // Системные поля
-  // --------------------
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  submittedAt DateTime?    // выставляем при первой отправке на модерацию
+  submittedAt DateTime?
   status      DoctorStatus @default(DRAFT)
 
-  // --------------------
-  // Telegram
-  // --------------------
   telegramId        String  @unique
   telegramUsername  String?
   telegramFirstName String?
   telegramLastName  String?
 
-  // --------------------
-  // Личные данные
-  // --------------------
   lastName   String
   firstName  String
   middleName String?
-  gender     String        // male / female
+  gender     String
   birthDay   Int?
   birthMonth Int?
   birthYear  Int?
   city       String?
 
-  // --------------------
-  // Профессиональные данные
-  // --------------------
   speciality1     String
   speciality2     String?
   speciality3     String?
   education       String
-  degree          String?   // none / specialist / candidate / doctor
+  degree          String?
   workplace       String?
   position        String?
   experienceYears Int
   awards          String?
 
-  // --------------------
-  // Контакты
-  // --------------------
   email String
 
-  // --------------------
-  // Описание профиля
-  // --------------------
   about             String
   specialityDetails String
   experienceDetails String
@@ -82,14 +61,8 @@ model Doctor {
   achievements      String?
   publications      String?
 
-  // --------------------
-  // Документы/файлы
-  // --------------------
   files DoctorFile[]
 
-  // --------------------
-  // Индексы
-  // --------------------
   @@index([status])
   @@index([speciality1])
   @@index([city])
@@ -104,14 +77,13 @@ model DoctorFile {
   doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   kind      DoctorFileKind
-  url       String         // сюда кладём public url или key (если public base не задан)
+  url       String
   mime      String?
   sizeBytes Int?
-
-  // порядок отображения (если нужно)
   sortOrder Int            @default(0)
 
   @@index([doctorId])
   @@index([kind])
   @@index([doctorId, kind])
+  @@index([doctorId, kind, sortOrder])
 }
