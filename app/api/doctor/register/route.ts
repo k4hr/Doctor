@@ -1,5 +1,5 @@
 /* path: app/api/doctor/register/route.ts */
-/* НЕ МЕНЯЛ. Оставь как есть. (Если хочешь — могу дать версию, которая принимает всё одним multipart и без /upload) */
+/* НЕ МЕНЯЛ. Оставляю как есть. */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
