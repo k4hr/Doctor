@@ -71,11 +71,20 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-export default async function DoctorAdminCardPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+function parseMaybeJsonArray(value: string | null): string[] {
+  if (!value) return [];
+  const v = String(value).trim();
+  if (!v) return [];
+  if (v.startsWith('[')) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr)) return arr.map((x) => String(x)).filter(Boolean);
+    } catch {}
+  }
+  return [v];
+}
+
+export default async function DoctorAdminCardPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -112,8 +121,8 @@ export default async function DoctorAdminCardPage({
     (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
     doctor.telegramId;
 
-  const profileUrl = toPublicUrlMaybe(doctor.profilePhotoUrl);
-  const diplomaUrl = toPublicUrlMaybe(doctor.diplomaPhotoUrl);
+  const profileUrls = parseMaybeJsonArray(doctor.profilePhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
+  const docsUrls = parseMaybeJsonArray(doctor.diplomaPhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
 
   return (
     <main style={{ padding: 16 }}>
@@ -151,37 +160,52 @@ export default async function DoctorAdminCardPage({
             <b>Email:</b> {doctor.email}
           </div>
           <div>
-            <b>SubmittedAt:</b>{' '}
-            {doctor.submittedAt ? new Date(doctor.submittedAt).toLocaleString() : '—'}
+            <b>SubmittedAt:</b> {doctor.submittedAt ? new Date(doctor.submittedAt).toLocaleString() : '—'}
           </div>
         </div>
 
         <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
 
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 14 }}>
           <div>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Фото профиля</div>
-            {profileUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profileUrl}
-                alt="profile"
-                style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }}
-              />
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              Фото профиля {profileUrls.length ? <span style={{ opacity: 0.7 }}>({profileUrls.length})</span> : null}
+            </div>
+
+            {profileUrls.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {profileUrls.map((u) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={u}
+                    src={u}
+                    alt="profile"
+                    style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 14, border: '1px solid #e5e7eb' }}
+                  />
+                ))}
+              </div>
             ) : (
               <div style={{ opacity: 0.7 }}>Не загружено</div>
             )}
           </div>
 
           <div>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Диплом</div>
-            {diplomaUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={diplomaUrl}
-                alt="diploma"
-                style={{ width: '100%', borderRadius: 14, border: '1px solid #e5e7eb' }}
-              />
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              Документы {docsUrls.length ? <span style={{ opacity: 0.7 }}>({docsUrls.length})</span> : null}
+            </div>
+
+            {docsUrls.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {docsUrls.map((u) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={u}
+                    src={u}
+                    alt="doc"
+                    style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 14, border: '1px solid #e5e7eb' }}
+                  />
+                ))}
+              </div>
             ) : (
               <div style={{ opacity: 0.7 }}>Не загружено</div>
             )}
