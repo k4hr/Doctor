@@ -86,15 +86,12 @@ function parseMaybeJsonArray(value: string | null): string[] {
   if (!value) return [];
   const v = String(value).trim();
   if (!v) return [];
-  // если это JSON-массив строк (как мы пишем при множественной загрузке)
   if (v.startsWith('[')) {
     try {
       const arr = JSON.parse(v);
-      if (Array.isArray(arr)) {
-        return arr.map((x) => String(x)).filter(Boolean);
-      }
+      if (Array.isArray(arr)) return arr.map((x) => String(x)).filter(Boolean);
     } catch {
-      // игнор
+      // ignore
     }
   }
   return [v];
@@ -140,17 +137,22 @@ export async function GET(req: Request) {
     });
 
     const items = list.map((d) => {
-      const profileArr = parseMaybeJsonArray(d.profilePhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
-      const docsArr = parseMaybeJsonArray(d.diplomaPhotoUrl).map((x) => toPublicUrlMaybe(x)).filter(Boolean) as string[];
+      const profileArr = parseMaybeJsonArray(d.profilePhotoUrl)
+        .map((x) => toPublicUrlMaybe(x))
+        .filter(Boolean) as string[];
+
+      const docsArr = parseMaybeJsonArray(d.diplomaPhotoUrl)
+        .map((x) => toPublicUrlMaybe(x))
+        .filter(Boolean) as string[];
 
       return {
         ...d,
 
-        // ✅ совместимость со старым UI/типами (одно превью)
+        // совместимость (одно превью)
         profilePhotoUrl: profileArr[0] || null,
         diplomaPhotoUrl: docsArr[0] || null,
 
-        // ✅ новый формат (мульти)
+        // новый формат (мульти)
         profilePhotoUrls: profileArr,
         diplomaPhotoUrls: docsArr,
       };
