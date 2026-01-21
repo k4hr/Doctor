@@ -9,10 +9,19 @@ datasource db {
 }
 
 enum DoctorStatus {
-  PENDING     // анкета создана, но не отправлена / или ожидает модерацию
+  DRAFT       // анкета сохранена, но НЕ отправлена на модерацию
+  PENDING     // отправлено на модерацию
   NEED_FIX    // модератор запросил правки
   APPROVED    // одобрен
   REJECTED    // отклонён окончательно
+}
+
+enum DoctorFileKind {
+  PROFILE_PHOTO   // фото профиля (до 3)
+  DIPLOMA_PHOTO   // диплом/доки (до 10)
+  // на будущее можно добавить:
+  // CERTIFICATE
+  // LICENSE
 }
 
 model Doctor {
@@ -22,8 +31,8 @@ model Doctor {
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  submittedAt DateTime?    // реально отправлено на модерацию (после загрузки доков)
-  status      DoctorStatus @default(PENDING)
+  submittedAt DateTime?    // выставляем при первой отправке на модерацию
+  status      DoctorStatus @default(DRAFT)
 
   // --------------------
   // Telegram
@@ -39,7 +48,7 @@ model Doctor {
   lastName   String
   firstName  String
   middleName String?
-  gender     String        // male / female (строка, без enum — гибче)
+  gender     String        // male / female
   birthDay   Int?
   birthMonth Int?
   birthYear  Int?
@@ -52,7 +61,7 @@ model Doctor {
   speciality2     String?
   speciality3     String?
   education       String
-  degree          String?  // none / specialist / candidate / doctor
+  degree          String?   // none / specialist / candidate / doctor
   workplace       String?
   position        String?
   experienceYears Int
@@ -74,10 +83,9 @@ model Doctor {
   publications      String?
 
   // --------------------
-  // Документы (после шага docs)
+  // Документы/файлы
   // --------------------
-  profilePhotoUrl String?
-  diplomaPhotoUrl String?
+  files DoctorFile[]
 
   // --------------------
   // Индексы
@@ -86,4 +94,24 @@ model Doctor {
   @@index([speciality1])
   @@index([city])
   @@index([submittedAt])
+}
+
+model DoctorFile {
+  id        String         @id @default(cuid())
+  createdAt DateTime       @default(now())
+
+  doctorId  String
+  doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  kind      DoctorFileKind
+  url       String         // сюда кладём public url или key (если public base не задан)
+  mime      String?
+  sizeBytes Int?
+
+  // порядок отображения (если нужно)
+  sortOrder Int            @default(0)
+
+  @@index([doctorId])
+  @@index([kind])
+  @@index([doctorId, kind])
 }
