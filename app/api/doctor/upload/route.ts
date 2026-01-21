@@ -1,4 +1,5 @@
 /* path: app/api/doctor/upload/route.ts */
+/* ОБНОВЛЁН: принимает profilePhotos (до 3) и docPhotos (до 10), плюс совместимость со старыми profilePhoto/diplomaPhoto */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -14,10 +15,35 @@ type TgUser = {
   last_name: string | null;
 };
 
-function verifyTelegramWebAppInitData(initData: string, botToken: string) {
+function timingSafeEqualHex(a: string, b: string) {
+  try {
+    const ab = Buffer.from(a, 'hex');
+    const bb = Buffer.from(b, 'hex');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
+function verifyTelegramWebAppInitData(
+  initData: string,
+  botToken: string,
+  maxAgeSec = 60 * 60 * 24
+) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
+
+  const authDateStr = params.get('auth_date');
+  if (!authDateStr) return { ok: false as const, error: 'NO_AUTH_DATE' as const };
+
+  const authDate = Number(authDateStr);
+  if (!Number.isFinite(authDate)) return { ok: false as const, error: 'BAD_AUTH_DATE' as const };
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (authDate > nowSec + 60) return { ok: false as const, error: 'AUTH_DATE_IN_FUTURE' as const };
+  if (nowSec - authDate > maxAgeSec) return { ok: false as const, error: 'INITDATA_EXPIRED' as const };
 
   params.delete('hash');
 
@@ -29,7 +55,9 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string) {
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
   const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-  if (computedHash !== hash) return { ok: false as const, error: 'BAD_HASH' as const };
+  if (!timingSafeEqualHex(computedHash, hash)) {
+    return { ok: false as const, error: 'BAD_HASH' as const };
+  }
 
   const userStr = params.get('user');
   if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
@@ -61,8 +89,18 @@ function safeExt(mime: string) {
   return 'bin';
 }
 
-function isAllowedMime(mime: string) {
-  return mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp' || mime === 'application/pdf';
+function isProfileMime(mime: string) {
+  return mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp';
+}
+
+function isDocMime(mime: string) {
+  // Документы — можно фото + pdf
+  return (
+    mime === 'image/jpeg' ||
+    mime === 'image/png' ||
+    mime === 'image/webp' ||
+    mime === 'application/pdf'
+  );
 }
 
 function makeS3() {
@@ -88,11 +126,22 @@ async function fileToBuffer(file: File) {
   return Buffer.from(ab);
 }
 
+function asFiles(v: unknown): File[] {
+  return Array.isArray(v) ? v.filter((x) => x instanceof File) as File[] : [];
+}
+
+function rand() {
+  return crypto.randomBytes(6).toString('hex');
+}
+
 export async function POST(req: Request) {
   try {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' },
+        { status: 500 }
+      );
     }
 
     const r2AccountId = process.env.R2_ACCOUNT_ID;
@@ -114,14 +163,7 @@ export async function POST(req: Request) {
 
     const form = await req.formData();
     const initData = String(form.get('initData') || '').trim();
-
-    const profileFile = form.get('profilePhoto');
-    const diplomaFile = form.get('diplomaPhoto');
-
     if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
-    if (!(profileFile instanceof File) || !(diplomaFile instanceof File)) {
-      return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
-    }
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
@@ -134,60 +176,141 @@ export async function POST(req: Request) {
     });
 
     if (!doctor) {
-      return NextResponse.json({ ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' },
+        { status: 404 }
+      );
     }
 
-    const profileMime = profileFile.type || '';
-    const diplomaMime = diplomaFile.type || '';
+    // НОВЫЕ КЛЮЧИ (массивы)
+    const profilePhotos = asFiles(form.getAll('profilePhotos'));
+    const docPhotos = asFiles(form.getAll('docPhotos'));
 
-    if (!isAllowedMime(profileMime)) {
-      return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhoto' }, { status: 400 });
+    // Совместимость со старыми ключами (если фронт вдруг старый)
+    const legacyProfile = form.get('profilePhoto');
+    const legacyDiploma = form.get('diplomaPhoto');
+
+    const finalProfile = profilePhotos.length
+      ? profilePhotos
+      : legacyProfile instanceof File
+        ? [legacyProfile]
+        : [];
+
+    const finalDocs = docPhotos.length
+      ? docPhotos
+      : legacyDiploma instanceof File
+        ? [legacyDiploma]
+        : [];
+
+    const MAX_PROFILE = 3;
+    const MAX_DOCS = 10;
+
+    if (finalProfile.length === 0 || finalDocs.length === 0) {
+      return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
     }
-    if (!isAllowedMime(diplomaMime)) {
-      return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'diplomaPhoto' }, { status: 400 });
+    if (finalProfile.length > MAX_PROFILE) {
+      return NextResponse.json(
+        { ok: false, error: 'TOO_MANY_FILES', field: 'profilePhotos', max: MAX_PROFILE },
+        { status: 400 }
+      );
+    }
+    if (finalDocs.length > MAX_DOCS) {
+      return NextResponse.json(
+        { ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS },
+        { status: 400 }
+      );
     }
 
-    const maxAvatar = 8 * 1024 * 1024;
-    const maxDiploma = 25 * 1024 * 1024;
-    if (profileFile.size > maxAvatar)
-      return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhoto', maxBytes: maxAvatar }, { status: 400 });
-    if (diplomaFile.size > maxDiploma)
-      return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'diplomaPhoto', maxBytes: maxDiploma }, { status: 400 });
+    // Валидация mime + размер
+    const maxAvatar = 8 * 1024 * 1024;   // 8MB на файл профиля
+    const maxDoc = 25 * 1024 * 1024;     // 25MB на документ
+
+    for (const f of finalProfile) {
+      const mime = f.type || '';
+      if (!isProfileMime(mime)) {
+        return NextResponse.json(
+          { ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime },
+          { status: 400 }
+        );
+      }
+      if (f.size > maxAvatar) {
+        return NextResponse.json(
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar },
+          { status: 400 }
+        );
+      }
+    }
+
+    for (const f of finalDocs) {
+      const mime = f.type || '';
+      if (!isDocMime(mime)) {
+        return NextResponse.json(
+          { ok: false, error: 'BAD_MIME', field: 'docPhotos', mime },
+          { status: 400 }
+        );
+      }
+      if (f.size > maxDoc) {
+        return NextResponse.json(
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc },
+          { status: 400 }
+        );
+      }
+    }
 
     const s3 = makeS3();
 
-    const profileKey = `doctors/${doctor.id}/avatar-${Date.now()}.${safeExt(profileMime)}`;
-    const diplomaKey = `doctors/${doctor.id}/diploma-${Date.now()}.${safeExt(diplomaMime)}`;
+    // Грузим по очереди (надёжнее по памяти, чем Promise.all на 13 файлов сразу)
+    const uploadedProfile: string[] = [];
+    for (let i = 0; i < finalProfile.length; i++) {
+      const f = finalProfile[i];
+      const mime = f.type || '';
+      const key = `doctors/${doctor.id}/avatar-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: r2Bucket,
-        Key: profileKey,
-        Body: await fileToBuffer(profileFile),
-        ContentType: profileMime,
-        CacheControl: 'public, max-age=31536000, immutable',
-      })
-    );
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: key,
+          Body: await fileToBuffer(f),
+          ContentType: mime,
+          CacheControl: 'public, max-age=31536000, immutable',
+        })
+      );
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: r2Bucket,
-        Key: diplomaKey,
-        Body: await fileToBuffer(diplomaFile),
-        ContentType: diplomaMime,
-        CacheControl: 'public, max-age=31536000, immutable',
-      })
-    );
+      uploadedProfile.push(publicUrlForKey(key) || key);
+    }
 
-    // делаем публичные ссылки (если задан base)
-    const profileUrl = publicUrlForKey(profileKey);
-    const diplomaUrl = publicUrlForKey(diplomaKey);
+    const uploadedDocs: string[] = [];
+    for (let i = 0; i < finalDocs.length; i++) {
+      const f = finalDocs[i];
+      const mime = f.type || '';
+      const key = `doctors/${doctor.id}/doc-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: key,
+          Body: await fileToBuffer(f),
+          ContentType: mime,
+          CacheControl: 'public, max-age=31536000, immutable',
+        })
+      );
+
+      uploadedDocs.push(publicUrlForKey(key) || key);
+    }
+
+    // ВАЖНО ПРО СХЕМУ:
+    // У тебя в Doctor сейчас, судя по коду, есть ТОЛЬКО profilePhotoUrl и diplomaPhotoUrl (строки).
+    // Поэтому делаем так:
+    // - если 1 файл — сохраняем строкой как раньше
+    // - если много — сохраняем JSON-строкой массива (чтобы ничего не потерять)
+    const profileValue = uploadedProfile.length === 1 ? uploadedProfile[0] : JSON.stringify(uploadedProfile);
+    const docsValue = uploadedDocs.length === 1 ? uploadedDocs[0] : JSON.stringify(uploadedDocs);
 
     await prisma.doctor.update({
       where: { id: doctor.id },
       data: {
-        profilePhotoUrl: profileUrl || profileKey,
-        diplomaPhotoUrl: diplomaUrl || diplomaKey,
+        profilePhotoUrl: profileValue,
+        diplomaPhotoUrl: docsValue,
         submittedAt: new Date(),
         status: 'PENDING',
       },
@@ -196,8 +319,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       doctorId: doctor.id,
-      profilePhotoUrl: profileUrl || profileKey,
-      diplomaPhotoUrl: diplomaUrl || diplomaKey,
+      profilePhotos: uploadedProfile,
+      docPhotos: uploadedDocs,
       submittedAt: new Date().toISOString(),
       status: 'PENDING',
     });
