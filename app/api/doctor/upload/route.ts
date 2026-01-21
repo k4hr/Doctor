@@ -1,6 +1,17 @@
 /* path: app/api/doctor/upload/route.ts */
-/* ОБНОВЛЁН: принимает profilePhotos (до 3) и docPhotos (до 10), плюс совместимость со старыми profilePhoto/diplomaPhoto
-   Выровнял под "фото" (без PDF), чтобы превью (img) в UI не ломалось. */
+/*
+  ОБНОВЛЁН под новую схему Prisma:
+  - Doctor.files: DoctorFile[]
+  - DoctorFile.kind: PROFILE_PHOTO / DIPLOMA_PHOTO
+  Принимает:
+    - profilePhotos (1..3)
+    - docPhotos     (1..10)
+  + совместимость со старыми:
+    - profilePhoto
+    - diplomaPhoto
+
+  Выровнял под "фото" (без PDF), чтобы <img> в UI не ломался.
+*/
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -160,9 +171,10 @@ export async function POST(req: Request) {
 
     const telegramId = v.user.id;
 
+    // Нам нужен submittedAt, чтобы не перетирать его каждый раз
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
-      select: { id: true },
+      select: { id: true, submittedAt: true, status: true },
     });
 
     if (!doctor) {
@@ -249,8 +261,8 @@ export async function POST(req: Request) {
 
     const s3 = makeS3();
 
-    // Грузим по очереди (надёжнее по памяти)
-    const uploadedProfile: string[] = [];
+    // Загружаем по очереди (надёжнее по памяти)
+    const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
       const f = finalProfile[i];
       const mime = f.type || '';
@@ -266,10 +278,15 @@ export async function POST(req: Request) {
         })
       );
 
-      uploadedProfile.push(publicUrlForKey(key) || key);
+      uploadedProfile.push({
+        url: publicUrlForKey(key) || key,
+        mime,
+        sizeBytes: f.size,
+        sortOrder: i,
+      });
     }
 
-    const uploadedDocs: string[] = [];
+    const uploadedDocs: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalDocs.length; i++) {
       const f = finalDocs[i];
       const mime = f.type || '';
@@ -285,32 +302,64 @@ export async function POST(req: Request) {
         })
       );
 
-      uploadedDocs.push(publicUrlForKey(key) || key);
+      uploadedDocs.push({
+        url: publicUrlForKey(key) || key,
+        mime,
+        sizeBytes: f.size,
+        sortOrder: i,
+      });
     }
 
-    // СХЕМА: profilePhotoUrl/diplomaPhotoUrl — строки.
-    // Поэтому:
-    // - 1 файл => строка
-    // - много => JSON-строка массива
-    const profileValue = uploadedProfile.length === 1 ? uploadedProfile[0] : JSON.stringify(uploadedProfile);
-    const docsValue = uploadedDocs.length === 1 ? uploadedDocs[0] : JSON.stringify(uploadedDocs);
+    const now = new Date();
 
-    await prisma.doctor.update({
-      where: { id: doctor.id },
-      data: {
-        profilePhotoUrl: profileValue,
-        diplomaPhotoUrl: docsValue,
-        submittedAt: new Date(),
-        status: 'PENDING',
-      },
+    // ✅ Пишем в DoctorFile (и только туда), плюс апдейтим статус доктора
+    await prisma.$transaction(async (tx) => {
+      // удаляем старые файлы этих типов (чтобы перезагрузка заменяла пак)
+      await tx.doctorFile.deleteMany({
+        where: {
+          doctorId: doctor.id,
+          kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] },
+        },
+      });
+
+      // создаём новые
+      await tx.doctorFile.createMany({
+        data: [
+          ...uploadedProfile.map((x) => ({
+            doctorId: doctor.id,
+            kind: 'PROFILE_PHOTO' as const,
+            url: x.url,
+            mime: x.mime,
+            sizeBytes: x.sizeBytes,
+            sortOrder: x.sortOrder,
+          })),
+          ...uploadedDocs.map((x) => ({
+            doctorId: doctor.id,
+            kind: 'DIPLOMA_PHOTO' as const,
+            url: x.url,
+            mime: x.mime,
+            sizeBytes: x.sizeBytes,
+            sortOrder: x.sortOrder,
+          })),
+        ],
+      });
+
+      // status -> PENDING, submittedAt ставим только один раз (первая отправка)
+      await tx.doctor.update({
+        where: { id: doctor.id },
+        data: {
+          status: 'PENDING',
+          submittedAt: doctor.submittedAt ?? now,
+        },
+      });
     });
 
     return NextResponse.json({
       ok: true,
       doctorId: doctor.id,
-      profilePhotos: uploadedProfile,
-      docPhotos: uploadedDocs,
-      submittedAt: new Date().toISOString(),
+      profilePhotos: uploadedProfile.map((x) => x.url),
+      docPhotos: uploadedDocs.map((x) => x.url),
+      submittedAt: (doctor.submittedAt ?? now).toISOString(),
       status: 'PENDING',
     });
   } catch (e) {
