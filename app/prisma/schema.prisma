@@ -1,0 +1,89 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DoctorStatus {
+  DRAFT
+  PENDING
+  NEED_FIX
+  APPROVED
+  REJECTED
+}
+
+enum DoctorFileKind {
+  PROFILE_PHOTO
+  DIPLOMA_PHOTO
+}
+
+model Doctor {
+  id          String       @id @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  submittedAt DateTime?
+  status      DoctorStatus @default(DRAFT)
+
+  telegramId        String  @unique
+  telegramUsername  String?
+  telegramFirstName String?
+  telegramLastName  String?
+
+  lastName   String
+  firstName  String
+  middleName String?
+  gender     String
+  birthDay   Int?
+  birthMonth Int?
+  birthYear  Int?
+  city       String?
+
+  speciality1     String
+  speciality2     String?
+  speciality3     String?
+  education       String
+  degree          String?
+  workplace       String?
+  position        String?
+  experienceYears Int
+  awards          String?
+
+  email String
+
+  about             String
+  specialityDetails String
+  experienceDetails String
+  courses           String?
+  achievements      String?
+  publications      String?
+
+  files DoctorFile[]
+
+  @@index([status])
+  @@index([speciality1])
+  @@index([city])
+  @@index([submittedAt])
+}
+
+model DoctorFile {
+  id        String         @id @default(cuid())
+  createdAt DateTime       @default(now())
+
+  doctorId  String
+  doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  kind      DoctorFileKind
+  url       String
+  mime      String?
+  sizeBytes Int?
+  sortOrder Int            @default(0)
+
+  @@index([doctorId])
+  @@index([kind])
+  @@index([doctorId, kind])
+  @@index([doctorId, kind, sortOrder])
+}
