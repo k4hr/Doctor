@@ -7,6 +7,8 @@ import TopBarBack from '../../../components/TopBarBack';
 import { VRACHI_LIST } from '../../lib/vrachi';
 
 type TgWebApp = {
+  ready?: () => void;
+  expand?: () => void;
   MainButton?: {
     show?: () => void;
     hide?: () => void;
@@ -112,7 +114,41 @@ export default function DoctorRegistrationPage() {
   const [docPhotos, setDocPhotos] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const inTwa = useMemo(() => (typeof window !== 'undefined' ? isTWA() : false), []);
+  // ✅ ВАЖНО: inTwa нельзя вычислять один раз через useMemo([]).
+  // В iOS Telegram WebView объект WebApp может появиться чуть позже первого рендера.
+  const [inTwa, setInTwa] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    const probe = () => {
+      const wa = tg();
+      if (!wa) return false;
+
+      try {
+        wa.ready?.();
+        wa.expand?.();
+      } catch {}
+
+      if (alive) setInTwa(true);
+      return true;
+    };
+
+    // Сразу пробуем
+    if (probe()) return;
+
+    // И ещё несколько раз (iOS часто “поздно” отдаёт window.Telegram.WebApp)
+    let tries = 0;
+    const id = setInterval(() => {
+      tries += 1;
+      if (probe() || tries >= 12) clearInterval(id);
+    }, 200);
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
 
   const profileUrls = useMemo(() => profilePhotos.map((f) => URL.createObjectURL(f)), [profilePhotos]);
   const docUrls = useMemo(() => docPhotos.map((f) => URL.createObjectURL(f)), [docPhotos]);
@@ -311,14 +347,28 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" autoComplete="family-name" />
+            <input
+              name="lastName"
+              type="text"
+              required
+              placeholder="Иванов"
+              className="docreg-input"
+              autoComplete="family-name"
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" autoComplete="given-name" />
+            <input
+              name="firstName"
+              type="text"
+              required
+              placeholder="Иван"
+              className="docreg-input"
+              autoComplete="given-name"
+            />
           </label>
 
           <label className="docreg-field">
@@ -367,23 +417,35 @@ export default function DoctorRegistrationPage() {
             </span>
 
             <select name="speciality1" required className="docreg-input docreg-select" defaultValue="">
-              <option value="" disabled>Основная специализация</option>
+              <option value="" disabled>
+                Основная специализация
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
             <select name="speciality2" className="docreg-input docreg-select docreg-select-second" defaultValue="">
-              <option value="" disabled>Дополнительная специализация (по желанию)</option>
+              <option value="" disabled>
+                Дополнительная специализация (по желанию)
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
             <select name="speciality3" className="docreg-input docreg-select docreg-select-third" defaultValue="">
-              <option value="" disabled>Ещё одна специализация (по желанию)</option>
+              <option value="" disabled>
+                Ещё одна специализация (по желанию)
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
@@ -396,7 +458,13 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Образование<span className="req">*</span>
             </span>
-            <textarea name="education" required placeholder="ВУЗ, годы обучения, факультет, квалификация." className="docreg-textarea" rows={3} />
+            <textarea
+              name="education"
+              required
+              placeholder="ВУЗ, годы обучения, факультет, квалификация."
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
@@ -423,7 +491,16 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Стаж работы, лет<span className="req">*</span>
             </span>
-            <input name="experienceYears" type="number" required min={0} max={70} inputMode="numeric" placeholder="Общий стаж" className="docreg-input" />
+            <input
+              name="experienceYears"
+              type="number"
+              required
+              min={0}
+              max={70}
+              inputMode="numeric"
+              placeholder="Общий стаж"
+              className="docreg-input"
+            />
           </label>
 
           <label className="docreg-field">
@@ -440,7 +517,14 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               E-mail<span className="req">*</span>
             </span>
-            <input name="email" type="email" required placeholder="doctor@example.com" className="docreg-input" autoComplete="email" />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="doctor@example.com"
+              className="docreg-input"
+              autoComplete="email"
+            />
           </label>
         </section>
 
@@ -452,21 +536,39 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea name="about" required placeholder="Коротко о себе и подходе к пациентам" className="docreg-textarea" rows={3} />
+            <textarea
+              name="about"
+              required
+              placeholder="Коротко о себе и подходе к пациентам"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Специализация подробно<span className="req">*</span>
             </span>
-            <textarea name="specialityDetails" required placeholder="С какими запросами работаете" className="docreg-textarea" rows={3} />
+            <textarea
+              name="specialityDetails"
+              required
+              placeholder="С какими запросами работаете"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea name="experienceDetails" required placeholder="Опишите опыт работы" className="docreg-textarea" rows={3} />
+            <textarea
+              name="experienceDetails"
+              required
+              placeholder="Опишите опыт работы"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
@@ -585,16 +687,21 @@ export default function DoctorRegistrationPage() {
           </div>
         </section>
 
-        {!inTwa && (
-          <div className="docreg-submit-wrap">
-            <button type="submit" className="docreg-submit" disabled={submitting}>
-              {submitting ? 'Отправка…' : 'Отправить на модерацию'}
-            </button>
-            <p className="docreg-footnote">
-              Нажимая «Отправить», вы подтверждаете корректность данных и согласны на модерацию.
-            </p>
-          </div>
-        )}
+        {/* ✅ Всегда показываем кнопку внутри страницы.
+            В TWA всё равно есть Telegram MainButton, но этот “план Б” лечит iOS-глюки со sticky/blur и submit. */}
+        <div className="docreg-submit-wrap">
+          <button
+            type="button"
+            className="docreg-submit"
+            disabled={submitting}
+            onClick={() => submitAll()}
+          >
+            {submitting ? 'Отправка…' : 'Отправить на модерацию'}
+          </button>
+          <p className="docreg-footnote">
+            Нажимая «Отправить», вы подтверждаете корректность данных и согласны на модерацию.
+          </p>
+        </div>
       </form>
 
       <style jsx global>{`
@@ -605,7 +712,7 @@ export default function DoctorRegistrationPage() {
       <style jsx>{`
         .docreg {
           min-height: 100dvh;
-          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 120px);
           width: 100%;
           max-width: 100%;
           overflow-x: hidden;
@@ -793,15 +900,18 @@ export default function DoctorRegistrationPage() {
         }
         .miniDanger:active { transform: scale(0.99); }
 
+        /* ✅ iOS WebView + sticky + backdrop-filter иногда ломает тапы.
+           Делаем фиксированную панель без blur (стабильно кликается). */
         .docreg-submit-wrap {
-          position: sticky;
+          position: fixed;
+          left: 0;
+          right: 0;
           bottom: 0;
-          z-index: 10;
-          margin: 10px -16px 0;
+          z-index: 9999;
           padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
-          background: rgba(255, 255, 255, 0.92);
-          backdrop-filter: blur(10px);
+          background: rgba(255, 255, 255, 0.98);
           border-top: 1px solid rgba(15, 23, 42, 0.06);
+          pointer-events: auto;
         }
 
         .docreg-submit {
