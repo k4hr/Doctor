@@ -29,10 +29,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# создаём public, даже если её нет в репо
 RUN mkdir -p public
-
-# Собираем Next-приложение (у тебя в package.json build: "npx prisma generate && next build" или аналог)
 RUN npm run build
 
 # ---------- deps-prod ----------
@@ -41,12 +38,9 @@ WORKDIR /app
 
 COPY package.json ./
 COPY package-lock.json* ./
-
-# ✅ ВАЖНО: Prisma schema должна быть доступна во время postinstall (prisma generate)
-# Копируем только prisma-часть (быстро и безопасно)
 COPY prisma ./prisma
 
-# Важно: НЕ использовать --ignore-scripts, чтобы postinstall (prisma generate) отработал
+# ВАЖНО: без --ignore-scripts, чтобы postinstall (prisma generate) отработал
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev --no-audit --no-fund ; \
     else \
@@ -66,7 +60,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
+# ✅ prisma schema + migrations должны быть в раннере для migrate deploy
+COPY --from=builder /app/prisma ./prisma
+
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/bin/tini","--"]
-CMD ["npm","run","start","-s"]
+
+# ✅ миграции перед стартом
+CMD ["bash","-lc","npm run prisma:migrate:deploy && node .next/standalone/server.js"]
