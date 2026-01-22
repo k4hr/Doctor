@@ -2,14 +2,13 @@
 FROM node:20-slim AS base
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PRIVATE_SKIP_TYPECHECK=1
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates openssl curl bash tini \
   && rm -rf /var/lib/apt/lists/*
 
-# ---------- deps ----------
+# ---------- deps (install all deps for build) ----------
 FROM base AS deps
 WORKDIR /app
 
@@ -17,9 +16,9 @@ COPY package.json ./
 COPY package-lock.json* ./
 
 RUN if [ -f package-lock.json ]; then \
-      npm ci --no-audit --no-fund --ignore-scripts ; \
+      npm ci --no-audit --no-fund ; \
     else \
-      npm install --no-audit --no-fund --ignore-scripts ; \
+      npm install --no-audit --no-fund ; \
     fi
 
 # ---------- builder ----------
@@ -40,7 +39,9 @@ COPY package.json ./
 COPY package-lock.json* ./
 COPY prisma ./prisma
 
-# ВАЖНО: без --ignore-scripts, чтобы postinstall (prisma generate) отработал
+# ВАЖНО:
+# 1) не игнорим scripts, чтобы сработал postinstall (prisma generate) если он есть
+# 2) prisma CLI должен быть в production deps (см. ниже)
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev --no-audit --no-fund ; \
     else \
@@ -54,18 +55,24 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 
+# node_modules (prod)
 COPY --from=deps_prod /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
-# ✅ prisma schema + migrations должны быть в раннере для migrate deploy
+# ✅ Standalone server кладём в /app (так server.js увидит .next/static)
+COPY --from=builder /app/.next/standalone ./
+
+# ✅ Статику отдельно — именно сюда её ждёт standalone
+COPY --from=builder /app/.next/static ./.next/static
+
+# ✅ public
+COPY --from=builder /app/public ./public
+
+# prisma schema + migrations в раннер
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 
 ENTRYPOINT ["/usr/bin/tini","--"]
 
-# ✅ миграции перед стартом
-CMD ["bash","-lc","npm run prisma:migrate:deploy && node .next/standalone/server.js"]
+# ✅ миграции перед стартом + запуск standalone
+CMD ["bash","-lc","npm run prisma:migrate:deploy && node server.js"]
