@@ -8,17 +8,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates openssl curl bash tini \
   && rm -rf /var/lib/apt/lists/*
 
-# ---------- deps (install all deps for build) ----------
+# ---------- deps (install all deps for build, but DO NOT run postinstall) ----------
 FROM base AS deps
 WORKDIR /app
 
 COPY package.json ./
 COPY package-lock.json* ./
 
+# ✅ на всякий случай кладём schema (если postinstall вдруг запустится — не упадёт)
+RUN mkdir -p prisma
+COPY prisma/schema.prisma ./prisma/schema.prisma
+
+# ✅ КРИТИЧНО: --ignore-scripts, чтобы postinstall НЕ запускался на этом слое
 RUN if [ -f package-lock.json ]; then \
-      npm ci --no-audit --no-fund ; \
+      npm ci --no-audit --no-fund --ignore-scripts ; \
     else \
-      npm install --no-audit --no-fund ; \
+      npm install --no-audit --no-fund --ignore-scripts ; \
     fi
 
 # ---------- builder ----------
@@ -39,12 +44,15 @@ COPY package.json ./
 COPY package-lock.json* ./
 COPY prisma ./prisma
 
-# ВАЖНО: без --ignore-scripts (postinstall prisma generate, если есть)
+# ✅ Здесь scripts можно НЕ игнорить (schema уже есть)
 RUN if [ -f package-lock.json ]; then \
       npm ci --omit=dev --no-audit --no-fund ; \
     else \
       npm install --omit=dev --no-audit --no-fund ; \
     fi
+
+# (опционально, но можно оставить для надёжности)
+# RUN npm run prisma:generate
 
 # ---------- runner ----------
 FROM base AS runner
@@ -53,22 +61,21 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 
-# node_modules (prod)
 COPY --from=deps_prod /app/node_modules ./node_modules
 
-# ✅ Standalone server -> /app
+# ✅ Standalone server -> /app (server.js в корне)
 COPY --from=builder /app/.next/standalone ./
 
-# ✅ ВАЖНО: перезаписываем package.json нашим (иначе standalone package.json может снести scripts)
-COPY --from=deps_prod /app/package.json ./package.json
-
-# ✅ Статика именно туда, где её ждёт standalone
+# ✅ статика туда, где её ждёт standalone
 COPY --from=builder /app/.next/static ./.next/static
 
 # ✅ public
 COPY --from=builder /app/public ./public
 
-# ✅ prisma schema + migrations
+# ✅ package.json (чтобы npm run prisma:* работало)
+COPY --from=builder /app/package.json ./package.json
+
+# ✅ prisma schema + migrations нужны в раннере для migrate deploy
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
