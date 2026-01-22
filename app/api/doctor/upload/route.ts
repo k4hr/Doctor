@@ -1,21 +1,10 @@
 /* path: app/api/doctor/upload/route.ts */
-/*
-  ОБНОВЛЁН под новую схему Prisma:
-  - Doctor.files: DoctorFile[]
-  - DoctorFile.kind: PROFILE_PHOTO / DIPLOMA_PHOTO
-  Принимает:
-    - profilePhotos (1..3)
-    - docPhotos     (1..10)
-  + совместимость со старыми:
-    - profilePhoto
-    - diplomaPhoto
-
-  Выровнял под "фото" (без PDF), чтобы <img> в UI не ломался.
-*/
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { Readable } from 'node:stream';
+import { DoctorFileKind } from '@prisma/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -122,17 +111,18 @@ function publicUrlForKey(key: string) {
   return `${base.replace(/\/$/, '')}/${key}`;
 }
 
-async function fileToBuffer(file: File) {
-  const ab = await file.arrayBuffer();
-  return Buffer.from(ab);
-}
-
 function asFiles(v: unknown): File[] {
   return Array.isArray(v) ? (v.filter((x) => x instanceof File) as File[]) : [];
 }
 
 function rand() {
   return crypto.randomBytes(6).toString('hex');
+}
+
+function fileBodyStream(file: File) {
+  // AWS SDK v3 в Node нормально принимает Readable stream
+  // File.stream() -> Web ReadableStream -> Node Readable
+  return Readable.fromWeb(file.stream() as any);
 }
 
 export async function POST(req: Request) {
@@ -171,7 +161,6 @@ export async function POST(req: Request) {
 
     const telegramId = v.user.id;
 
-    // Нам нужен submittedAt, чтобы не перетирать его каждый раз
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId },
       select: { id: true, submittedAt: true, status: true },
@@ -184,11 +173,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // НОВЫЕ КЛЮЧИ (массивы)
+    // новые ключи
     const profilePhotos = asFiles(form.getAll('profilePhotos'));
     const docPhotos = asFiles(form.getAll('docPhotos'));
 
-    // Совместимость со старыми ключами (если фронт вдруг старый)
+    // legacy
     const legacyProfile = form.get('profilePhoto');
     const legacyDiploma = form.get('diplomaPhoto');
 
@@ -208,7 +197,10 @@ export async function POST(req: Request) {
     const MAX_DOCS = 10;
 
     if (finalProfile.length === 0 || finalDocs.length === 0) {
-      return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: 'FILES_REQUIRED', hint: 'Нужны и фото профиля, и фото диплома/документов' },
+        { status: 400 }
+      );
     }
     if (finalProfile.length > MAX_PROFILE) {
       return NextResponse.json(
@@ -223,21 +215,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // Валидация mime + размер
-    const maxAvatar = 8 * 1024 * 1024; // 8MB на файл профиля
-    const maxDoc = 25 * 1024 * 1024; // 25MB на документ
+    // валидация mime + размер
+    const maxAvatar = 8 * 1024 * 1024; // 8MB
+    const maxDoc = 25 * 1024 * 1024; // 25MB
 
     for (const f of finalProfile) {
       const mime = f.type || '';
       if (!isImageMime(mime)) {
-        return NextResponse.json(
-          { ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime }, { status: 400 });
       }
       if (f.size > maxAvatar) {
         return NextResponse.json(
-          { ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar },
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar, gotBytes: f.size },
           { status: 400 }
         );
       }
@@ -246,14 +235,11 @@ export async function POST(req: Request) {
     for (const f of finalDocs) {
       const mime = f.type || '';
       if (!isImageMime(mime)) {
-        return NextResponse.json(
-          { ok: false, error: 'BAD_MIME', field: 'docPhotos', mime },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'docPhotos', mime }, { status: 400 });
       }
       if (f.size > maxDoc) {
         return NextResponse.json(
-          { ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc },
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc, gotBytes: f.size },
           { status: 400 }
         );
       }
@@ -261,22 +247,29 @@ export async function POST(req: Request) {
 
     const s3 = makeS3();
 
-    // Загружаем по очереди (надёжнее по памяти)
     const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
       const f = finalProfile[i];
       const mime = f.type || '';
       const key = `doctors/${doctor.id}/avatar-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: r2Bucket,
-          Key: key,
-          Body: await fileToBuffer(f),
-          ContentType: mime,
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
+      try {
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: r2Bucket,
+            Key: key,
+            Body: fileBodyStream(f), // ✅ STREAM, не Buffer
+            ContentType: mime,
+            CacheControl: 'public, max-age=31536000, immutable',
+          })
+        );
+      } catch (e) {
+        console.error('R2 upload avatar failed', { i, mime, size: f.size, key }, e);
+        return NextResponse.json(
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i },
+          { status: 502 }
+        );
+      }
 
       uploadedProfile.push({
         url: publicUrlForKey(key) || key,
@@ -292,15 +285,23 @@ export async function POST(req: Request) {
       const mime = f.type || '';
       const key = `doctors/${doctor.id}/doc-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: r2Bucket,
-          Key: key,
-          Body: await fileToBuffer(f),
-          ContentType: mime,
-          CacheControl: 'public, max-age=31536000, immutable',
-        })
-      );
+      try {
+        await s3.send(
+          new PutObjectCommand({
+            Bucket: r2Bucket,
+            Key: key,
+            Body: fileBodyStream(f), // ✅ STREAM, не Buffer
+            ContentType: mime,
+            CacheControl: 'public, max-age=31536000, immutable',
+          })
+        );
+      } catch (e) {
+        console.error('R2 upload doc failed', { i, mime, size: f.size, key }, e);
+        return NextResponse.json(
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i },
+          { status: 502 }
+        );
+      }
 
       uploadedDocs.push({
         url: publicUrlForKey(key) || key,
@@ -312,22 +313,19 @@ export async function POST(req: Request) {
 
     const now = new Date();
 
-    // ✅ Пишем в DoctorFile (и только туда), плюс апдейтим статус доктора
     await prisma.$transaction(async (tx) => {
-      // удаляем старые файлы этих типов (чтобы перезагрузка заменяла пак)
       await tx.doctorFile.deleteMany({
         where: {
           doctorId: doctor.id,
-          kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] },
+          kind: { in: [DoctorFileKind.PROFILE_PHOTO, DoctorFileKind.DIPLOMA_PHOTO] },
         },
       });
 
-      // создаём новые
       await tx.doctorFile.createMany({
         data: [
           ...uploadedProfile.map((x) => ({
             doctorId: doctor.id,
-            kind: 'PROFILE_PHOTO' as const,
+            kind: DoctorFileKind.PROFILE_PHOTO,
             url: x.url,
             mime: x.mime,
             sizeBytes: x.sizeBytes,
@@ -335,7 +333,7 @@ export async function POST(req: Request) {
           })),
           ...uploadedDocs.map((x) => ({
             doctorId: doctor.id,
-            kind: 'DIPLOMA_PHOTO' as const,
+            kind: DoctorFileKind.DIPLOMA_PHOTO,
             url: x.url,
             mime: x.mime,
             sizeBytes: x.sizeBytes,
@@ -344,7 +342,6 @@ export async function POST(req: Request) {
         ],
       });
 
-      // status -> PENDING, submittedAt ставим только один раз (первая отправка)
       await tx.doctor.update({
         where: { id: doctor.id },
         data: {
@@ -364,6 +361,9 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED' }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: 'UPLOAD_FAILED', hint: 'Смотри логи сервера (Railway) — там будет причина' },
+      { status: 500 }
+    );
   }
 }
