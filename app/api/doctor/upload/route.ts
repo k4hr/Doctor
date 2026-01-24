@@ -15,8 +15,9 @@ type TgUser = {
   last_name: string | null;
 };
 
-function envTrim(name: string) {
-  return String(process.env[name] ?? '').trim();
+function envClean(name: string) {
+  // убираем переводы строк + трим
+  return String(process.env[name] ?? '').replace(/[\r\n]/g, '').trim();
 }
 
 function timingSafeEqualHex(a: string, b: string) {
@@ -101,11 +102,10 @@ function isImageMime(mime: string) {
 }
 
 function makeS3() {
-  const accountId = envTrim('R2_ACCOUNT_ID');
-  const accessKeyId = envTrim('R2_ACCESS_KEY_ID');
-  const secretAccessKey = envTrim('R2_SECRET_ACCESS_KEY');
+  const accountId = envClean('R2_ACCOUNT_ID');
+  const accessKeyId = envClean('R2_ACCESS_KEY_ID');
+  const secretAccessKey = envClean('R2_SECRET_ACCESS_KEY');
 
-  // Критично: без лишних пробелов/переводов строк
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error('NO_R2_ENV: Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY');
   }
@@ -114,18 +114,16 @@ function makeS3() {
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
-
-    // R2 нормально работает с path-style: /<bucket>/<key>
     forcePathStyle: true,
 
-    // ✅ Чтобы SDK не лепил CRC32 заголовки на PutObject (частая причина проблем с S3-compatible)
+    // чтобы не добавлял лишние checksum-хедеры на PutObject
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   } as any);
 }
 
 function publicUrlForKey(key: string) {
-  const base = envTrim('R2_PUBLIC_BASE_URL');
+  const base = envClean('R2_PUBLIC_BASE_URL');
   if (!base) return null;
   return `${base.replace(/\/$/, '')}/${key}`;
 }
@@ -151,12 +149,12 @@ function pickS3Error(e: any) {
 
 export async function POST(req: Request) {
   try {
-    const botToken = envTrim('TELEGRAM_BOT_TOKEN');
+    const botToken = envClean('TELEGRAM_BOT_TOKEN');
     if (!botToken) {
-      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' }, { status: 500 });
+      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
     }
 
-    const r2Bucket = envTrim('R2_BUCKET');
+    const r2Bucket = envClean('R2_BUCKET');
     if (!r2Bucket) {
       return NextResponse.json({ ok: false, error: 'NO_R2_BUCKET', hint: 'Set R2_BUCKET' }, { status: 500 });
     }
@@ -192,10 +190,7 @@ export async function POST(req: Request) {
     const MAX_DOCS = 10;
 
     if (finalProfile.length === 0 || finalDocs.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'FILES_REQUIRED', hint: 'Нужны и фото профиля, и фото диплома/документов' },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
     }
     if (finalProfile.length > MAX_PROFILE) {
       return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'profilePhotos', max: MAX_PROFILE }, { status: 400 });
@@ -204,8 +199,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS }, { status: 400 });
     }
 
-    const maxAvatar = 8 * 1024 * 1024; // 8MB
-    const maxDoc = 25 * 1024 * 1024; // 25MB
+    const maxAvatar = 8 * 1024 * 1024;
+    const maxDoc = 25 * 1024 * 1024;
 
     for (const f of finalProfile) {
       const mime = (f.type || '').trim();
@@ -213,10 +208,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime }, { status: 400 });
       }
       if (f.size > maxAvatar) {
-        return NextResponse.json(
-          { ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar, gotBytes: f.size },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar, gotBytes: f.size }, { status: 400 });
       }
     }
 
@@ -226,10 +218,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'docPhotos', mime }, { status: 400 });
       }
       if (f.size > maxDoc) {
-        return NextResponse.json(
-          { ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc, gotBytes: f.size },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc, gotBytes: f.size }, { status: 400 });
       }
     }
 
@@ -257,18 +246,10 @@ export async function POST(req: Request) {
       } catch (e) {
         const details = pickS3Error(e);
         console.error('R2 upload avatar failed', { i, mime, size: f.size, key, details }, e);
-        return NextResponse.json(
-          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i, details },
-          { status: 502 }
-        );
+        return NextResponse.json({ ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i, details }, { status: 502 });
       }
 
-      uploadedProfile.push({
-        url: publicUrlForKey(key) || key,
-        mime,
-        sizeBytes: f.size,
-        sortOrder: i,
-      });
+      uploadedProfile.push({ url: publicUrlForKey(key) || key, mime, sizeBytes: f.size, sortOrder: i });
     }
 
     const uploadedDocs: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
@@ -293,57 +274,29 @@ export async function POST(req: Request) {
       } catch (e) {
         const details = pickS3Error(e);
         console.error('R2 upload doc failed', { i, mime, size: f.size, key, details }, e);
-        return NextResponse.json(
-          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i, details },
-          { status: 502 }
-        );
+        return NextResponse.json({ ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i, details }, { status: 502 });
       }
 
-      uploadedDocs.push({
-        url: publicUrlForKey(key) || key,
-        mime,
-        sizeBytes: f.size,
-        sortOrder: i,
-      });
+      uploadedDocs.push({ url: publicUrlForKey(key) || key, mime, sizeBytes: f.size, sortOrder: i });
     }
 
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
       await tx.doctorFile.deleteMany({
-        where: {
-          doctorId: doctor.id,
-          kind: { in: [DoctorFileKind.PROFILE_PHOTO, DoctorFileKind.DIPLOMA_PHOTO] },
-        },
+        where: { doctorId: doctor.id, kind: { in: [DoctorFileKind.PROFILE_PHOTO, DoctorFileKind.DIPLOMA_PHOTO] } },
       });
 
       await tx.doctorFile.createMany({
         data: [
-          ...uploadedProfile.map((x) => ({
-            doctorId: doctor.id,
-            kind: DoctorFileKind.PROFILE_PHOTO,
-            url: x.url,
-            mime: x.mime,
-            sizeBytes: x.sizeBytes,
-            sortOrder: x.sortOrder,
-          })),
-          ...uploadedDocs.map((x) => ({
-            doctorId: doctor.id,
-            kind: DoctorFileKind.DIPLOMA_PHOTO,
-            url: x.url,
-            mime: x.mime,
-            sizeBytes: x.sizeBytes,
-            sortOrder: x.sortOrder,
-          })),
+          ...uploadedProfile.map((x) => ({ doctorId: doctor.id, kind: DoctorFileKind.PROFILE_PHOTO, url: x.url, mime: x.mime, sizeBytes: x.sizeBytes, sortOrder: x.sortOrder })),
+          ...uploadedDocs.map((x) => ({ doctorId: doctor.id, kind: DoctorFileKind.DIPLOMA_PHOTO, url: x.url, mime: x.mime, sizeBytes: x.sizeBytes, sortOrder: x.sortOrder })),
         ],
       });
 
       await tx.doctor.update({
         where: { id: doctor.id },
-        data: {
-          status: 'PENDING',
-          submittedAt: doctor.submittedAt ?? now,
-        },
+        data: { status: 'PENDING', submittedAt: doctor.submittedAt ?? now },
       });
     });
 
@@ -357,9 +310,6 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     console.error(e);
-    return NextResponse.json(
-      { ok: false, error: 'UPLOAD_FAILED', hint: String(e?.message || 'See server logs') },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED', hint: String(e?.message || 'See server logs') }, { status: 500 });
   }
 }
