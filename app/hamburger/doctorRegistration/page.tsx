@@ -9,7 +9,7 @@ import { VRACHI_LIST } from '../../lib/vrachi';
 type TgWebApp = {
   ready?: () => void;
   expand?: () => void;
-  initData?: string; // важно: в рантайме это есть
+  initData?: string;
   MainButton?: {
     show?: () => void;
     hide?: () => void;
@@ -32,6 +32,15 @@ function tg(): TgWebApp | null {
   } catch {
     return null;
   }
+}
+
+function tgHardHideMainButton() {
+  try {
+    const wa = tg();
+    wa?.MainButton?.offClick?.(); // снимаем вообще все хендлеры
+    wa?.MainButton?.hideProgress?.();
+    wa?.MainButton?.hide?.();
+  } catch {}
 }
 
 function haptic(type: 'light' | 'medium' = 'light') {
@@ -109,19 +118,16 @@ async function fetchWithTimeout(
  *  - через query/hash параметр tgWebAppData (если открытие не совсем стандартное)
  */
 function getTelegramInitDataSmart(): { initData: string; source: string } {
-  // 1) Нормальный путь: WebApp.initData
   const wa = tg();
   const fromWa = (wa?.initData || '').trim();
   if (fromWa) return { initData: fromWa, source: 'Telegram.WebApp.initData' };
 
-  // 2) Fallback: tgWebAppData в query
   try {
     const sp = new URLSearchParams(window.location.search);
     const q = (sp.get('tgWebAppData') || '').trim();
     if (q) return { initData: q, source: 'URL ?tgWebAppData' };
   } catch {}
 
-  // 3) Fallback: tgWebAppData в hash
   try {
     const hash = (window.location.hash || '').replace(/^#/, '');
     const sp2 = new URLSearchParams(hash);
@@ -162,13 +168,21 @@ export default function DoctorRegistrationPage() {
     };
   }, []);
 
-  // ВАЖНО: на самой странице тоже дёргаем ready/expand, не полагаемся на layout
+  // ✅ На входе: говорим Telegram "мы WebApp", и сразу скрываем MainButton (он глобальный)
   useEffect(() => {
     try {
       const wa = tg();
       wa?.ready?.();
       wa?.expand?.();
     } catch {}
+
+    // На всякий случай, если с другой страницы прилип
+    tgHardHideMainButton();
+
+    return () => {
+      // ✅ На выходе: гарантированно убираем, чтобы не прилипал дальше
+      tgHardHideMainButton();
+    };
   }, []);
 
   const profileUrls = useMemo(() => profilePhotos.map((f) => URL.createObjectURL(f)), [profilePhotos]);
@@ -234,11 +248,10 @@ export default function DoctorRegistrationPage() {
     const { initData, source } = getTelegramInitDataSmart();
 
     if (!waExists || !initData) {
-      // Это ключевая диагностика: Telegram открыл не как WebApp
       const host = typeof window !== 'undefined' ? window.location.host : '';
       showToast(
         `Нет initData (${source}). Telegram.WebApp=${waExists ? 'есть' : 'нет'}. Домен=${host}. ` +
-          `Проверь: @BotFather /setdomain + открывать как WebApp (menu button/web_app кнопка), а не просто URL.`
+          `Проверь: @BotFather /setdomain и открывать именно как WebApp (web_app кнопка / menu button), а не просто URL.`
       );
       setStage('');
       return;
@@ -277,7 +290,6 @@ export default function DoctorRegistrationPage() {
       setStage('Загружаем документы…');
       const fd = new FormData();
       fd.append('initData', initData);
-
       profilePhotos.forEach((f) => fd.append('profilePhotos', f, f.name));
       docPhotos.forEach((f) => fd.append('docPhotos', f, f.name));
 
@@ -302,6 +314,10 @@ export default function DoctorRegistrationPage() {
 
       setStage('Готово ✅');
       showToast('Анкета и документы отправлены. Профиль ушёл на модерацию.');
+
+      // ✅ Перед уходом ещё раз прибить MainButton, чтобы точно не прилип
+      tgHardHideMainButton();
+
       router.push('/hamburger/profile');
     } catch (e: any) {
       console.error(e);
@@ -321,44 +337,8 @@ export default function DoctorRegistrationPage() {
     await submitAll();
   };
 
-  useEffect(() => {
-    const wa = tg();
-    if (!wa?.MainButton) return;
-
-    const onMain = () => setTimeout(() => void submitAll(), 0);
-
-    try {
-      wa.ready?.();
-      wa.expand?.();
-
-      wa.MainButton.setText?.(submitting ? 'Отправка…' : 'Отправить на модерацию');
-      wa.MainButton.setParams?.({
-        is_visible: true,
-        color: '#24c768',
-        text_color: '#ffffff',
-        is_active: !submitting,
-      });
-      wa.MainButton.show?.();
-
-      if (submitting) {
-        wa.MainButton.disable?.();
-        wa.MainButton.showProgress?.(true);
-      } else {
-        wa.MainButton.hideProgress?.();
-        wa.MainButton.enable?.();
-      }
-
-      wa.MainButton.offClick?.();
-      wa.MainButton.onClick?.(onMain);
-    } catch {}
-
-    return () => {
-      try {
-        wa.MainButton?.offClick?.(onMain);
-      } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submitting, profilePhotos.length, docPhotos.length]);
+  // ✅ ВАЖНО: Telegram MainButton не используем вообще.
+  // Если где-то ещё его показывают — он будет убит tgHardHideMainButton() на входе/выходе этой страницы.
 
   return (
     <main className="docreg">
