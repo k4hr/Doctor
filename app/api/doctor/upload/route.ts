@@ -26,11 +26,7 @@ function timingSafeEqualHex(a: string, b: string) {
   }
 }
 
-function verifyTelegramWebAppInitData(
-  initData: string,
-  botToken: string,
-  maxAgeSec = 60 * 60 * 24
-) {
+function verifyTelegramWebAppInitData(initData: string, botToken: string, maxAgeSec = 60 * 60 * 24) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
@@ -100,17 +96,28 @@ function isImageMime(mime: string) {
   );
 }
 
-function makeS3() {
-  const accountId = process.env.R2_ACCOUNT_ID!;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID!;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY!;
+function requireEnv(name: string) {
+  const v = (process.env[name] || '').trim();
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
 
+function makeS3() {
+  const accountId = requireEnv('R2_ACCOUNT_ID');
+  const accessKeyId = requireEnv('R2_ACCESS_KEY_ID');
+  const secretAccessKey = requireEnv('R2_SECRET_ACCESS_KEY');
+
+  // ВАЖНО: endpoint БЕЗ "/bucket"
   return new S3Client({
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true, // ✅ для R2/кастомного endpoint часто критично
-  });
+    forcePathStyle: true,
+
+    // ✅ снижает шанс конфликтов подписи/чексумм на R2
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  } as any);
 }
 
 function publicUrlForKey(key: string) {
@@ -140,30 +147,21 @@ function pickS3Error(e: any) {
 
 export async function POST(req: Request) {
   try {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
     if (!botToken) {
+      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' }, { status: 500 });
+    }
+
+    const r2Bucket = (process.env.R2_BUCKET || '').trim();
+    if (!r2Bucket) {
       return NextResponse.json(
-        { ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' },
+        { ok: false, error: 'NO_R2_ENV', hint: 'Set R2_BUCKET (+ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)' },
         { status: 500 }
       );
     }
 
-    const r2AccountId = process.env.R2_ACCOUNT_ID;
-    const r2Bucket = process.env.R2_BUCKET;
-    const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID;
-    const r2Secret = process.env.R2_SECRET_ACCESS_KEY;
-
-    if (!r2AccountId || !r2Bucket || !r2AccessKeyId || !r2Secret) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'NO_R2_ENV',
-          hint:
-            'Set R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and R2_PUBLIC_BASE_URL for public links)',
-        },
-        { status: 500 }
-      );
-    }
+    // ✅ валидируем наличие env через makeS3 (там requireEnv)
+    const s3 = makeS3();
 
     const form = await req.formData();
     const initData = String(form.get('initData') || '').trim();
@@ -180,10 +178,7 @@ export async function POST(req: Request) {
     });
 
     if (!doctor) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' }, { status: 404 });
     }
 
     // новые ключи
@@ -194,17 +189,8 @@ export async function POST(req: Request) {
     const legacyProfile = form.get('profilePhoto');
     const legacyDiploma = form.get('diplomaPhoto');
 
-    const finalProfile = profilePhotos.length
-      ? profilePhotos
-      : legacyProfile instanceof File
-        ? [legacyProfile]
-        : [];
-
-    const finalDocs = docPhotos.length
-      ? docPhotos
-      : legacyDiploma instanceof File
-        ? [legacyDiploma]
-        : [];
+    const finalProfile = profilePhotos.length ? profilePhotos : legacyProfile instanceof File ? [legacyProfile] : [];
+    const finalDocs = docPhotos.length ? docPhotos : legacyDiploma instanceof File ? [legacyDiploma] : [];
 
     const MAX_PROFILE = 3;
     const MAX_DOCS = 10;
@@ -216,16 +202,10 @@ export async function POST(req: Request) {
       );
     }
     if (finalProfile.length > MAX_PROFILE) {
-      return NextResponse.json(
-        { ok: false, error: 'TOO_MANY_FILES', field: 'profilePhotos', max: MAX_PROFILE },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'profilePhotos', max: MAX_PROFILE }, { status: 400 });
     }
     if (finalDocs.length > MAX_DOCS) {
-      return NextResponse.json(
-        { ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS }, { status: 400 });
     }
 
     // валидация mime + размер
@@ -233,12 +213,9 @@ export async function POST(req: Request) {
     const maxDoc = 25 * 1024 * 1024; // 25MB
 
     for (const f of finalProfile) {
-      const mime = f.type || '';
+      const mime = (f.type || '').trim();
       if (!isImageMime(mime)) {
-        return NextResponse.json(
-          { ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime }, { status: 400 });
       }
       if (f.size > maxAvatar) {
         return NextResponse.json(
@@ -249,12 +226,9 @@ export async function POST(req: Request) {
     }
 
     for (const f of finalDocs) {
-      const mime = f.type || '';
+      const mime = (f.type || '').trim();
       if (!isImageMime(mime)) {
-        return NextResponse.json(
-          { ok: false, error: 'BAD_MIME', field: 'docPhotos', mime },
-          { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'docPhotos', mime }, { status: 400 });
       }
       if (f.size > maxDoc) {
         return NextResponse.json(
@@ -264,15 +238,12 @@ export async function POST(req: Request) {
       }
     }
 
-    const s3 = makeS3();
-
     const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
       const f = finalProfile[i];
-      const mime = f.type || '';
+      const mime = (f.type || '').trim();
       const key = `doctors/${doctor.id}/avatar-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
-      // ✅ ВАЖНО: Buffer + ContentLength (без стрима)
       const body = Buffer.from(await f.arrayBuffer());
 
       try {
@@ -306,7 +277,7 @@ export async function POST(req: Request) {
     const uploadedDocs: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalDocs.length; i++) {
       const f = finalDocs[i];
-      const mime = f.type || '';
+      const mime = (f.type || '').trim();
       const key = `doctors/${doctor.id}/doc-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
       const body = Buffer.from(await f.arrayBuffer());
@@ -387,8 +358,12 @@ export async function POST(req: Request) {
       submittedAt: (doctor.submittedAt ?? now).toISOString(),
       status: 'PENDING',
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error(e);
+    const msg = String(e?.message || '');
+    if (msg.startsWith('Missing env:')) {
+      return NextResponse.json({ ok: false, error: 'NO_R2_ENV', hint: msg }, { status: 500 });
+    }
     return NextResponse.json(
       { ok: false, error: 'UPLOAD_FAILED', hint: 'Смотри логи сервера (Railway) — там будет причина' },
       { status: 500 }
