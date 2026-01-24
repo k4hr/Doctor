@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { Readable } from 'node:stream';
 import { DoctorFileKind } from '@prisma/client';
 
 export const runtime = 'nodejs';
@@ -86,11 +85,19 @@ function safeExt(mime: string) {
   if (mime === 'image/jpeg') return 'jpg';
   if (mime === 'image/png') return 'png';
   if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/heic') return 'heic';
+  if (mime === 'image/heif') return 'heif';
   return 'bin';
 }
 
 function isImageMime(mime: string) {
-  return mime === 'image/jpeg' || mime === 'image/png' || mime === 'image/webp';
+  return (
+    mime === 'image/jpeg' ||
+    mime === 'image/png' ||
+    mime === 'image/webp' ||
+    mime === 'image/heic' ||
+    mime === 'image/heif'
+  );
 }
 
 function makeS3() {
@@ -102,6 +109,7 @@ function makeS3() {
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true, // ✅ для R2/кастомного endpoint часто критично
   });
 }
 
@@ -119,10 +127,15 @@ function rand() {
   return crypto.randomBytes(6).toString('hex');
 }
 
-function fileBodyStream(file: File) {
-  // AWS SDK v3 в Node нормально принимает Readable stream
-  // File.stream() -> Web ReadableStream -> Node Readable
-  return Readable.fromWeb(file.stream() as any);
+function pickS3Error(e: any) {
+  return {
+    name: e?.name,
+    message: e?.message,
+    code: e?.Code || e?.code,
+    statusCode: e?.$metadata?.httpStatusCode,
+    requestId: e?.$metadata?.requestId,
+    cfId: e?.$metadata?.cfId,
+  };
 }
 
 export async function POST(req: Request) {
@@ -222,7 +235,10 @@ export async function POST(req: Request) {
     for (const f of finalProfile) {
       const mime = f.type || '';
       if (!isImageMime(mime)) {
-        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime },
+          { status: 400 }
+        );
       }
       if (f.size > maxAvatar) {
         return NextResponse.json(
@@ -235,7 +251,10 @@ export async function POST(req: Request) {
     for (const f of finalDocs) {
       const mime = f.type || '';
       if (!isImageMime(mime)) {
-        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'docPhotos', mime }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: 'BAD_MIME', field: 'docPhotos', mime },
+          { status: 400 }
+        );
       }
       if (f.size > maxDoc) {
         return NextResponse.json(
@@ -253,20 +272,25 @@ export async function POST(req: Request) {
       const mime = f.type || '';
       const key = `doctors/${doctor.id}/avatar-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
+      // ✅ ВАЖНО: Buffer + ContentLength (без стрима)
+      const body = Buffer.from(await f.arrayBuffer());
+
       try {
         await s3.send(
           new PutObjectCommand({
             Bucket: r2Bucket,
             Key: key,
-            Body: fileBodyStream(f), // ✅ STREAM, не Buffer
+            Body: body,
             ContentType: mime,
+            ContentLength: body.length,
             CacheControl: 'public, max-age=31536000, immutable',
           })
         );
       } catch (e) {
-        console.error('R2 upload avatar failed', { i, mime, size: f.size, key }, e);
+        const details = pickS3Error(e);
+        console.error('R2 upload avatar failed', { i, mime, size: f.size, key, details }, e);
         return NextResponse.json(
-          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i },
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i, details },
           { status: 502 }
         );
       }
@@ -285,20 +309,24 @@ export async function POST(req: Request) {
       const mime = f.type || '';
       const key = `doctors/${doctor.id}/doc-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
 
+      const body = Buffer.from(await f.arrayBuffer());
+
       try {
         await s3.send(
           new PutObjectCommand({
             Bucket: r2Bucket,
             Key: key,
-            Body: fileBodyStream(f), // ✅ STREAM, не Buffer
+            Body: body,
             ContentType: mime,
+            ContentLength: body.length,
             CacheControl: 'public, max-age=31536000, immutable',
           })
         );
       } catch (e) {
-        console.error('R2 upload doc failed', { i, mime, size: f.size, key }, e);
+        const details = pickS3Error(e);
+        console.error('R2 upload doc failed', { i, mime, size: f.size, key, details }, e);
         return NextResponse.json(
-          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i },
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i, details },
           { status: 502 }
         );
       }
