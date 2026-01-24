@@ -15,6 +15,10 @@ type TgUser = {
   last_name: string | null;
 };
 
+function envTrim(name: string) {
+  return String(process.env[name] ?? '').trim();
+}
+
 function timingSafeEqualHex(a: string, b: string) {
   try {
     const ab = Buffer.from(a, 'hex');
@@ -96,35 +100,25 @@ function isImageMime(mime: string) {
   );
 }
 
-function envTrim(name: string) {
-  return (process.env[name] || '').trim();
-}
+function makeS3() {
+  const accountId = envTrim('R2_ACCOUNT_ID');
+  const accessKeyId = envTrim('R2_ACCESS_KEY_ID');
+  const secretAccessKey = envTrim('R2_SECRET_ACCESS_KEY');
 
-function mustEnv(name: string) {
-  const v = envTrim(name);
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
-
-function makeS3(bucket: string) {
-  const accountId = mustEnv('R2_ACCOUNT_ID');
-  const accessKeyId = mustEnv('R2_ACCESS_KEY_ID');
-  const secretAccessKey = mustEnv('R2_SECRET_ACCESS_KEY');
-
-  // ✅ ВАЖНО: bucket endpoint режим (endpoint уже "привязан" к бакету)
-  // Тогда canonical path будет "/<key>", а не "/<bucket>/<key>"
-  const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucket}`;
+  // Критично: без лишних пробелов/переводов строк
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    throw new Error('NO_R2_ENV: Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY');
+  }
 
   return new S3Client({
     region: 'auto',
-    endpoint,
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
 
-    // ✅ bucket endpoint mode
-    bucketEndpoint: true,
-    forcePathStyle: false,
+    // R2 нормально работает с path-style: /<bucket>/<key>
+    forcePathStyle: true,
 
-    // ✅ меньше сюрпризов от SDK на R2
+    // ✅ Чтобы SDK не лепил CRC32 заголовки на PutObject (частая причина проблем с S3-compatible)
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   } as any);
@@ -164,10 +158,7 @@ export async function POST(req: Request) {
 
     const r2Bucket = envTrim('R2_BUCKET');
     if (!r2Bucket) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_R2_ENV', hint: 'Set R2_BUCKET (+ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: 'NO_R2_BUCKET', hint: 'Set R2_BUCKET' }, { status: 500 });
     }
 
     const form = await req.formData();
@@ -242,7 +233,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const s3 = makeS3(r2Bucket);
+    const s3 = makeS3();
 
     const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
@@ -255,7 +246,7 @@ export async function POST(req: Request) {
       try {
         await s3.send(
           new PutObjectCommand({
-            Bucket: r2Bucket, // можно оставить — в bucketEndpoint режиме не ломает подпись
+            Bucket: r2Bucket,
             Key: key,
             Body: body,
             ContentType: mime,
@@ -366,10 +357,9 @@ export async function POST(req: Request) {
     });
   } catch (e: any) {
     console.error(e);
-    const msg = String(e?.message || '');
-    if (msg.startsWith('Missing env:')) {
-      return NextResponse.json({ ok: false, error: 'NO_R2_ENV', hint: msg }, { status: 500 });
-    }
-    return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED' }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: 'UPLOAD_FAILED', hint: String(e?.message || 'See server logs') },
+      { status: 500 }
+    );
   }
 }
