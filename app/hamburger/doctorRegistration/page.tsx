@@ -7,9 +7,9 @@ import TopBarBack from '../../../components/TopBarBack';
 import { VRACHI_LIST } from '../../lib/vrachi';
 
 type TgWebApp = {
-  initData?: string;
   ready?: () => void;
   expand?: () => void;
+  initData?: string; // важно: в рантайме это есть
   MainButton?: {
     show?: () => void;
     hide?: () => void;
@@ -38,41 +38,6 @@ function haptic(type: 'light' | 'medium' = 'light') {
   try {
     tg()?.HapticFeedback?.impactOccurred?.(type);
   } catch {}
-}
-
-// ✅ NEW: иногда tgWebAppData лежит в URL, а initData пустой
-function getInitDataFromUrl(): string {
-  try {
-    const href = window.location.href;
-    const url = new URL(href);
-
-    // 1) query ?tgWebAppData=...
-    const q = url.searchParams.get('tgWebAppData');
-    if (q && q.trim()) return decodeURIComponent(q);
-
-    // 2) hash #tgWebAppData=... (бывает так)
-    const hash = (url.hash || '').replace(/^#/, '');
-    if (hash) {
-      const hp = new URLSearchParams(hash);
-      const h = hp.get('tgWebAppData');
-      if (h && h.trim()) return decodeURIComponent(h);
-    }
-
-    return '';
-  } catch {
-    return '';
-  }
-}
-
-// ✅ FIX: initData берём из Telegram SDK, а если там пусто — из URL
-function getTelegramInitData(): string {
-  try {
-    const wa = (window as any)?.Telegram?.WebApp;
-    const d = typeof wa?.initData === 'string' ? wa.initData : '';
-    return (d && d.trim()) ? d : getInitDataFromUrl();
-  } catch {
-    return getInitDataFromUrl();
-  }
 }
 
 function niceFieldName(name: string) {
@@ -138,6 +103,35 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Telegram может передавать initData:
+ *  - через window.Telegram.WebApp.initData
+ *  - через query/hash параметр tgWebAppData (если открытие не совсем стандартное)
+ */
+function getTelegramInitDataSmart(): { initData: string; source: string } {
+  // 1) Нормальный путь: WebApp.initData
+  const wa = tg();
+  const fromWa = (wa?.initData || '').trim();
+  if (fromWa) return { initData: fromWa, source: 'Telegram.WebApp.initData' };
+
+  // 2) Fallback: tgWebAppData в query
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const q = (sp.get('tgWebAppData') || '').trim();
+    if (q) return { initData: q, source: 'URL ?tgWebAppData' };
+  } catch {}
+
+  // 3) Fallback: tgWebAppData в hash
+  try {
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    const sp2 = new URLSearchParams(hash);
+    const h = (sp2.get('tgWebAppData') || '').trim();
+    if (h) return { initData: h, source: 'URL #tgWebAppData' };
+  } catch {}
+
+  return { initData: '', source: 'none' };
+}
+
 export default function DoctorRegistrationPage() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -146,11 +140,9 @@ export default function DoctorRegistrationPage() {
   const [docPhotos, setDocPhotos] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // ✅ чтобы iOS не сходил с ума от "очистки value"
   const [profileInputKey, setProfileInputKey] = useState(1);
   const [docInputKey, setDocInputKey] = useState(1);
 
-  // ✅ stage + toast чтобы всегда видно где стопор
   const [stage, setStage] = useState<string>('');
   const [toast, setToast] = useState<string>('');
   const toastTimerRef = useRef<any>(null);
@@ -160,7 +152,6 @@ export default function DoctorRegistrationPage() {
     try {
       tg()?.showAlert?.(msg);
     } catch {}
-
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(''), 3500);
   };
@@ -171,7 +162,7 @@ export default function DoctorRegistrationPage() {
     };
   }, []);
 
-  // ✅ NEW: на всякий — говорим Telegram’у что мы готовы и просим expand
+  // ВАЖНО: на самой странице тоже дёргаем ready/expand, не полагаемся на layout
   useEffect(() => {
     try {
       const wa = tg();
@@ -180,10 +171,7 @@ export default function DoctorRegistrationPage() {
     } catch {}
   }, []);
 
-  const profileUrls = useMemo(
-    () => profilePhotos.map((f) => URL.createObjectURL(f)),
-    [profilePhotos]
-  );
+  const profileUrls = useMemo(() => profilePhotos.map((f) => URL.createObjectURL(f)), [profilePhotos]);
   const docUrls = useMemo(() => docPhotos.map((f) => URL.createObjectURL(f)), [docPhotos]);
 
   useEffect(() => {
@@ -194,13 +182,8 @@ export default function DoctorRegistrationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    return () => revokeUrls(profileUrls);
-  }, [profileUrls]);
-
-  useEffect(() => {
-    return () => revokeUrls(docUrls);
-  }, [docUrls]);
+  useEffect(() => () => revokeUrls(profileUrls), [profileUrls]);
+  useEffect(() => () => revokeUrls(docUrls), [docUrls]);
 
   const validateFiles = () => {
     if (profilePhotos.length === 0) {
@@ -230,7 +213,6 @@ export default function DoctorRegistrationPage() {
 
     setStage('Проверяем поля…');
 
-    // 1) поля
     const ok = form.reportValidity();
     if (!ok) {
       haptic('light');
@@ -239,7 +221,6 @@ export default function DoctorRegistrationPage() {
       return;
     }
 
-    // 2) файлы
     setStage('Проверяем файлы…');
     if (!validateFiles()) {
       haptic('light');
@@ -247,27 +228,17 @@ export default function DoctorRegistrationPage() {
       return;
     }
 
-    // 3) initData
     setStage('Проверяем Telegram…');
-    const initData = getTelegramInitData(); // ✅ FIXED
-    if (!initData) {
-      // ✅ даём чуть больше диагностики (без слива всего initData)
-      const wa = tg();
-      const hasTelegram = !!wa;
-      const urlHasTg = (() => {
-        try {
-          const u = new URL(window.location.href);
-          if (u.searchParams.get('tgWebAppData')) return true;
-          const h = (u.hash || '').replace(/^#/, '');
-          if (h && new URLSearchParams(h).get('tgWebAppData')) return true;
-          return false;
-        } catch {
-          return false;
-        }
-      })();
 
+    const waExists = !!tg();
+    const { initData, source } = getTelegramInitDataSmart();
+
+    if (!waExists || !initData) {
+      // Это ключевая диагностика: Telegram открыл не как WebApp
+      const host = typeof window !== 'undefined' ? window.location.host : '';
       showToast(
-        `Нет initData. Telegram=${hasTelegram ? 'да' : 'нет'}, tgWebAppData в URL=${urlHasTg ? 'да' : 'нет'}.`
+        `Нет initData (${source}). Telegram.WebApp=${waExists ? 'есть' : 'нет'}. Домен=${host}. ` +
+          `Проверь: @BotFather /setdomain + открывать как WebApp (menu button/web_app кнопка), а не просто URL.`
       );
       setStage('');
       return;
@@ -294,7 +265,7 @@ export default function DoctorRegistrationPage() {
       if (!resReg.ok) {
         const msg =
           jReg?.error === 'BAD_HASH'
-            ? 'BAD_HASH: проверь TELEGRAM_BOT_TOKEN (и что это токен именно того бота).'
+            ? 'BAD_HASH: проверь TELEGRAM_BOT_TOKEN (токен именно этого бота).'
             : jReg?.error === 'VALIDATION_ERROR'
               ? `Ошибка в поле: ${niceFieldName(jReg?.field || '')}`
               : `Ошибка сохранения анкеты (${resReg.status}).`;
@@ -350,14 +321,11 @@ export default function DoctorRegistrationPage() {
     await submitAll();
   };
 
-  // Telegram MainButton — оставляем
   useEffect(() => {
     const wa = tg();
     if (!wa?.MainButton) return;
 
-    const onMain = () => {
-      setTimeout(() => void submitAll(), 0);
-    };
+    const onMain = () => setTimeout(() => void submitAll(), 0);
 
     try {
       wa.ready?.();
@@ -597,7 +565,11 @@ export default function DoctorRegistrationPage() {
         <section className="docreg-card">
           <div className="docs-head">
             <h2 className="docreg-card-title docs-h2">Документы</h2>
-            <button type="button" className="docs-req-link" onClick={() => router.push('/hamburger/doctorRegistration/treb')}>
+            <button
+              type="button"
+              className="docs-req-link"
+              onClick={() => router.push('/hamburger/doctorRegistration/treb')}
+            >
               Перед загрузкой документов еще раз ознакомьтесь с требованиями
             </button>
           </div>
@@ -640,7 +612,14 @@ export default function DoctorRegistrationPage() {
               <div className="hint">Портрет, хорошее освещение.</div>
 
               {profilePhotos.length > 0 && (
-                <button type="button" className="miniDanger" onClick={() => { setProfilePhotos([]); setProfileInputKey((x) => x + 1); }}>
+                <button
+                  type="button"
+                  className="miniDanger"
+                  onClick={() => {
+                    setProfilePhotos([]);
+                    setProfileInputKey((x) => x + 1);
+                  }}
+                >
                   Очистить
                 </button>
               )}
@@ -683,7 +662,14 @@ export default function DoctorRegistrationPage() {
               <div className="hint">Фото читаемое: ФИО, ВУЗ, дата. Можно несколько страниц.</div>
 
               {docPhotos.length > 0 && (
-                <button type="button" className="miniDanger" onClick={() => { setDocPhotos([]); setDocInputKey((x) => x + 1); }}>
+                <button
+                  type="button"
+                  className="miniDanger"
+                  onClick={() => {
+                    setDocPhotos([]);
+                    setDocInputKey((x) => x + 1);
+                  }}
+                >
                   Очистить
                 </button>
               )}
@@ -691,7 +677,7 @@ export default function DoctorRegistrationPage() {
           </div>
         </section>
 
-        {/* Кнопка внутри страницы — всегда */}
+        {/* КНОПКА ВНУТРИ СТРАНИЦЫ — ВСЕГДА */}
         <div className="docreg-submit-wrap">
           <button
             type="button"
