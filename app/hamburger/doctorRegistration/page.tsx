@@ -7,6 +7,7 @@ import TopBarBack from '../../../components/TopBarBack';
 import { VRACHI_LIST } from '../../lib/vrachi';
 
 type TgWebApp = {
+  initData?: string;
   ready?: () => void;
   expand?: () => void;
   MainButton?: {
@@ -39,11 +40,38 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-function getTelegramInitData(): string {
+// ✅ NEW: иногда tgWebAppData лежит в URL, а initData пустой
+function getInitDataFromUrl(): string {
   try {
-    return (window as any)?.Telegram?.WebApp?.initData || '';
+    const href = window.location.href;
+    const url = new URL(href);
+
+    // 1) query ?tgWebAppData=...
+    const q = url.searchParams.get('tgWebAppData');
+    if (q && q.trim()) return decodeURIComponent(q);
+
+    // 2) hash #tgWebAppData=... (бывает так)
+    const hash = (url.hash || '').replace(/^#/, '');
+    if (hash) {
+      const hp = new URLSearchParams(hash);
+      const h = hp.get('tgWebAppData');
+      if (h && h.trim()) return decodeURIComponent(h);
+    }
+
+    return '';
   } catch {
     return '';
+  }
+}
+
+// ✅ FIX: initData берём из Telegram SDK, а если там пусто — из URL
+function getTelegramInitData(): string {
+  try {
+    const wa = (window as any)?.Telegram?.WebApp;
+    const d = typeof wa?.initData === 'string' ? wa.initData : '';
+    return (d && d.trim()) ? d : getInitDataFromUrl();
+  } catch {
+    return getInitDataFromUrl();
   }
 }
 
@@ -130,9 +158,7 @@ export default function DoctorRegistrationPage() {
   const showToast = (msg: string) => {
     setToast(msg);
     try {
-      const wa = tg();
-      // showAlert может работать, но на него не рассчитываем
-      wa?.showAlert?.(msg);
+      tg()?.showAlert?.(msg);
     } catch {}
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -145,13 +171,21 @@ export default function DoctorRegistrationPage() {
     };
   }, []);
 
+  // ✅ NEW: на всякий — говорим Telegram’у что мы готовы и просим expand
+  useEffect(() => {
+    try {
+      const wa = tg();
+      wa?.ready?.();
+      wa?.expand?.();
+    } catch {}
+  }, []);
+
   const profileUrls = useMemo(
     () => profilePhotos.map((f) => URL.createObjectURL(f)),
     [profilePhotos]
   );
   const docUrls = useMemo(() => docPhotos.map((f) => URL.createObjectURL(f)), [docPhotos]);
 
-  // чистим objectURL
   useEffect(() => {
     return () => {
       revokeUrls(profileUrls);
@@ -215,9 +249,26 @@ export default function DoctorRegistrationPage() {
 
     // 3) initData
     setStage('Проверяем Telegram…');
-    const initData = getTelegramInitData();
+    const initData = getTelegramInitData(); // ✅ FIXED
     if (!initData) {
-      showToast('Нет initData. Откройте страницу именно через Telegram WebApp.');
+      // ✅ даём чуть больше диагностики (без слива всего initData)
+      const wa = tg();
+      const hasTelegram = !!wa;
+      const urlHasTg = (() => {
+        try {
+          const u = new URL(window.location.href);
+          if (u.searchParams.get('tgWebAppData')) return true;
+          const h = (u.hash || '').replace(/^#/, '');
+          if (h && new URLSearchParams(h).get('tgWebAppData')) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      })();
+
+      showToast(
+        `Нет initData. Telegram=${hasTelegram ? 'да' : 'нет'}, tgWebAppData в URL=${urlHasTg ? 'да' : 'нет'}.`
+      );
       setStage('');
       return;
     }
@@ -231,8 +282,6 @@ export default function DoctorRegistrationPage() {
       setStage('Отправляем анкету…');
       const data = Object.fromEntries(new FormData(form).entries());
 
-      console.log('[doctorRegistration] register ->', { ...data, initData: initData.slice(0, 30) + '...' });
-
       const resReg = await fetchWithTimeout('/api/doctor/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +290,6 @@ export default function DoctorRegistrationPage() {
       });
 
       const jReg = await resReg.json().catch(() => ({}));
-      console.log('[doctorRegistration] register resp', resReg.status, jReg);
 
       if (!resReg.ok) {
         const msg =
@@ -262,11 +310,6 @@ export default function DoctorRegistrationPage() {
       profilePhotos.forEach((f) => fd.append('profilePhotos', f, f.name));
       docPhotos.forEach((f) => fd.append('docPhotos', f, f.name));
 
-      console.log('[doctorRegistration] upload ->', {
-        profile: profilePhotos.map((x) => ({ name: x.name, size: x.size, type: x.type })),
-        docs: docPhotos.map((x) => ({ name: x.name, size: x.size, type: x.type })),
-      });
-
       const resUp = await fetchWithTimeout('/api/doctor/upload', {
         method: 'POST',
         body: fd,
@@ -274,7 +317,6 @@ export default function DoctorRegistrationPage() {
       });
 
       const jUp = await resUp.json().catch(() => ({}));
-      console.log('[doctorRegistration] upload resp', resUp.status, jUp);
 
       if (!resUp.ok) {
         const msg =
@@ -377,38 +419,19 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input
-              name="lastName"
-              type="text"
-              required
-              placeholder="Иванов"
-              className="docreg-input"
-              autoComplete="family-name"
-            />
+            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" autoComplete="family-name" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input
-              name="firstName"
-              type="text"
-              required
-              placeholder="Иван"
-              className="docreg-input"
-              autoComplete="given-name"
-            />
+            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" autoComplete="given-name" />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">Отчество</span>
-            <input
-              name="middleName"
-              type="text"
-              placeholder="Отчество (по желанию)"
-              className="docreg-input"
-            />
+            <input name="middleName" type="text" placeholder="Отчество (по желанию)" className="docreg-input" />
           </label>
 
           <div className="docreg-field">
@@ -430,44 +453,15 @@ export default function DoctorRegistrationPage() {
           <div className="docreg-field">
             <span className="docreg-label">Дата рождения</span>
             <div className="docreg-dob-row">
-              <input
-                name="birthDay"
-                type="number"
-                inputMode="numeric"
-                placeholder="День"
-                className="docreg-input"
-                min={1}
-                max={31}
-              />
-              <input
-                name="birthMonth"
-                type="number"
-                inputMode="numeric"
-                placeholder="Месяц"
-                className="docreg-input"
-                min={1}
-                max={12}
-              />
-              <input
-                name="birthYear"
-                type="number"
-                inputMode="numeric"
-                placeholder="Год"
-                className="docreg-input"
-                min={1900}
-                max={2100}
-              />
+              <input name="birthDay" type="number" inputMode="numeric" placeholder="День" className="docreg-input" min={1} max={31} />
+              <input name="birthMonth" type="number" inputMode="numeric" placeholder="Месяц" className="docreg-input" min={1} max={12} />
+              <input name="birthYear" type="number" inputMode="numeric" placeholder="Год" className="docreg-input" min={1900} max={2100} />
             </div>
           </div>
 
           <label className="docreg-field">
             <span className="docreg-label">Город</span>
-            <input
-              name="city"
-              type="text"
-              placeholder="Город работы/приёма"
-              className="docreg-input"
-            />
+            <input name="city" type="text" placeholder="Город работы/приёма" className="docreg-input" />
           </label>
         </section>
 
@@ -481,43 +475,23 @@ export default function DoctorRegistrationPage() {
             </span>
 
             <select name="speciality1" required className="docreg-input docreg-select" defaultValue="">
-              <option value="" disabled>
-                Основная специализация
-              </option>
+              <option value="" disabled>Основная специализация</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
-            <select
-              name="speciality2"
-              className="docreg-input docreg-select docreg-select-second"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Дополнительная специализация (по желанию)
-              </option>
+            <select name="speciality2" className="docreg-input docreg-select docreg-select-second" defaultValue="">
+              <option value="" disabled>Дополнительная специализация (по желанию)</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
-            <select
-              name="speciality3"
-              className="docreg-input docreg-select docreg-select-third"
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Ещё одна специализация (по желанию)
-              </option>
+            <select name="speciality3" className="docreg-input docreg-select docreg-select-third" defaultValue="">
+              <option value="" disabled>Ещё одна специализация (по желанию)</option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
+                <option key={spec} value={spec}>{spec}</option>
               ))}
             </select>
 
@@ -530,13 +504,7 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Образование<span className="req">*</span>
             </span>
-            <textarea
-              name="education"
-              required
-              placeholder="ВУЗ, годы обучения, факультет, квалификация."
-              className="docreg-textarea"
-              rows={3}
-            />
+            <textarea name="education" required placeholder="ВУЗ, годы обучения, факультет, квалификация." className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
@@ -551,12 +519,7 @@ export default function DoctorRegistrationPage() {
 
           <label className="docreg-field">
             <span className="docreg-label">Место работы</span>
-            <input
-              name="workplace"
-              type="text"
-              placeholder="Клиника, медцентр"
-              className="docreg-input"
-            />
+            <input name="workplace" type="text" placeholder="Клиника, медцентр" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
@@ -568,16 +531,7 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Стаж работы, лет<span className="req">*</span>
             </span>
-            <input
-              name="experienceYears"
-              type="number"
-              required
-              min={0}
-              max={70}
-              inputMode="numeric"
-              placeholder="Общий стаж"
-              className="docreg-input"
-            />
+            <input name="experienceYears" type="number" required min={0} max={70} inputMode="numeric" placeholder="Общий стаж" className="docreg-input" />
           </label>
 
           <label className="docreg-field">
@@ -594,14 +548,7 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               E-mail<span className="req">*</span>
             </span>
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="doctor@example.com"
-              className="docreg-input"
-              autoComplete="email"
-            />
+            <input name="email" type="email" required placeholder="doctor@example.com" className="docreg-input" autoComplete="email" />
           </label>
         </section>
 
@@ -613,39 +560,21 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea
-              name="about"
-              required
-              placeholder="Коротко о себе и подходе к пациентам"
-              className="docreg-textarea"
-              rows={3}
-            />
+            <textarea name="about" required placeholder="Коротко о себе и подходе к пациентам" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Специализация подробно<span className="req">*</span>
             </span>
-            <textarea
-              name="specialityDetails"
-              required
-              placeholder="С какими запросами работаете"
-              className="docreg-textarea"
-              rows={3}
-            />
+            <textarea name="specialityDetails" required placeholder="С какими запросами работаете" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea
-              name="experienceDetails"
-              required
-              placeholder="Опишите опыт работы"
-              className="docreg-textarea"
-              rows={3}
-            />
+            <textarea name="experienceDetails" required placeholder="Опишите опыт работы" className="docreg-textarea" rows={3} />
           </label>
 
           <label className="docreg-field">
@@ -668,11 +597,7 @@ export default function DoctorRegistrationPage() {
         <section className="docreg-card">
           <div className="docs-head">
             <h2 className="docreg-card-title docs-h2">Документы</h2>
-            <button
-              type="button"
-              className="docs-req-link"
-              onClick={() => router.push('/hamburger/doctorRegistration/treb')}
-            >
+            <button type="button" className="docs-req-link" onClick={() => router.push('/hamburger/doctorRegistration/treb')}>
               Перед загрузкой документов еще раз ознакомьтесь с требованиями
             </button>
           </div>
@@ -715,14 +640,7 @@ export default function DoctorRegistrationPage() {
               <div className="hint">Портрет, хорошее освещение.</div>
 
               {profilePhotos.length > 0 && (
-                <button
-                  type="button"
-                  className="miniDanger"
-                  onClick={() => {
-                    setProfilePhotos([]);
-                    setProfileInputKey((x) => x + 1);
-                  }}
-                >
+                <button type="button" className="miniDanger" onClick={() => { setProfilePhotos([]); setProfileInputKey((x) => x + 1); }}>
                   Очистить
                 </button>
               )}
@@ -765,14 +683,7 @@ export default function DoctorRegistrationPage() {
               <div className="hint">Фото читаемое: ФИО, ВУЗ, дата. Можно несколько страниц.</div>
 
               {docPhotos.length > 0 && (
-                <button
-                  type="button"
-                  className="miniDanger"
-                  onClick={() => {
-                    setDocPhotos([]);
-                    setDocInputKey((x) => x + 1);
-                  }}
-                >
+                <button type="button" className="miniDanger" onClick={() => { setDocPhotos([]); setDocInputKey((x) => x + 1); }}>
                   Очистить
                 </button>
               )}
@@ -780,7 +691,7 @@ export default function DoctorRegistrationPage() {
           </div>
         </section>
 
-        {/* ✅ КНОПКА ВНУТРИ СТРАНИЦЫ — ВСЕГДА (чтобы не зависеть от MainButton и submit) */}
+        {/* Кнопка внутри страницы — всегда */}
         <div className="docreg-submit-wrap">
           <button
             type="button"
@@ -799,7 +710,6 @@ export default function DoctorRegistrationPage() {
         </div>
       </form>
 
-      {/* ✅ Toast, который точно видно в TWA */}
       {toast ? <div className="toast">{toast}</div> : null}
 
       <style jsx global>{`
