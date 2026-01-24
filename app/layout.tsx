@@ -1,6 +1,7 @@
 /* path: app/layout.tsx */
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 
 import TwaBootstrap from '../components/TwaBootstrap';
 import GlobalSafeTop from '../components/GlobalSafeTop';
@@ -30,6 +31,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" data-theme="light">
       <head>
+        {/* ✅ Telegram WebApp SDK: без него window.Telegram.WebApp может быть undefined */}
+        <Script
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="beforeInteractive"
+        />
+
         {/* Дублируем meta viewport для совместимости с WebView Telegram */}
         <meta
           name="viewport"
@@ -46,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
+
       <body style={{ background: '#F5F7FA', color: '#0B0C10' }}>
         {/* Глобальный фон */}
         <div className="lm-bg" />
