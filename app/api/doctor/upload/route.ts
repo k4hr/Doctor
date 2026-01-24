@@ -96,32 +96,42 @@ function isImageMime(mime: string) {
   );
 }
 
-function requireEnv(name: string) {
-  const v = (process.env[name] || '').trim();
+function envTrim(name: string) {
+  return (process.env[name] || '').trim();
+}
+
+function mustEnv(name: string) {
+  const v = envTrim(name);
   if (!v) throw new Error(`Missing env: ${name}`);
   return v;
 }
 
-function makeS3() {
-  const accountId = requireEnv('R2_ACCOUNT_ID');
-  const accessKeyId = requireEnv('R2_ACCESS_KEY_ID');
-  const secretAccessKey = requireEnv('R2_SECRET_ACCESS_KEY');
+function makeS3(bucket: string) {
+  const accountId = mustEnv('R2_ACCOUNT_ID');
+  const accessKeyId = mustEnv('R2_ACCESS_KEY_ID');
+  const secretAccessKey = mustEnv('R2_SECRET_ACCESS_KEY');
 
-  // ВАЖНО: endpoint БЕЗ "/bucket"
+  // ✅ ВАЖНО: bucket endpoint режим (endpoint уже "привязан" к бакету)
+  // Тогда canonical path будет "/<key>", а не "/<bucket>/<key>"
+  const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucket}`;
+
   return new S3Client({
     region: 'auto',
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true,
 
-    // ✅ снижает шанс конфликтов подписи/чексумм на R2
+    // ✅ bucket endpoint mode
+    bucketEndpoint: true,
+    forcePathStyle: false,
+
+    // ✅ меньше сюрпризов от SDK на R2
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   } as any);
 }
 
 function publicUrlForKey(key: string) {
-  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
+  const base = envTrim('R2_PUBLIC_BASE_URL');
   if (!base) return null;
   return `${base.replace(/\/$/, '')}/${key}`;
 }
@@ -147,21 +157,18 @@ function pickS3Error(e: any) {
 
 export async function POST(req: Request) {
   try {
-    const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+    const botToken = envTrim('TELEGRAM_BOT_TOKEN');
     if (!botToken) {
       return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN' }, { status: 500 });
     }
 
-    const r2Bucket = (process.env.R2_BUCKET || '').trim();
+    const r2Bucket = envTrim('R2_BUCKET');
     if (!r2Bucket) {
       return NextResponse.json(
         { ok: false, error: 'NO_R2_ENV', hint: 'Set R2_BUCKET (+ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)' },
         { status: 500 }
       );
     }
-
-    // ✅ валидируем наличие env через makeS3 (там requireEnv)
-    const s3 = makeS3();
 
     const form = await req.formData();
     const initData = String(form.get('initData') || '').trim();
@@ -181,11 +188,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' }, { status: 404 });
     }
 
-    // новые ключи
     const profilePhotos = asFiles(form.getAll('profilePhotos'));
     const docPhotos = asFiles(form.getAll('docPhotos'));
 
-    // legacy
     const legacyProfile = form.get('profilePhoto');
     const legacyDiploma = form.get('diplomaPhoto');
 
@@ -208,7 +213,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS }, { status: 400 });
     }
 
-    // валидация mime + размер
     const maxAvatar = 8 * 1024 * 1024; // 8MB
     const maxDoc = 25 * 1024 * 1024; // 25MB
 
@@ -238,6 +242,8 @@ export async function POST(req: Request) {
       }
     }
 
+    const s3 = makeS3(r2Bucket);
+
     const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
     for (let i = 0; i < finalProfile.length; i++) {
       const f = finalProfile[i];
@@ -249,7 +255,7 @@ export async function POST(req: Request) {
       try {
         await s3.send(
           new PutObjectCommand({
-            Bucket: r2Bucket,
+            Bucket: r2Bucket, // можно оставить — в bucketEndpoint режиме не ломает подпись
             Key: key,
             Body: body,
             ContentType: mime,
@@ -364,9 +370,6 @@ export async function POST(req: Request) {
     if (msg.startsWith('Missing env:')) {
       return NextResponse.json({ ok: false, error: 'NO_R2_ENV', hint: msg }, { status: 500 });
     }
-    return NextResponse.json(
-      { ok: false, error: 'UPLOAD_FAILED', hint: 'Смотри логи сервера (Railway) — там будет причина' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED' }, { status: 500 });
   }
 }
