@@ -1,14 +1,21 @@
-// path: middleware.ts
+/* path: middleware.ts */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 function withFrameHeaders(res: NextResponse) {
-  // Минимальный CSP: никому не даём встраивать нас во фрейм
+  /**
+   * ✅ Важно:
+   * frame-ancestors 'self' ломает Web/desktop Telegram (там часто iframe).
+   * Разрешаем домены Telegram Web.
+   */
   res.headers.set(
     'Content-Security-Policy',
-    "frame-ancestors 'self'"
+    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://t.me"
   );
+
+  // X-Frame-Options конфликтует с frame-ancestors, убираем
   res.headers.delete('X-Frame-Options');
+
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.headers.set('X-Content-Type-Options', 'nosniff');
   return res;
@@ -17,7 +24,7 @@ function withFrameHeaders(res: NextResponse) {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ----- API: только Telegram initData -----
+  // ----- API: прокидываем Telegram initData в единый заголовок -----
   if (pathname.startsWith('/api')) {
     const requestHeaders = new Headers(req.headers);
 
