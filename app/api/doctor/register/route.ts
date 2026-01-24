@@ -1,5 +1,4 @@
 /* path: app/api/doctor/register/route.ts */
-/* НЕ МЕНЯЛ. Оставляю как есть. */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -37,11 +36,7 @@ function timingSafeEqualHex(a: string, b: string) {
   }
 }
 
-function verifyTelegramWebAppInitData(
-  initData: string,
-  botToken: string,
-  maxAgeSec = 60 * 60 * 24
-) {
+function verifyTelegramWebAppInitData(initData: string, botToken: string, maxAgeSec = 60 * 60 * 24) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
@@ -64,11 +59,7 @@ function verifyTelegramWebAppInitData(
     .join('\n');
 
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-
-  const computedHash = crypto
-    .createHmac('sha256', secretKey)
-    .update(dataCheckString)
-    .digest('hex');
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
   if (!timingSafeEqualHex(computedHash, hash)) {
     return { ok: false as const, error: 'BAD_HASH' as const };
@@ -98,12 +89,9 @@ function verifyTelegramWebAppInitData(
 
 export async function POST(req: Request) {
   try {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
     if (!botToken) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN in env' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN', hint: 'Set TELEGRAM_BOT_TOKEN in env' }, { status: 500 });
     }
 
     const body = await req.json().catch(() => null);
@@ -111,7 +99,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
     }
 
-    const initData = typeof (body as any).initData === 'string' ? (body as any).initData : '';
+    const initData = typeof (body as any).initData === 'string' ? String((body as any).initData).trim() : '';
     if (!initData) {
       return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
     }
