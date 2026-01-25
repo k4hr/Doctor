@@ -176,11 +176,9 @@ export default function DoctorRegistrationPage() {
       wa?.expand?.();
     } catch {}
 
-    // На всякий случай, если с другой страницы прилип
     tgHardHideMainButton();
 
     return () => {
-      // ✅ На выходе: гарантированно убираем, чтобы не прилипал дальше
       tgHardHideMainButton();
     };
   }, []);
@@ -315,9 +313,7 @@ export default function DoctorRegistrationPage() {
       setStage('Готово ✅');
       showToast('Анкета и документы отправлены. Профиль ушёл на модерацию.');
 
-      // ✅ Перед уходом ещё раз прибить MainButton, чтобы точно не прилип
       tgHardHideMainButton();
-
       router.push('/hamburger/profile');
     } catch (e: any) {
       console.error(e);
@@ -336,9 +332,6 @@ export default function DoctorRegistrationPage() {
     e.preventDefault();
     await submitAll();
   };
-
-  // ✅ ВАЖНО: Telegram MainButton не используем вообще.
-  // Если где-то ещё его показывают — он будет убит tgHardHideMainButton() на входе/выходе этой страницы.
 
   return (
     <main className="docreg">
@@ -367,14 +360,28 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Фамилия<span className="req">*</span>
             </span>
-            <input name="lastName" type="text" required placeholder="Иванов" className="docreg-input" autoComplete="family-name" />
+            <input
+              name="lastName"
+              type="text"
+              required
+              placeholder="Иванов"
+              className="docreg-input"
+              autoComplete="family-name"
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Имя<span className="req">*</span>
             </span>
-            <input name="firstName" type="text" required placeholder="Иван" className="docreg-input" autoComplete="given-name" />
+            <input
+              name="firstName"
+              type="text"
+              required
+              placeholder="Иван"
+              className="docreg-input"
+              autoComplete="given-name"
+            />
           </label>
 
           <label className="docreg-field">
@@ -657,7 +664,7 @@ export default function DoctorRegistrationPage() {
           </div>
         </section>
 
-        {/* КНОПКА ВНУТРИ СТРАНИЦЫ — ВСЕГДА */}
+        {/* ✅ НИЖНЯЯ ПАНЕЛЬ — ТЕПЕРЬ НЕ FIXED, А В КОНЦЕ СТРАНИЦЫ */}
         <div className="docreg-submit-wrap">
           <button
             type="button"
@@ -686,7 +693,7 @@ export default function DoctorRegistrationPage() {
       <style jsx>{`
         .docreg {
           min-height: 100dvh;
-          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 140px);
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           width: 100%;
           max-width: 100%;
           overflow-x: hidden;
@@ -874,15 +881,14 @@ export default function DoctorRegistrationPage() {
         }
         .miniDanger:active { transform: scale(0.99); }
 
+        /* ✅ БЫЛО fixed — СТАЛО обычным блоком внизу */
         .docreg-submit-wrap {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 9999;
-          padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
-          background: rgba(255, 255, 255, 0.98);
-          border-top: 1px solid rgba(15, 23, 42, 0.06);
+          margin-top: 6px;
+          background: #ffffff;
+          border-radius: 18px;
+          padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+          border: 1px solid rgba(15, 23, 42, 0.04);
         }
 
         .docreg-submit {
@@ -920,7 +926,7 @@ export default function DoctorRegistrationPage() {
           position: fixed;
           left: 12px;
           right: 12px;
-          bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
           z-index: 10000;
           padding: 12px 14px;
           border-radius: 14px;
