@@ -1,264 +1,157 @@
-/* path: app/hamburger/profile/admin/doctor/[id]/page.tsx */
-import crypto from 'crypto';
-import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers';
-import TopBarBack from '../../../../../../components/TopBarBack';
+'use client';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+import { useMemo, useState } from 'react';
 
-function timingSafeEqualHex(a: string, b: string) {
+type Props = {
+  doctorId: string;
+  currentStatus: string;
+};
+
+function haptic(type: 'light' | 'medium' = 'light') {
   try {
-    const ab = Buffer.from(a, 'hex');
-    const bb = Buffer.from(b, 'hex');
-    if (ab.length !== bb.length) return false;
-    return crypto.timingSafeEqual(ab, bb);
-  } catch {
-    return false;
-  }
+    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
 }
 
-function verifyAndExtractTelegramId(initData: string, botToken: string): string | null {
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    if (!hash) return null;
+export default function DoctorAdminActions({ doctorId, currentStatus }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [localStatus, setLocalStatus] = useState(currentStatus);
 
-    params.delete('hash');
-
-    const dcs = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const computedHash = crypto.createHmac('sha256', secretKey).update(dcs).digest('hex');
-
-    if (!timingSafeEqualHex(computedHash, hash)) return null;
-
-    const userStr = params.get('user');
-    if (!userStr) return null;
-
-    const user = JSON.parse(userStr);
-    if (!user?.id) return null;
-
-    return String(user.id);
-  } catch {
-    return null;
-  }
-}
-
-function isAdmin(telegramId: string) {
-  const raw = (process.env.ADMIN_TG_IDS || '').trim();
-  if (!raw) return false;
-  const set = new Set(
-    raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
+  const canApprove = useMemo(
+    () => localStatus !== 'APPROVED',
+    [localStatus]
   );
-  return set.has(String(telegramId));
-}
 
-function toPublicUrlMaybe(value: string | null) {
-  if (!value) return null;
-  const v = String(value).trim();
-  if (!v) return null;
-  if (/^https?:\/\//i.test(v)) return v;
+  const patchStatus = async (nextStatus: 'APPROVED' | 'NEED_FIX' | 'REJECTED' | 'PENDING' | 'DRAFT') => {
+    if (loading) return;
+    haptic('medium');
 
-  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
-  if (!base) return v;
-  return `${base.replace(/\/$/, '')}/${v}`;
-}
+    try {
+      setLoading(true);
 
-export default async function DoctorAdminCardPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+      const res = await fetch(`/api/admin/doctor/${encodeURIComponent(doctorId)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
-  const initData = cookies().get('tg_init_data')?.value || '';
+      const j = await res.json().catch(() => ({} as any));
+      if (!res.ok || !j?.ok) {
+        haptic('light');
+        const msg = j?.hint || j?.error || `Ошибка смены статуса (${res.status})`;
+        try {
+          (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
+        } catch {
+          alert(msg);
+        }
+        return;
+      }
 
-  const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
-  const okAdmin = tgId ? isAdmin(tgId) : false;
+      setLocalStatus(j.status || nextStatus);
+      haptic('light');
 
-  if (!tgId || !okAdmin) {
-    return (
-      <main style={{ padding: 16 }}>
-        <TopBarBack />
-        <h1 style={{ marginTop: 8 }}>Доступ запрещён</h1>
-        <p style={{ opacity: 0.7 }}>Нужно открыть из Telegram и иметь права администратора.</p>
-      </main>
-    );
-  }
-
-  const doctor = await prisma.doctor.findUnique({
-    where: { id },
-    include: {
-      files: {
-        where: { kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] } },
-        orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-      },
-    },
-  });
-
-  if (!doctor) {
-    return (
-      <main style={{ padding: 16 }}>
-        <TopBarBack />
-        <h1 style={{ marginTop: 8 }}>Не найдено</h1>
-        <p style={{ opacity: 0.7 }}>Анкета врача не найдена.</p>
-      </main>
-    );
-  }
-
-  const fullName = [doctor.lastName, doctor.firstName, doctor.middleName].filter(Boolean).join(' ');
-  const tgName =
-    [doctor.telegramFirstName, doctor.telegramLastName].filter(Boolean).join(' ') ||
-    (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
-    doctor.telegramId;
-
-  const profileUrls = doctor.files
-    .filter((f) => f.kind === 'PROFILE_PHOTO')
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
-    .map((f) => toPublicUrlMaybe(f.url))
-    .filter(Boolean) as string[];
-
-  const docsUrls = doctor.files
-    .filter((f) => f.kind === 'DIPLOMA_PHOTO')
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
-    .map((f) => toPublicUrlMaybe(f.url))
-    .filter(Boolean) as string[];
+      try {
+        (window as any)?.Telegram?.WebApp?.showAlert?.(`Статус обновлён: ${j.status || nextStatus}`);
+      } catch {}
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main style={{ padding: 16 }}>
-      <TopBarBack />
-      <h1 style={{ marginTop: 8 }}>Анкета врача</h1>
-
-      <div
-        style={{
-          marginTop: 10,
-          padding: 12,
-          borderRadius: 14,
-          border: '1px solid #e5e7eb',
-          background: '#fff',
-        }}
-      >
-        <div style={{ fontWeight: 900, fontSize: 16 }}>{fullName}</div>
-        <div style={{ opacity: 0.7, marginTop: 4 }}>Telegram: {tgName}</div>
-        <div style={{ marginTop: 6, fontWeight: 800 }}>
-          Статус: <span style={{ color: '#111827' }}>{doctor.status}</span>
-        </div>
-
-        <div style={{ marginTop: 10, display: 'grid', gap: 8, fontSize: 13 }}>
-          <div>
-            <b>Специализация:</b> {doctor.speciality1}
-            {doctor.speciality2 ? `, ${doctor.speciality2}` : ''}
-            {doctor.speciality3 ? `, ${doctor.speciality3}` : ''}
-          </div>
-          <div>
-            <b>Город:</b> {doctor.city || '—'}
-          </div>
-          <div>
-            <b>Стаж:</b> {doctor.experienceYears} лет
-          </div>
-          <div>
-            <b>Email:</b> {doctor.email}
-          </div>
-          <div>
-            <b>SubmittedAt:</b> {doctor.submittedAt ? new Date(doctor.submittedAt).toLocaleString() : '—'}
-          </div>
-        </div>
-
-        <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-
-        <div style={{ display: 'grid', gap: 14 }}>
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>
-              Фото профиля {profileUrls.length ? <span style={{ opacity: 0.7 }}>({profileUrls.length})</span> : null}
-            </div>
-
-            {profileUrls.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {profileUrls.map((u) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={u}
-                    src={u}
-                    alt="profile"
-                    style={{
-                      width: '100%',
-                      height: 120,
-                      objectFit: 'cover',
-                      borderRadius: 14,
-                      border: '1px solid #e5e7eb',
-                      background: '#f3f4f6',
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div style={{ opacity: 0.7 }}>Не загружено</div>
-            )}
-          </div>
-
-          <div>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>
-              Документы {docsUrls.length ? <span style={{ opacity: 0.7 }}>({docsUrls.length})</span> : null}
-            </div>
-
-            {docsUrls.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {docsUrls.map((u) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={u}
-                    src={u}
-                    alt="doc"
-                    style={{
-                      width: '100%',
-                      height: 120,
-                      objectFit: 'cover',
-                      borderRadius: 14,
-                      border: '1px solid #e5e7eb',
-                      background: '#f3f4f6',
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div style={{ opacity: 0.7 }}>Не загружено</div>
-            )}
-          </div>
-        </div>
-
-        <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-
-        <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
-          <div>
-            <b>Образование:</b>
-            <br />
-            {doctor.education}
-          </div>
-          <div>
-            <b>О себе:</b>
-            <br />
-            {doctor.about}
-          </div>
-          <div>
-            <b>Специализация подробно:</b>
-            <br />
-            {doctor.specialityDetails}
-          </div>
-          <div>
-            <b>Опыт подробно:</b>
-            <br />
-            {doctor.experienceDetails}
-          </div>
-        </div>
-
-        <p style={{ marginTop: 12, fontSize: 12, opacity: 0.6 }}>
-          Дальше добавим кнопки: APPROVE / NEED_FIX / REJECT (через отдельные admin API).
-        </p>
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ fontSize: 12, opacity: 0.7 }}>
+        Модерация анкеты: текущий статус <b>{localStatus}</b>
       </div>
-    </main>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+        <button
+          type="button"
+          disabled={loading || !canApprove}
+          onClick={() => patchStatus('APPROVED')}
+          style={{
+            border: 0,
+            borderRadius: 12,
+            padding: '10px 10px',
+            fontWeight: 900,
+            cursor: loading ? 'default' : 'pointer',
+            background: canApprove ? '#24c768' : 'rgba(34,197,94,0.25)',
+            color: '#fff',
+          }}
+        >
+          {loading ? '…' : 'APPROVE'}
+        </button>
+
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => patchStatus('NEED_FIX')}
+          style={{
+            border: 0,
+            borderRadius: 12,
+            padding: '10px 10px',
+            fontWeight: 900,
+            cursor: loading ? 'default' : 'pointer',
+            background: '#f59e0b',
+            color: '#111827',
+          }}
+        >
+          {loading ? '…' : 'NEED_FIX'}
+        </button>
+
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => patchStatus('REJECTED')}
+          style={{
+            border: 0,
+            borderRadius: 12,
+            padding: '10px 10px',
+            fontWeight: 900,
+            cursor: loading ? 'default' : 'pointer',
+            background: '#ef4444',
+            color: '#fff',
+          }}
+        >
+          {loading ? '…' : 'REJECT'}
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => patchStatus('PENDING')}
+          style={{
+            border: '1px solid rgba(15,23,42,0.12)',
+            borderRadius: 12,
+            padding: '10px 10px',
+            fontWeight: 900,
+            cursor: loading ? 'default' : 'pointer',
+            background: '#fff',
+            color: '#111827',
+          }}
+        >
+          В PENDING
+        </button>
+
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => patchStatus('DRAFT')}
+          style={{
+            border: '1px solid rgba(15,23,42,0.12)',
+            borderRadius: 12,
+            padding: '10px 10px',
+            fontWeight: 900,
+            cursor: loading ? 'default' : 'pointer',
+            background: '#fff',
+            color: '#111827',
+          }}
+        >
+          В DRAFT
+        </button>
+      </div>
+    </div>
   );
 }
