@@ -1,157 +1,336 @@
-'use client';
+import crypto from 'crypto';
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import TopBarBack from '../../../../../../components/TopBarBack';
+import { DoctorFileKind } from '@prisma/client';
+import DoctorAdminActions from './DoctorAdminActions';
 
-import { useMemo, useState } from 'react';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-type Props = {
-  doctorId: string;
-  currentStatus: string;
-};
-
-function haptic(type: 'light' | 'medium' = 'light') {
+function timingSafeEqualHex(a: string, b: string) {
   try {
-    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
-  } catch {}
+    const ab = Buffer.from(a, 'hex');
+    const bb = Buffer.from(b, 'hex');
+    if (ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
 }
 
-export default function DoctorAdminActions({ doctorId, currentStatus }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [localStatus, setLocalStatus] = useState(currentStatus);
+function verifyAndExtractTelegramId(initData: string, botToken: string): string | null {
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) return null;
 
-  const canApprove = useMemo(
-    () => localStatus !== 'APPROVED',
-    [localStatus]
+    params.delete('hash');
+
+    const dcs = [...params.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const computedHash = crypto.createHmac('sha256', secretKey).update(dcs).digest('hex');
+
+    if (!timingSafeEqualHex(computedHash, hash)) return null;
+
+    const userStr = params.get('user');
+    if (!userStr) return null;
+
+    const user = JSON.parse(userStr);
+    if (!user?.id) return null;
+
+    return String(user.id);
+  } catch {
+    return null;
+  }
+}
+
+function isAdmin(telegramId: string) {
+  const raw = (process.env.ADMIN_TG_IDS || '').trim();
+  if (!raw) return false;
+  const set = new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   );
+  return set.has(String(telegramId));
+}
 
-  const patchStatus = async (nextStatus: 'APPROVED' | 'NEED_FIX' | 'REJECTED' | 'PENDING' | 'DRAFT') => {
-    if (loading) return;
-    haptic('medium');
+function toPublicUrlMaybe(value: string | null) {
+  if (!value) return null;
+  const v = String(value).trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return v;
 
-    try {
-      setLoading(true);
+  const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
+  if (!base) return v;
+  return `${base.replace(/\/$/, '')}/${v}`;
+}
 
-      const res = await fetch(`/api/admin/doctor/${encodeURIComponent(doctorId)}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
-      });
+function fmtDate(d: Date | null | undefined) {
+  if (!d) return '—';
+  try {
+    return new Date(d).toLocaleString();
+  } catch {
+    return String(d);
+  }
+}
 
-      const j = await res.json().catch(() => ({} as any));
-      if (!res.ok || !j?.ok) {
-        haptic('light');
-        const msg = j?.hint || j?.error || `Ошибка смены статуса (${res.status})`;
-        try {
-          (window as any)?.Telegram?.WebApp?.showAlert?.(msg);
-        } catch {
-          alert(msg);
-        }
-        return;
-      }
+function show(v: any) {
+  if (v === null || v === undefined) return '—';
+  const s = String(v);
+  return s.trim().length ? s : '—';
+}
 
-      setLocalStatus(j.status || nextStatus);
-      haptic('light');
+function genderRu(v: string | null | undefined) {
+  if (!v) return '—';
+  if (v === 'male') return 'Мужской';
+  if (v === 'female') return 'Женский';
+  return v;
+}
 
-      try {
-        (window as any)?.Telegram?.WebApp?.showAlert?.(`Статус обновлён: ${j.status || nextStatus}`);
-      } catch {}
-    } finally {
-      setLoading(false);
-    }
-  };
+function degreeRu(v: string | null | undefined) {
+  if (!v) return '—';
+  if (v === 'none') return 'Нет';
+  if (v === 'specialist') return 'Специалист';
+  if (v === 'candidate') return 'Кандидат наук';
+  if (v === 'doctor') return 'Доктор наук';
+  return v;
+}
+
+function statusUi(status: string) {
+  switch (status) {
+    case 'APPROVED':
+      return { label: 'Одобрена', bg: 'rgba(34,197,94,0.14)', fg: '#166534' };
+    case 'PENDING':
+      return { label: 'На модерации', bg: 'rgba(59,130,246,0.14)', fg: '#1e40af' };
+    case 'NEED_FIX':
+      return { label: 'Нужны правки', bg: 'rgba(245,158,11,0.16)', fg: '#92400e' };
+    case 'REJECTED':
+      return { label: 'Отклонена', bg: 'rgba(239,68,68,0.14)', fg: '#991b1b' };
+    case 'DRAFT':
+      return { label: 'Черновик', bg: 'rgba(156,163,175,0.16)', fg: '#374151' };
+    default:
+      return { label: status, bg: 'rgba(156,163,175,0.16)', fg: '#374151' };
+  }
+}
+
+export default async function DoctorAdminCardPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  const initData = cookies().get('tg_init_data')?.value || '';
+
+  const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
+  const okAdmin = tgId ? isAdmin(tgId) : false;
+
+  if (!tgId || !okAdmin) {
+    return (
+      <main style={{ padding: 16 }}>
+        <TopBarBack />
+        <h1 style={{ marginTop: 8 }}>Доступ запрещён</h1>
+        <p style={{ opacity: 0.7 }}>Нужно открыть из Telegram и иметь права администратора.</p>
+      </main>
+    );
+  }
+
+  const doctor = await prisma.doctor.findUnique({
+    where: { id },
+    include: {
+      files: {
+        where: { kind: { in: [DoctorFileKind.PROFILE_PHOTO, DoctorFileKind.DIPLOMA_PHOTO] } },
+        orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      },
+    },
+  });
+
+  if (!doctor) {
+    return (
+      <main style={{ padding: 16 }}>
+        <TopBarBack />
+        <h1 style={{ marginTop: 8 }}>Не найдено</h1>
+        <p style={{ opacity: 0.7 }}>Анкета врача не найдена.</p>
+      </main>
+    );
+  }
+
+  const fullName = [doctor.lastName, doctor.firstName, doctor.middleName].filter(Boolean).join(' ') || '—';
+  const tgName =
+    [doctor.telegramFirstName, doctor.telegramLastName].filter(Boolean).join(' ') ||
+    (doctor.telegramUsername ? `@${doctor.telegramUsername}` : '') ||
+    doctor.telegramId;
+
+  const ui = statusUi(doctor.status);
+
+  const profileUrls = doctor.files
+    .filter((f) => f.kind === DoctorFileKind.PROFILE_PHOTO)
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .map((f) => toPublicUrlMaybe(f.url))
+    .filter(Boolean) as string[];
+
+  const docsUrls = doctor.files
+    .filter((f) => f.kind === DoctorFileKind.DIPLOMA_PHOTO)
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .map((f) => toPublicUrlMaybe(f.url))
+    .filter(Boolean) as string[];
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>
-        Модерация анкеты: текущий статус <b>{localStatus}</b>
+    <main style={{ padding: 16 }}>
+      <TopBarBack />
+      <h1 style={{ marginTop: 8 }}>Анкета врача</h1>
+
+      <div
+        style={{
+          marginTop: 10,
+          padding: 12,
+          borderRadius: 14,
+          border: '1px solid #e5e7eb',
+          background: '#fff',
+        }}
+      >
+        <div style={{ fontWeight: 900, fontSize: 16 }}>{fullName}</div>
+        <div style={{ opacity: 0.75, marginTop: 4 }}>Telegram: {tgName}</div>
+
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ fontWeight: 900 }}>Статус:</div>
+          <div
+            style={{
+              fontWeight: 900,
+              padding: '6px 10px',
+              borderRadius: 999,
+              background: ui.bg,
+              color: ui.fg,
+              border: '1px solid rgba(15,23,42,0.08)',
+            }}
+          >
+            {ui.label} <span style={{ opacity: 0.65 }}>({doctor.status})</span>
+          </div>
+        </div>
+
+        {/* КНОПКИ МОДЕРАЦИИ */}
+        <div style={{ marginTop: 12 }}>
+          <DoctorAdminActions doctorId={doctor.id} currentStatus={doctor.status} />
+        </div>
+
+        <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+
+        {/* ВСЕ ПОЛЯ, КОТОРЫЕ ОН ЗАПОЛНЯЕТ */}
+        <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+          <div style={{ fontWeight: 900, fontSize: 14 }}>Личные данные</div>
+          <div><b>Фамилия:</b> {show(doctor.lastName)}</div>
+          <div><b>Имя:</b> {show(doctor.firstName)}</div>
+          <div><b>Отчество:</b> {show(doctor.middleName)}</div>
+          <div><b>Пол:</b> {genderRu(doctor.gender)}</div>
+          <div><b>Дата рождения:</b> {show(doctor.birthDay)}.{show(doctor.birthMonth)}.{show(doctor.birthYear)}</div>
+          <div><b>Город:</b> {show(doctor.city)}</div>
+
+          <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
+
+          <div style={{ fontWeight: 900, fontSize: 14 }}>Профессия</div>
+          <div>
+            <b>Специализации:</b> {show(doctor.speciality1)}
+            {doctor.speciality2 ? `, ${doctor.speciality2}` : ''}
+            {doctor.speciality3 ? `, ${doctor.speciality3}` : ''}
+          </div>
+          <div><b>Образование:</b><br />{show(doctor.education)}</div>
+          <div><b>Степень:</b> {degreeRu(doctor.degree)}</div>
+          <div><b>Место работы:</b> {show(doctor.workplace)}</div>
+          <div><b>Должность:</b> {show(doctor.position)}</div>
+          <div><b>Стаж (лет):</b> {show(doctor.experienceYears)}</div>
+          <div><b>Награды:</b><br />{show(doctor.awards)}</div>
+
+          <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
+
+          <div style={{ fontWeight: 900, fontSize: 14 }}>Контакты</div>
+          <div><b>Email:</b> {show(doctor.email)}</div>
+
+          <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
+
+          <div style={{ fontWeight: 900, fontSize: 14 }}>Описание</div>
+          <div><b>О себе:</b><br />{show(doctor.about)}</div>
+          <div><b>Специализация подробно:</b><br />{show(doctor.specialityDetails)}</div>
+          <div><b>Опыт работы:</b><br />{show(doctor.experienceDetails)}</div>
+          <div><b>Курсы:</b><br />{show(doctor.courses)}</div>
+          <div><b>Достижения:</b><br />{show(doctor.achievements)}</div>
+          <div><b>Публикации:</b><br />{show(doctor.publications)}</div>
+
+          <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
+
+          <div style={{ fontWeight: 900, fontSize: 14 }}>Системное</div>
+          <div><b>ID:</b> {doctor.id}</div>
+          <div><b>createdAt:</b> {fmtDate(doctor.createdAt)}</div>
+          <div><b>updatedAt:</b> {fmtDate(doctor.updatedAt)}</div>
+          <div><b>submittedAt:</b> {fmtDate(doctor.submittedAt)}</div>
+        </div>
+
+        <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
+
+        {/* ФОТО */}
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              Фото профиля {profileUrls.length ? <span style={{ opacity: 0.7 }}>({profileUrls.length})</span> : null}
+            </div>
+
+            {profileUrls.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {profileUrls.map((u) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={u}
+                    src={u}
+                    alt="profile"
+                    style={{
+                      width: '100%',
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 14,
+                      border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ opacity: 0.7 }}>Не загружено</div>
+            )}
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              Документы/дипломы {docsUrls.length ? <span style={{ opacity: 0.7 }}>({docsUrls.length})</span> : null}
+            </div>
+
+            {docsUrls.length ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {docsUrls.map((u) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={u}
+                    src={u}
+                    alt="doc"
+                    style={{
+                      width: '100%',
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 14,
+                      border: '1px solid #e5e7eb',
+                      background: '#f3f4f6',
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ opacity: 0.7 }}>Не загружено</div>
+            )}
+          </div>
+        </div>
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-        <button
-          type="button"
-          disabled={loading || !canApprove}
-          onClick={() => patchStatus('APPROVED')}
-          style={{
-            border: 0,
-            borderRadius: 12,
-            padding: '10px 10px',
-            fontWeight: 900,
-            cursor: loading ? 'default' : 'pointer',
-            background: canApprove ? '#24c768' : 'rgba(34,197,94,0.25)',
-            color: '#fff',
-          }}
-        >
-          {loading ? '…' : 'APPROVE'}
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => patchStatus('NEED_FIX')}
-          style={{
-            border: 0,
-            borderRadius: 12,
-            padding: '10px 10px',
-            fontWeight: 900,
-            cursor: loading ? 'default' : 'pointer',
-            background: '#f59e0b',
-            color: '#111827',
-          }}
-        >
-          {loading ? '…' : 'NEED_FIX'}
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => patchStatus('REJECTED')}
-          style={{
-            border: 0,
-            borderRadius: 12,
-            padding: '10px 10px',
-            fontWeight: 900,
-            cursor: loading ? 'default' : 'pointer',
-            background: '#ef4444',
-            color: '#fff',
-          }}
-        >
-          {loading ? '…' : 'REJECT'}
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => patchStatus('PENDING')}
-          style={{
-            border: '1px solid rgba(15,23,42,0.12)',
-            borderRadius: 12,
-            padding: '10px 10px',
-            fontWeight: 900,
-            cursor: loading ? 'default' : 'pointer',
-            background: '#fff',
-            color: '#111827',
-          }}
-        >
-          В PENDING
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => patchStatus('DRAFT')}
-          style={{
-            border: '1px solid rgba(15,23,42,0.12)',
-            borderRadius: 12,
-            padding: '10px 10px',
-            fontWeight: 900,
-            cursor: loading ? 'default' : 'pointer',
-            background: '#fff',
-            color: '#111827',
-          }}
-        >
-          В DRAFT
-        </button>
-      </div>
-    </div>
+    </main>
   );
 }
