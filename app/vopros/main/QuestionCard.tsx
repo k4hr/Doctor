@@ -184,7 +184,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           gap: 8px;
 
           /* ВАЖНО: фиксированная высота карточек */
-          height: 168px;
+          height: 210px;
           overflow: hidden;
         }
 
