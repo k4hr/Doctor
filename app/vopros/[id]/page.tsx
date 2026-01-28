@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import TopBarBack from '../../../components/TopBarBack';
 import { DoctorStatus, QuestionStatus } from '@prisma/client';
+import PhotoLightbox from './PhotoLightbox';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -279,24 +280,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {photoUrls.length === 0 ? (
             <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
           ) : canSeePhotos ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {photoUrls.map((u) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={u}
-                  src={u}
-                  alt="photo"
-                  style={{
-                    width: '100%',
-                    height: 120,
-                    objectFit: 'cover',
-                    borderRadius: 14,
-                    border: '1px solid rgba(15,23,42,0.08)',
-                    background: '#f3f4f6',
-                  }}
-                />
-              ))}
-            </div>
+            <PhotoLightbox urls={photoUrls} />
           ) : (
             <div
               style={{
