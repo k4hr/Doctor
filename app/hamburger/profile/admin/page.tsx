@@ -72,7 +72,6 @@ export default function AdminMenuPage() {
       WebApp?.ready?.();
     } catch {}
 
-    // UI-имя сразу
     const unsafe = WebApp?.initDataUnsafe?.user || null;
     if (unsafe) {
       setTgUser({
@@ -153,6 +152,12 @@ export default function AdminMenuPage() {
 
       {isAdmin && (
         <section className="card">
+          {/* ✅ НОВОЕ: ВОПРОСЫ */}
+          <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/questions')}>
+            <span className="item-title">Вопросы</span>
+            <span className="item-sub">Список, фото, удаление из общего списка</span>
+          </button>
+
           <button type="button" className="item" onClick={() => go('/hamburger/profile/admin/doctor')}>
             <span className="item-title">Врачи</span>
             <span className="item-sub">Анкеты, статусы, модерация</span>
@@ -213,7 +218,6 @@ export default function AdminMenuPage() {
           gap: 10px;
         }
 
-        /* ВАЖНО: фикс “в одну строку” */
         .item {
           width: 100%;
           border: 1px solid rgba(156, 163, 175, 0.45);
