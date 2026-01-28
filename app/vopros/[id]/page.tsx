@@ -65,14 +65,12 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function fmtDateRuMsk(d: Date | null | undefined) {
+function fmtDateTimeRuMsk(d: Date | null | undefined) {
   if (!d) return '—';
   const dt = d instanceof Date ? d : new Date(d);
   const ts = dt.getTime();
   if (!Number.isFinite(ts)) return '—';
 
-  // строго: русская дата, московская зона
-  // пример: 28.01.2026 г.
   const datePart = new Intl.DateTimeFormat('ru-RU', {
     timeZone: 'Europe/Moscow',
     day: '2-digit',
@@ -80,7 +78,14 @@ function fmtDateRuMsk(d: Date | null | undefined) {
     year: 'numeric',
   }).format(dt);
 
-  return `${datePart} г.`;
+  const timePart = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(dt);
+
+  return `${datePart} г., ${timePart}`;
 }
 
 function statusUi(status: string) {
@@ -230,7 +235,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           ) : null}
 
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(15,23,42,0.55)', fontWeight: 700 }}>
-            {fmtDateRuMsk(q.createdAt)}
+            {fmtDateTimeRuMsk(q.createdAt)}
           </span>
         </div>
 
