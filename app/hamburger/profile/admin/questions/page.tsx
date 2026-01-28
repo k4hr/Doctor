@@ -1,7 +1,10 @@
 /* path: app/hamburger/profile/admin/questions/page.tsx */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../../../components/TopBarBack';
 import PhotoLightbox from '../../../../vopros/[id]/PhotoLightbox';
@@ -114,6 +117,8 @@ export default function AdminQuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [warn, setWarn] = useState('');
 
+  const [initData, setInitData] = useState<string>('');
+
   const [lbOpen, setLbOpen] = useState(false);
   const [lbUrls, setLbUrls] = useState<string[]>([]);
   const [lbIndex, setLbIndex] = useState(0);
@@ -121,19 +126,24 @@ export default function AdminQuestionsPage() {
   // чтобы не упереться в строгие типы неизвестного компонента
   const PhotoLightboxAny = PhotoLightbox as any;
 
-  const initData = useMemo(() => {
-    const WebApp: any = (window as any)?.Telegram?.WebApp;
-    const v = (WebApp?.initData as string) || getInitDataFromCookie();
-    if (WebApp?.initData) setCookie('tg_init_data', WebApp.initData, 3);
-    return String(v || '');
+  useEffect(() => {
+    // ВСЁ, что трогает window/document — только тут
+    try {
+      const WebApp: any = (window as any)?.Telegram?.WebApp;
+      const v = (WebApp?.initData as string) || getInitDataFromCookie();
+      if (WebApp?.initData) setCookie('tg_init_data', WebApp.initData, 3);
+      setInitData(String(v || ''));
+    } catch {
+      setInitData(getInitDataFromCookie());
+    }
   }, []);
 
-  const load = async () => {
+  const load = async (init: string) => {
     try {
       setWarn('');
       setLoading(true);
 
-      if (!initData) {
+      if (!init) {
         setWarn('Нет initData — страница недоступна.');
         setItems([]);
         return;
@@ -143,8 +153,8 @@ export default function AdminQuestionsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-          'X-Init-Data': initData,
+          'X-Telegram-Init-Data': init,
+          'X-Init-Data': init,
         },
         body: JSON.stringify({ limit: 100 }),
         cache: 'no-store',
@@ -168,9 +178,14 @@ export default function AdminQuestionsPage() {
   };
 
   useEffect(() => {
-    load();
+    // грузим только когда initData появился
+    if (initData) {
+      load(initData);
+    } else {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initData]);
 
   const openQuestion = (id: string) => {
     haptic('light');
@@ -235,7 +250,7 @@ export default function AdminQuestionsPage() {
             type="button"
             onClick={() => {
               haptic('light');
-              load();
+              load(initData);
             }}
             disabled={loading}
           >
@@ -360,7 +375,6 @@ export default function AdminQuestionsPage() {
         </div>
       )}
 
-      {/* Лайтбокс (через any — чтобы не ловить TypeScript на несоответствии пропсов) */}
       <PhotoLightboxAny
         open={lbOpen}
         urls={lbUrls}
