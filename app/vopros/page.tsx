@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../components/TopBarBack';
 import { VRACHI_LIST } from '../lib/vrachi';
+import { feedUpsertTop } from '../lib/questionsStore';
 
 type TgWebApp = {
   ready?: () => void;
@@ -36,7 +37,7 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(input, { ...init, signal: controller.signal });
+    const res = await fetch(input, { ...init, signal: controller.signal, cache: 'no-store' });
     return res;
   } finally {
     clearTimeout(t);
@@ -167,7 +168,7 @@ export default function VoprosPage() {
     try {
       setSubmitting(true);
 
-      // 1) create question (текстовые поля)
+      // 1) create question
       setStage('Отправляем вопрос…');
 
       const resCreate = await fetchWithTimeout('/api/question/create', {
@@ -180,7 +181,7 @@ export default function VoprosPage() {
           title: title.trim(),
           body: body.trim(),
           keywords: parseKeywordsClient(keywords),
-          assignedDoctorId: assignedDoctorId.trim() || undefined, // опционально
+          assignedDoctorId: assignedDoctorId.trim() || undefined,
         }),
       });
 
@@ -199,6 +200,20 @@ export default function VoprosPage() {
       }
 
       const questionId = String(jCreate.id);
+      const createdAtIso =
+        typeof jCreate?.createdAt === 'string' && jCreate.createdAt ? String(jCreate.createdAt) : new Date().toISOString();
+
+      // ✅ МГНОВЕННО добавляем в ленту (optimistic)
+      feedUpsertTop({
+        id: questionId,
+        title: title.trim(),
+        bodySnippet: body.trim(),
+        createdAt: createdAtIso,
+        doctorLabel: speciality.trim() || '—',
+        status: 'WAITING',
+        priceBadge: 'FREE',
+        optimistic: true,
+      });
 
       // 2) upload photos (если выбраны)
       if (photos.length > 0) {
@@ -228,7 +243,7 @@ export default function VoprosPage() {
       setStage('Готово ✅');
       showToast('Вопрос отправлен. Он будет доступен врачам выбранной категории.');
 
-      // очистим форму (и уйдём назад/на ленту)
+      // очистим форму
       setSpeciality('');
       setTitle('');
       setBody('');
@@ -237,7 +252,7 @@ export default function VoprosPage() {
       setPhotos([]);
       setPhotosInputKey((x) => x + 1);
 
-      // куда уводить — решишь потом. Сейчас логично на главную.
+      // ✅ просто уходим на главную — там уже есть новый вопрос из стора
       router.push('/');
     } catch (e: any) {
       console.error(e);
@@ -265,7 +280,6 @@ export default function VoprosPage() {
         </header>
 
         <form ref={formRef} onSubmit={handleSubmit}>
-          {/* Раздел медицины */}
           <label className="field">
             <span className="field-label">Раздел медицины</span>
             <div className="select-wrap">
@@ -301,7 +315,6 @@ export default function VoprosPage() {
             </p>
           </label>
 
-          {/* Заголовок */}
           <label className="field">
             <span className="field-label">Заголовок вопроса</span>
             <input
@@ -312,12 +325,9 @@ export default function VoprosPage() {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={140}
             />
-            <p className="field-hint">
-              Например: «Что делать, если морозит и чувствуется слабость?»
-            </p>
+            <p className="field-hint">Например: «Что делать, если морозит и чувствуется слабость?»</p>
           </label>
 
-          {/* Тело вопроса */}
           <label className="field">
             <span className="field-label">Ваш вопрос врачу</span>
             <textarea
@@ -333,7 +343,6 @@ export default function VoprosPage() {
             </p>
           </label>
 
-          {/* Ключевые слова */}
           <label className="field">
             <span className="field-label">Ключевые слова</span>
             <input
@@ -344,12 +353,9 @@ export default function VoprosPage() {
               onChange={(e) => setKeywords(e.target.value)}
               maxLength={220}
             />
-            <p className="field-hint">
-              Это поможет людям находить похожие вопросы в общем поиске.
-            </p>
+            <p className="field-hint">Это поможет людям находить похожие вопросы в общем поиске.</p>
           </label>
 
-          {/* ✅ Фото (до 10) */}
           <section className="field">
             <div className="photos-head">
               <span className="field-label">Фотографии (необязательно)</span>
@@ -385,9 +391,7 @@ export default function VoprosPage() {
               }}
             />
 
-            <div className="hint">
-              Загружайте только то, что относится к вопросу (анализы/кожа/снимки и т.п.).
-            </div>
+            <div className="hint">Загружайте только то, что относится к вопросу (анализы/кожа/снимки и т.п.).</div>
 
             {photos.length > 0 && (
               <button
@@ -404,20 +408,9 @@ export default function VoprosPage() {
             )}
           </section>
 
-          {/* ✅ скрытый тех-блок для будущего “выбор врача” */}
-          <input
-            type="hidden"
-            value={assignedDoctorId}
-            onChange={(e) => setAssignedDoctorId(e.target.value)}
-          />
+          <input type="hidden" value={assignedDoctorId} onChange={(e) => setAssignedDoctorId(e.target.value)} />
 
-          {/* Кнопка отправки */}
-          <button
-            type="submit"
-            className="ask-submit"
-            disabled={submitting}
-            onClick={() => haptic('medium')}
-          >
+          <button type="submit" className="ask-submit" disabled={submitting} onClick={() => haptic('medium')}>
             {submitting ? 'Отправка…' : 'Отправить вопрос'}
           </button>
 
