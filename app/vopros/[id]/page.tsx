@@ -65,17 +65,25 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function fmtDate(d: Date | null | undefined) {
+function fmtDateRuMsk(d: Date | null | undefined) {
   if (!d) return '—';
-  try {
-    return new Date(d).toLocaleString();
-  } catch {
-    return String(d);
-  }
+  const dt = d instanceof Date ? d : new Date(d);
+  const ts = dt.getTime();
+  if (!Number.isFinite(ts)) return '—';
+
+  // строго: русская дата, московская зона
+  // пример: 28.01.2026 г.
+  const datePart = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(dt);
+
+  return `${datePart} г.`;
 }
 
 function statusUi(status: string) {
-  // UI: только 2 статуса
   if (status === 'IN_PROGRESS') {
     return {
       label: 'Врач отвечает',
@@ -101,7 +109,6 @@ function show(v: any) {
 export default async function VoprosIdPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
-  // 1) тянем вопрос — публично
   const q = await prisma.question.findUnique({
     where: { id },
     include: {
@@ -122,7 +129,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     );
   }
 
-  // 2) определяем “кто смотрит” (если есть tg cookie) — ТОЛЬКО ради фото
   const botToken = envClean('TELEGRAM_BOT_TOKEN');
   const initData = cookies().get('tg_init_data')?.value || '';
   const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
@@ -137,9 +143,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   const isApprovedDoctor = !!doctor && doctor.status === DoctorStatus.APPROVED;
   const isAuthor = !!tgId && q.authorTelegramId === tgId;
 
-  // врач может видеть фото:
-  // - по категории (speciality совпадает с одной из специализаций врача)
-  // - или если вопрос назначен этому врачу
   const doctorSpecs = new Set(
     [doctor?.speciality1, doctor?.speciality2, doctor?.speciality3]
       .filter(Boolean)
@@ -227,7 +230,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           ) : null}
 
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(15,23,42,0.55)', fontWeight: 700 }}>
-            {fmtDate(q.createdAt)}
+            {fmtDateRuMsk(q.createdAt)}
           </span>
         </div>
 
@@ -265,7 +268,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
-        {/* ✅ Фото: показываем только тем, кому можно */}
         <div>
           <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
 
@@ -308,7 +310,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           )}
         </div>
 
-        {/* на будущее: блок ответа врача */}
         {q.status === QuestionStatus.DONE ? (
           <div style={{ marginTop: 8, padding: 12, borderRadius: 14, background: 'rgba(15,23,42,0.03)' }}>
             <div style={{ fontWeight: 900 }}>Ответ готов</div>
