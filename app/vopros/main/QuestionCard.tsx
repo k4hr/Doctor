@@ -145,7 +145,8 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
         </div>
 
         <div className="qcBottom">
-          <span className="qcPill qcPill--doctor">{q.doctorLabel}</span>
+          {/* было плашкой — стало просто текстом */}
+          <span className="qcDoctorText">{q.doctorLabel}</span>
           <span className="qcTime">{timeAgoRu(q.createdAt)}</span>
         </div>
       </button>
@@ -180,7 +181,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           box-shadow: 0 6px 18px rgba(18, 28, 45, 0.11);
         }
 
-        /* ВЕРХ: слева заголовок, справа две плашки (цена + статус) */
         .qcTop {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -189,7 +189,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        /* Заголовок: было 12px, просил +2 => 14px */
         .qcTitle {
           margin: 0;
           font-size: 14px;
@@ -212,7 +211,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           gap: 6px;
         }
 
-        /* Общий стиль плашек */
         .qcPill {
           flex: 0 0 auto;
 
@@ -256,22 +254,22 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #991b1b;
         }
 
-        .qcPill--doctor {
-          background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.85);
-
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        /* НИЗ: слева специальность, справа время */
         .qcBottom {
           display: grid;
           grid-template-columns: 1fr auto;
           align-items: end;
           gap: 10px;
+          min-width: 0;
+        }
+
+        /* Специальность — просто текст, без плашки */
+        .qcDoctorText {
+          font-size: 12px;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.70);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
           min-width: 0;
         }
 
