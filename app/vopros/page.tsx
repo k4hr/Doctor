@@ -1,10 +1,259 @@
 /* path: app/vopros/page.tsx */
 'use client';
 
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import TopBarBack from '../../components/TopBarBack';
 import { VRACHI_LIST } from '../lib/vrachi';
 
+type TgWebApp = {
+  ready?: () => void;
+  expand?: () => void;
+  initData?: string;
+  HapticFeedback?: { impactOccurred?: (type: 'light' | 'medium') => void };
+  showAlert?: (msg: string) => void;
+};
+
+function tg(): TgWebApp | null {
+  try {
+    return (window as any)?.Telegram?.WebApp || null;
+  } catch {
+    return null;
+  }
+}
+
+function haptic(type: 'light' | 'medium' = 'light') {
+  try {
+    tg()?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit & { timeoutMs?: number } = {}
+) {
+  const timeoutMs = init.timeoutMs ?? 25000;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(input, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * Telegram initData:
+ *  - window.Telegram.WebApp.initData
+ *  - URL ?tgWebAppData
+ *  - URL #tgWebAppData
+ */
+function getTelegramInitDataSmart(): { initData: string; source: string } {
+  const wa = tg();
+  const fromWa = (wa?.initData || '').trim();
+  if (fromWa) return { initData: fromWa, source: 'Telegram.WebApp.initData' };
+
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const q = (sp.get('tgWebAppData') || '').trim();
+    if (q) return { initData: q, source: 'URL ?tgWebAppData' };
+  } catch {}
+
+  try {
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    const sp2 = new URLSearchParams(hash);
+    const h = (sp2.get('tgWebAppData') || '').trim();
+    if (h) return { initData: h, source: 'URL #tgWebAppData' };
+  } catch {}
+
+  return { initData: '', source: 'none' };
+}
+
+const MAX_PHOTOS = 10;
+
+function clampFiles(files: FileList | null | undefined, max: number): File[] {
+  if (!files || files.length === 0) return [];
+  return Array.from(files).slice(0, max);
+}
+
+function revokeUrls(urls: string[]) {
+  try {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+  } catch {}
+}
+
+function parseKeywordsClient(raw: string): string {
+  // оставим в виде строки — сервер сам нормализует
+  return String(raw || '').trim();
+}
+
 export default function VoprosPage() {
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  const [speciality, setSpeciality] = useState('');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [keywords, setKeywords] = useState('');
+
+  // ✅ опционально (для будущего фильтра “по врачу”), пока скрыто и не обязательно
+  const [assignedDoctorId, setAssignedDoctorId] = useState('');
+
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photosInputKey, setPhotosInputKey] = useState(1);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [stage, setStage] = useState('');
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef<any>(null);
+
+  const photoUrls = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    try {
+      tg()?.showAlert?.(msg);
+    } catch {}
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 3500);
+  };
+
+  useEffect(() => {
+    try {
+      tg()?.ready?.();
+      tg()?.expand?.();
+    } catch {}
+
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => () => revokeUrls(photoUrls), [photoUrls]);
+
+  const validate = () => {
+    if (!speciality) return 'Выберите раздел медицины.';
+    if (title.trim().length < 6) return 'Заголовок слишком короткий (минимум 6 символов).';
+    if (body.trim().length < 50) return 'Опишите вопрос подробнее (минимум 50 символов).';
+    if (photos.length > MAX_PHOTOS) return `Можно загрузить максимум ${MAX_PHOTOS} фото.`;
+    return '';
+  };
+
+  const submitAll = async () => {
+    if (submitting) return;
+
+    const err = validate();
+    if (err) {
+      haptic('light');
+      showToast(err);
+      return;
+    }
+
+    const waExists = !!tg();
+    const { initData, source } = getTelegramInitDataSmart();
+
+    if (!waExists || !initData) {
+      const host = typeof window !== 'undefined' ? window.location.host : '';
+      showToast(
+        `Нет initData (${source}). Telegram.WebApp=${waExists ? 'есть' : 'нет'}. Домен=${host}. ` +
+          `Проверь: @BotFather /setdomain и открывать как WebApp (web_app кнопка / menu button).`
+      );
+      return;
+    }
+
+    haptic('medium');
+
+    try {
+      setSubmitting(true);
+
+      // 1) create question (текстовые поля)
+      setStage('Отправляем вопрос…');
+
+      const resCreate = await fetchWithTimeout('/api/question/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        timeoutMs: 25000,
+        body: JSON.stringify({
+          initData,
+          speciality: speciality.trim(),
+          title: title.trim(),
+          body: body.trim(),
+          keywords: parseKeywordsClient(keywords),
+          assignedDoctorId: assignedDoctorId.trim() || undefined, // опционально
+        }),
+      });
+
+      const jCreate = await resCreate.json().catch(() => ({} as any));
+      if (!resCreate.ok || !jCreate?.ok || !jCreate?.id) {
+        const msg =
+          jCreate?.field
+            ? `Проверь поле: ${String(jCreate.field)}`
+            : jCreate?.error
+              ? `Ошибка: ${String(jCreate.error)}`
+              : `Ошибка отправки (${resCreate.status})`;
+        haptic('light');
+        showToast(msg);
+        setStage('');
+        return;
+      }
+
+      const questionId = String(jCreate.id);
+
+      // 2) upload photos (если выбраны)
+      if (photos.length > 0) {
+        setStage('Загружаем фото…');
+
+        const fd = new FormData();
+        fd.append('initData', initData);
+        fd.append('questionId', questionId);
+        photos.forEach((f) => fd.append('photos', f, f.name));
+
+        const resUp = await fetchWithTimeout('/api/question/upload', {
+          method: 'POST',
+          body: fd,
+          timeoutMs: 45000,
+        });
+
+        const jUp = await resUp.json().catch(() => ({} as any));
+        if (!resUp.ok || !jUp?.ok) {
+          const msg = jUp?.error ? `Upload error: ${String(jUp.error)}` : `Ошибка загрузки фото (${resUp.status})`;
+          haptic('light');
+          showToast(msg);
+          setStage('');
+          return;
+        }
+      }
+
+      setStage('Готово ✅');
+      showToast('Вопрос отправлен. Он будет доступен врачам выбранной категории.');
+
+      // очистим форму (и уйдём назад/на ленту)
+      setSpeciality('');
+      setTitle('');
+      setBody('');
+      setKeywords('');
+      setAssignedDoctorId('');
+      setPhotos([]);
+      setPhotosInputKey((x) => x + 1);
+
+      // куда уводить — решишь потом. Сейчас логично на главную.
+      router.push('/');
+    } catch (e: any) {
+      console.error(e);
+      if (e?.name === 'AbortError') showToast('Таймаут: сервер отвечает слишком долго. Попробуйте ещё раз.');
+      else showToast('Сеть/сервер недоступны. Попробуйте позже.');
+    } finally {
+      setSubmitting(false);
+      setTimeout(() => setStage(''), 1200);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await submitAll();
+  };
+
   return (
     <main className="ask-page">
       <TopBarBack />
@@ -15,80 +264,168 @@ export default function VoprosPage() {
           <div className="ask-underline" />
         </header>
 
-        {/* Раздел медицины */}
-        <label className="field">
-          <span className="field-label">Раздел медицины</span>
-          <div className="select-wrap">
-            <select defaultValue="">
-              <option value="" disabled>
-                Выберите раздел медицины
-              </option>
-              {VRACHI_LIST.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+        <form ref={formRef} onSubmit={handleSubmit}>
+          {/* Раздел медицины */}
+          <label className="field">
+            <span className="field-label">Раздел медицины</span>
+            <div className="select-wrap">
+              <select value={speciality} onChange={(e) => setSpeciality(e.target.value)}>
+                <option value="" disabled>
+                  Выберите раздел медицины
                 </option>
-              ))}
-            </select>
-          </div>
-          <p className="field-hint">
-            Если сомневаетесь в выборе категории, выберите{' '}
-            <button
-              type="button"
-              className="link-btn"
-              // TODO: автоподстановка "Терапевт"
-              onClick={() => null}
-            >
-              терапевт
-            </button>
-            .
-          </p>
-        </label>
+                {VRACHI_LIST.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Заголовок */}
-        <label className="field">
-          <span className="field-label">Заголовок вопроса</span>
+            <p className="field-hint">
+              Если сомневаетесь — выберите{' '}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  haptic('light');
+                  setSpeciality('Терапевт');
+                }}
+              >
+                терапевт
+              </button>
+              .
+            </p>
+
+            <p className="privacy-hint">
+              Фото и детали вопроса будут доступны <b>только врачам выбранной категории</b>.
+            </p>
+          </label>
+
+          {/* Заголовок */}
+          <label className="field">
+            <span className="field-label">Заголовок вопроса</span>
+            <input
+              type="text"
+              className="text-input"
+              placeholder="Краткий заголовок вопроса"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={140}
+            />
+            <p className="field-hint">
+              Например: «Что делать, если морозит и чувствуется слабость?»
+            </p>
+          </label>
+
+          {/* Тело вопроса */}
+          <label className="field">
+            <span className="field-label">Ваш вопрос врачу</span>
+            <textarea
+              className="textarea-input"
+              placeholder="Постарайтесь описать проблему максимально детально"
+              rows={5}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              maxLength={6000}
+            />
+            <p className={'field-hint ' + (body.trim().length < 50 ? 'field-hint--warning' : '')}>
+              Минимум 50 символов. Сейчас: {body.trim().length}
+            </p>
+          </label>
+
+          {/* Ключевые слова */}
+          <label className="field">
+            <span className="field-label">Ключевые слова</span>
+            <input
+              type="text"
+              className="text-input"
+              placeholder="Например: температура, ребёнок, нурофен (через запятую)"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              maxLength={220}
+            />
+            <p className="field-hint">
+              Это поможет людям находить похожие вопросы в общем поиске.
+            </p>
+          </label>
+
+          {/* ✅ Фото (до 10) */}
+          <section className="field">
+            <div className="photos-head">
+              <span className="field-label">Фотографии (необязательно)</span>
+              <span className="photos-limit">до {MAX_PHOTOS}</span>
+            </div>
+
+            {photoUrls.length ? (
+              <div className="thumbs">
+                {photoUrls.map((u, idx) => (
+                  <div className="thumb" key={u}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="thumbImg" src={u} alt={`photo-${idx + 1}`} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="placeholder">Фото не выбраны</div>
+            )}
+
+            <input
+              key={photosInputKey}
+              className="file"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const next = clampFiles(e.target.files, MAX_PHOTOS);
+                if (e.target.files && e.target.files.length > MAX_PHOTOS) {
+                  showToast(`Можно выбрать максимум ${MAX_PHOTOS} фото.`);
+                }
+                setPhotos(next);
+                setPhotosInputKey((x) => x + 1);
+              }}
+            />
+
+            <div className="hint">
+              Загружайте только то, что относится к вопросу (анализы/кожа/снимки и т.п.).
+            </div>
+
+            {photos.length > 0 && (
+              <button
+                type="button"
+                className="miniDanger"
+                onClick={() => {
+                  haptic('light');
+                  setPhotos([]);
+                  setPhotosInputKey((x) => x + 1);
+                }}
+              >
+                Очистить фото
+              </button>
+            )}
+          </section>
+
+          {/* ✅ скрытый тех-блок для будущего “выбор врача” */}
           <input
-            type="text"
-            className="text-input"
-            placeholder="Краткий заголовок вопроса"
+            type="hidden"
+            value={assignedDoctorId}
+            onChange={(e) => setAssignedDoctorId(e.target.value)}
           />
-          <p className="field-hint">
-            Например: «Что делать, если морозит и чувствуется слабость?»
-          </p>
-        </label>
 
-        {/* Тело вопроса */}
-        <label className="field">
-          <span className="field-label">Ваш вопрос врачу</span>
-          <textarea
-            className="textarea-input"
-            placeholder="Ваш вопрос врачу — постарайтесь описать проблему наиболее детально"
-            rows={5}
-          />
-          <p className="field-hint field-hint--warning">
-            Необходимо ввести не менее 50&nbsp;символов.
-          </p>
-        </label>
+          {/* Кнопка отправки */}
+          <button
+            type="submit"
+            className="ask-submit"
+            disabled={submitting}
+            onClick={() => haptic('medium')}
+          >
+            {submitting ? 'Отправка…' : 'Отправить вопрос'}
+          </button>
 
-        {/* Ключевые слова */}
-        <label className="field">
-          <span className="field-label">Ключевые слова</span>
-          <input
-            type="text"
-            className="text-input"
-            placeholder="Задайте ключевые слова через запятую"
-          />
-        </label>
-
-        {/* Кнопка отправки */}
-        <button
-          type="button"
-          className="ask-submit"
-          onClick={() => null} // TODO: сабмит
-        >
-          Отправить вопрос
-        </button>
+          {stage ? <div className="stage">{stage}</div> : null}
+        </form>
       </section>
+
+      {toast ? <div className="toast">{toast}</div> : null}
 
       <style jsx>{`
         .ask-page {
@@ -97,12 +434,9 @@ export default function VoprosPage() {
           display: flex;
           flex-direction: column;
           gap: 18px;
-          /* НИКАКОГО своего background — берём общий фон приложения */
-          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
-            sans-serif;
+          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
         }
 
-        /* Просто вертикальный контейнер, без карточки */
         .ask-card {
           margin-top: 4px;
           padding-bottom: 12px;
@@ -203,6 +537,17 @@ export default function VoprosPage() {
           color: #b45309;
         }
 
+        .privacy-hint {
+          margin: 6px 0 0;
+          font-size: 11px;
+          line-height: 1.35;
+          color: rgba(17, 24, 39, 0.72);
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(36, 199, 104, 0.08);
+          border: 1px solid rgba(36, 199, 104, 0.18);
+        }
+
         .link-btn {
           border: none;
           padding: 0;
@@ -213,6 +558,83 @@ export default function VoprosPage() {
           text-decoration: underline;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+        }
+
+        .photos-head {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .photos-limit {
+          font-size: 11px;
+          font-weight: 800;
+          color: rgba(75, 85, 99, 0.8);
+        }
+
+        .thumbs {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .thumb {
+          width: 100%;
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          overflow: hidden;
+          background: #fafafa;
+          aspect-ratio: 1 / 1;
+        }
+
+        .thumbImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .placeholder {
+          width: 100%;
+          height: 160px;
+          border-radius: 14px;
+          border: 1px dashed rgba(156, 163, 175, 0.8);
+          display: grid;
+          place-items: center;
+          color: #6b7280;
+          font-size: 13px;
+          background: #fafafa;
+        }
+
+        .file {
+          width: 100%;
+          max-width: 100%;
+        }
+
+        .hint {
+          margin-top: 4px;
+          font-size: 11px;
+          color: #9ca3af;
+        }
+
+        .miniDanger {
+          margin-top: 8px;
+          border: 1px solid rgba(239, 68, 68, 0.35);
+          background: rgba(239, 68, 68, 0.06);
+          color: #b91c1c;
+          font-weight: 800;
+          border-radius: 12px;
+          padding: 10px 12px;
+          width: 100%;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+
+        .miniDanger:active {
+          transform: scale(0.99);
         }
 
         .ask-submit {
@@ -231,9 +653,37 @@ export default function VoprosPage() {
           box-shadow: 0 12px 26px rgba(36, 199, 104, 0.4);
         }
 
+        .ask-submit:disabled {
+          opacity: 0.65;
+          cursor: default;
+        }
+
         .ask-submit:active {
           transform: scale(0.98);
           box-shadow: 0 8px 18px rgba(36, 199, 104, 0.45);
+        }
+
+        .stage {
+          margin-top: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          color: #374151;
+          text-align: center;
+        }
+
+        .toast {
+          position: fixed;
+          left: 12px;
+          right: 12px;
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+          z-index: 10000;
+          padding: 12px 14px;
+          border-radius: 14px;
+          background: rgba(17, 24, 39, 0.92);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 700;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
         }
       `}</style>
     </main>
