@@ -156,6 +156,12 @@ export default function AdminQuestionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const openQuestion = (id: string) => {
+    haptic('light');
+    // Админ-деталка (её нужно сделать отдельно): /hamburger/profile/admin/questions/[id]
+    router.push(`/hamburger/profile/admin/questions/${encodeURIComponent(id)}`);
+  };
+
   const removeQuestion = async (id: string) => {
     if (!initData) return;
 
@@ -203,11 +209,26 @@ export default function AdminQuestionsPage() {
         <h1 className="title">Вопросы</h1>
 
         <div className="actions">
-          <button className="btn" type="button" onClick={() => { haptic('light'); load(); }} disabled={loading}>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              haptic('light');
+              load();
+            }}
+            disabled={loading}
+          >
             {loading ? 'Загрузка…' : 'Обновить'}
           </button>
 
-          <button className="btn btnGhost" type="button" onClick={() => { haptic('light'); router.push('/vopros'); }}>
+          <button
+            className="btn btnGhost"
+            type="button"
+            onClick={() => {
+              haptic('light');
+              router.push('/vopros');
+            }}
+          >
             Открыть ленту
           </button>
         </div>
@@ -222,255 +243,12 @@ export default function AdminQuestionsPage() {
       ) : (
         <div className="list">
           {items.map((q) => (
-            <section key={q.id} className="card">
-              <div className="row1">
-                <div className="ttl">{q.title}</div>
-                <span className="pill">{q.status}</span>
-              </div>
-
-              <div className="row2">
-                <span className="tag">{q.speciality}</span>
-                <span className="meta">{fmtDateTimeRuMsk(q.createdAt)}</span>
-              </div>
-
-              <div className="row3">
-                <span className="meta">Автор: <b>{authorName(q)}</b></span>
-                <span className="meta">ID: <span className="mono">{q.id}</span></span>
-              </div>
-
-              <div className="body">{short(q.body, 320)}</div>
-
-              {Array.isArray(q.keywords) && q.keywords.length ? (
-                <div className="kw">
-                  {q.keywords.slice(0, 20).map((k) => (
-                    <span key={k} className="kwPill">{k}</span>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* ✅ Фото: открываются твоим lightbox (зум пальцами) */}
-              {q.photoUrls.length ? (
-                <div className="photos">
-                  <div className="photosTitle">Фотографии ({q.photoUrls.length})</div>
-                  <PhotoLightbox urls={q.photoUrls} />
-                </div>
-              ) : (
-                <div className="mutedSmall">Фото нет</div>
-              )}
-
-              <div className="footer">
-                <button className="danger" type="button" onClick={() => removeQuestion(q.id)}>
-                  Удалить из общего списка
-                </button>
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-
-      <style jsx>{`
-        .page {
-          min-height: 100dvh;
-          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-        }
-
-        .head {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 10px;
-          margin-top: 6px;
-        }
-
-        .title {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 900;
-          color: #111827;
-        }
-
-        .actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-
-        .btn {
-          border: none;
-          background: #111827;
-          color: #fff;
-          border-radius: 999px;
-          padding: 10px 12px;
-          font-weight: 900;
-          font-size: 12px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .btn:disabled {
-          opacity: 0.6;
-          cursor: default;
-        }
-
-        .btnGhost {
-          background: rgba(17,24,39,0.08);
-          color: #111827;
-        }
-
-        .warn {
-          margin-top: 10px;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(239, 68, 68, 0.08);
-          border: 1px solid rgba(239, 68, 68, 0.18);
-          color: #b91c1c;
-          font-weight: 800;
-          font-size: 12px;
-          line-height: 1.35;
-        }
-
-        .muted {
-          margin-top: 14px;
-          color: rgba(17,24,39,0.60);
-          font-weight: 700;
-        }
-
-        .mutedSmall {
-          margin-top: 8px;
-          color: rgba(17,24,39,0.55);
-          font-weight: 700;
-          font-size: 12px;
-        }
-
-        .list {
-          margin-top: 14px;
-          display: grid;
-          gap: 12px;
-        }
-
-        .card {
-          background: rgba(255,255,255,0.92);
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 18px;
-          padding: 14px;
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.08);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          display: grid;
-          gap: 10px;
-        }
-
-        .row1 {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          align-items: flex-start;
-        }
-
-        .ttl {
-          font-size: 16px;
-          font-weight: 900;
-          color: #0b0c10;
-          line-height: 1.2;
-        }
-
-        .pill {
-          font-size: 12px;
-          font-weight: 900;
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: rgba(15, 23, 42, 0.06);
-          border: 1px solid rgba(15, 23, 42, 0.10);
-          color: rgba(15, 23, 42, 0.75);
-          white-space: nowrap;
-        }
-
-        .row2 {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .tag {
-          padding: 6px 10px;
-          border-radius: 999px;
-          background: rgba(36, 199, 104, 0.10);
-          border: 1px solid rgba(36, 199, 104, 0.18);
-          color: #166534;
-          font-weight: 900;
-          font-size: 12px;
-        }
-
-        .meta {
-          color: rgba(15, 23, 42, 0.65);
-          font-weight: 700;
-          font-size: 12px;
-        }
-
-        .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-          font-size: 11px;
-        }
-
-        .row3 {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .body {
-          font-size: 13px;
-          line-height: 1.45;
-          color: rgba(11, 12, 16, 0.78);
-          white-space: pre-wrap;
-        }
-
-        .kw {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
-
-        .kwPill {
-          padding: 5px 9px;
-          border-radius: 999px;
-          border: 1px solid rgba(15,23,42,0.10);
-          background: rgba(15,23,42,0.03);
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(15,23,42,0.70);
-        }
-
-        .photosTitle {
-          font-weight: 900;
-          margin-bottom: 8px;
-        }
-
-        .footer {
-          margin-top: 6px;
-          display: flex;
-          justify-content: flex-end;
-        }
-
-        .danger {
-          width: 100%;
-          border: 1px solid rgba(239, 68, 68, 0.35);
-          background: rgba(239, 68, 68, 0.08);
-          color: #b91c1c;
-          font-weight: 900;
-          border-radius: 14px;
-          padding: 12px 12px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .danger:active {
-          transform: scale(0.99);
-        }
-      `}</style>
-    </main>
-  );
-}
+            <section
+              key={q.id}
+              className="card"
+              role="button"
+              tabIndex={0}
+              aria-label={`Открыть вопрос: ${q.title}`}
+              onClick={() => openQuestion(q.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter'
