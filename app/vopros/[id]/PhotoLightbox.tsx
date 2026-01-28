@@ -3,10 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-type Props = {
-  urls: string[];
-};
-
+type Props = { urls: string[] };
 type Pt = { x: number; y: number };
 
 function clamp(n: number, a: number, b: number) {
@@ -17,7 +14,6 @@ export default function PhotoLightbox({ urls }: Props) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
 
-  // zoom state
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
@@ -36,6 +32,7 @@ export default function PhotoLightbox({ urls }: Props) {
     startMid: Pt;
     lastTapTs: number;
     lastTapPt: Pt | null;
+    moved: boolean;
   }>({
     mode: 'none',
     startScale: 1,
@@ -45,9 +42,9 @@ export default function PhotoLightbox({ urls }: Props) {
     startMid: { x: 0, y: 0 },
     lastTapTs: 0,
     lastTapPt: null,
+    moved: false,
   });
 
-  // размеры “вписанного” изображения при scale=1 (contain)
   const fitRef = useRef<{ fitW: number; fitH: number; boxW: number; boxH: number } | null>(null);
 
   const has = useMemo(() => Array.isArray(urls) && urls.length > 0, [urls]);
@@ -59,6 +56,7 @@ export default function PhotoLightbox({ urls }: Props) {
     setTx(0);
     setTy(0);
     gestureRef.current.mode = 'none';
+    gestureRef.current.moved = false;
     pointersRef.current.clear();
   };
 
@@ -105,7 +103,7 @@ export default function PhotoLightbox({ urls }: Props) {
   };
 
   const setZoom = (nextScale: number, nextTx: number, nextTy: number) => {
-    const s = clamp(nextScale, 1, 6); // максимум (можешь поставить 8)
+    const s = clamp(nextScale, 1, 6);
     const cl = clampTranslateFor(s, nextTx, nextTy);
     setScale(s);
     setTx(cl.tx);
@@ -122,7 +120,6 @@ export default function PhotoLightbox({ urls }: Props) {
   const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
   const mid = (a: Pt, b: Pt) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-  // открытие/закрытие + блок скролла
   useEffect(() => {
     if (!open) return;
 
@@ -145,7 +142,6 @@ export default function PhotoLightbox({ urls }: Props) {
     };
   }, [open, urls.length]);
 
-  // пересчитать fit на ресайзе/ориентации
   useEffect(() => {
     if (!open) return;
 
@@ -156,7 +152,6 @@ export default function PhotoLightbox({ urls }: Props) {
 
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize as any);
-
     const t = setTimeout(() => onResize(), 80);
 
     return () => {
@@ -167,7 +162,6 @@ export default function PhotoLightbox({ urls }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // смена картинки — сброс
   useEffect(() => {
     if (!open) return;
     resetZoom();
@@ -194,16 +188,8 @@ export default function PhotoLightbox({ urls }: Props) {
       </div>
 
       {open ? (
-        <div
-          className="overlay"
-          ref={overlayRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Просмотр фотографии"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) close();
-          }}
-        >
+        <div className="overlay" ref={overlayRef} role="dialog" aria-modal="true" aria-label="Просмотр фотографии">
+          {/* ✅ КРЕСТИК — ВСЕГДА ВИДИМЫЙ */}
           <button className="close" type="button" onClick={close} aria-label="Закрыть">
             ✕
           </button>
@@ -220,6 +206,8 @@ export default function PhotoLightbox({ urls }: Props) {
               const pt = getPointInStage(e.clientX, e.clientY);
               const g = gestureRef.current;
 
+              g.moved = false;
+
               const isDoubleTap =
                 now - g.lastTapTs < 280 &&
                 g.lastTapPt &&
@@ -234,31 +222,27 @@ export default function PhotoLightbox({ urls }: Props) {
               const pts = Array.from(pointersRef.current.values());
 
               if (isDoubleTap) {
-                if (scale <= 1.02) {
-                  // телеграм-стайл: двойной тап -> 2x по центру
-                  setZoom(2, 0, 0);
-                } else {
-                  resetZoom();
-                }
+                if (scale <= 1.02) setZoom(2, 0, 0);
+                else resetZoom();
                 e.preventDefault();
                 return;
               }
 
               if (pts.length === 1) {
-                gestureRef.current.mode = 'pan';
-                gestureRef.current.startScale = scale;
-                gestureRef.current.startTx = tx;
-                gestureRef.current.startTy = ty;
-                gestureRef.current.startMid = pts[0];
+                g.mode = 'pan';
+                g.startScale = scale;
+                g.startTx = tx;
+                g.startTy = ty;
+                g.startMid = pts[0];
               } else if (pts.length >= 2) {
                 const a = pts[0];
                 const b = pts[1];
-                gestureRef.current.mode = 'pinch';
-                gestureRef.current.startScale = scale;
-                gestureRef.current.startTx = tx;
-                gestureRef.current.startTy = ty;
-                gestureRef.current.startDist = dist(a, b);
-                gestureRef.current.startMid = mid(a, b);
+                g.mode = 'pinch';
+                g.startScale = scale;
+                g.startTx = tx;
+                g.startTy = ty;
+                g.startDist = dist(a, b);
+                g.startMid = mid(a, b);
               }
 
               e.preventDefault();
@@ -284,6 +268,8 @@ export default function PhotoLightbox({ urls }: Props) {
                 const dx = m.x - g.startMid.x;
                 const dy = m.y - g.startMid.y;
 
+                if (Math.abs(dx) + Math.abs(dy) > 4) g.moved = true;
+
                 setZoom(nextScale, g.startTx + dx, g.startTy + dy);
               } else if (pts.length === 1) {
                 if (scale <= 1.02) return;
@@ -292,6 +278,8 @@ export default function PhotoLightbox({ urls }: Props) {
                 const dx = p.x - g.startMid.x;
                 const dy = p.y - g.startMid.y;
 
+                if (Math.abs(dx) + Math.abs(dy) > 4) g.moved = true;
+
                 setZoom(scale, g.startTx + dx, g.startTy + dy);
               }
 
@@ -299,17 +287,25 @@ export default function PhotoLightbox({ urls }: Props) {
             }}
             onPointerUp={(e) => {
               pointersRef.current.delete(e.pointerId);
+              const g = gestureRef.current;
+
               const pts = Array.from(pointersRef.current.values());
+
+              // ✅ если это был “просто тап” (без движения) и зум = 1 — закрываем
+              if (!g.moved && scale <= 1.02) {
+                close();
+                return;
+              }
 
               if (pts.length === 1) {
                 const p = pts[0];
-                gestureRef.current.mode = 'pan';
-                gestureRef.current.startScale = scale;
-                gestureRef.current.startTx = tx;
-                gestureRef.current.startTy = ty;
-                gestureRef.current.startMid = p;
+                g.mode = 'pan';
+                g.startScale = scale;
+                g.startTx = tx;
+                g.startTy = ty;
+                g.startMid = p;
               } else {
-                gestureRef.current.mode = 'none';
+                g.mode = 'none';
               }
             }}
             onPointerCancel={(e) => {
@@ -425,7 +421,6 @@ export default function PhotoLightbox({ urls }: Props) {
           background: rgba(0, 0, 0, 0.92);
         }
 
-        /* ВАЖНО: stage = реальный контейнер для расчёта размеров/центра */
         .stage {
           position: absolute;
           inset: 0;
@@ -434,7 +429,6 @@ export default function PhotoLightbox({ urls }: Props) {
           user-select: none;
         }
 
-        /* Телеграм-стайл: картинка всегда anchored к центру (50/50) */
         .full {
           position: absolute;
           left: 50%;
@@ -444,27 +438,34 @@ export default function PhotoLightbox({ urls }: Props) {
           width: auto;
           height: auto;
           object-fit: contain;
-          border-radius: 0; /* как в TG */
+          border-radius: 0;
           background: transparent;
           will-change: transform;
           -webkit-user-drag: none;
           transform-origin: center center;
         }
 
+        /* ✅ СДЕЛАЛИ КРЕСТИК ВИДИМЫМ */
         .close {
           position: fixed;
-          top: calc(env(safe-area-inset-top, 0px) + 12px);
+          top: calc(env(safe-area-inset-top, 0px) + 10px);
           right: 12px;
-          width: 44px;
-          height: 44px;
+          width: 52px;
+          height: 52px;
           border-radius: 999px;
-          border: 1px solid rgba(255, 255, 255, 0.18);
-          background: rgba(255, 255, 255, 0.10);
-          color: #fff;
-          font-size: 18px;
+
+          z-index: 100005;
+
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          background: rgba(255, 255, 255, 0.92);
+          color: rgba(0, 0, 0, 0.85);
+
+          font-size: 22px;
           font-weight: 900;
-          cursor: pointer;
+
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
           -webkit-tap-highlight-color: transparent;
+          cursor: pointer;
         }
 
         .counter {
@@ -473,11 +474,12 @@ export default function PhotoLightbox({ urls }: Props) {
           left: 12px;
           padding: 7px 10px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.12);
-          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.16);
           color: rgba(255, 255, 255, 0.92);
           font-size: 12px;
           font-weight: 800;
+          z-index: 100005;
         }
 
         .reset {
@@ -488,12 +490,13 @@ export default function PhotoLightbox({ urls }: Props) {
           padding: 10px 14px;
           border-radius: 999px;
           border: 1px solid rgba(255, 255, 255, 0.18);
-          background: rgba(255, 255, 255, 0.10);
+          background: rgba(255, 255, 255, 0.12);
           color: rgba(255, 255, 255, 0.95);
           font-size: 12px;
           font-weight: 900;
           -webkit-tap-highlight-color: transparent;
           cursor: pointer;
+          z-index: 100005;
         }
 
         .nav {
@@ -504,13 +507,14 @@ export default function PhotoLightbox({ urls }: Props) {
           height: 54px;
           border-radius: 16px;
           border: 1px solid rgba(255, 255, 255, 0.18);
-          background: rgba(255, 255, 255, 0.10);
+          background: rgba(255, 255, 255, 0.12);
           color: #fff;
           font-size: 34px;
           line-height: 1;
           font-weight: 900;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          z-index: 100005;
         }
 
         .nav:disabled {
