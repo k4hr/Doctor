@@ -21,6 +21,18 @@ enum DoctorFileKind {
   DIPLOMA_PHOTO
 }
 
+/* ✅ NEW */
+enum QuestionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+}
+
+/* ✅ NEW */
+enum QuestionFileKind {
+  PHOTO
+}
+
 model Doctor {
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
@@ -63,6 +75,12 @@ model Doctor {
 
   files DoctorFile[]
 
+  /* ✅ NEW: вопросы назначенные врачу (фильтр “вопросы этого врача”) */
+  assignedQuestions Question[] @relation("AssignedDoctor")
+
+  /* ✅ NEW: вопросы, на которые врач реально ответил (статистика/рейтинг потом) */
+  answeredQuestions Question[] @relation("AnsweredDoctor")
+
   @@index([status])
   @@index([speciality1])
   @@index([city])
@@ -86,4 +104,64 @@ model DoctorFile {
   @@index([kind])
   @@index([doctorId, kind])
   @@index([doctorId, kind, sortOrder])
+}
+
+/* ✅ NEW */
+model Question {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Автор (пациент) — Telegram WebApp user
+  authorTelegramId String
+  authorUsername   String?
+  authorFirstName  String?
+  authorLastName   String?
+
+  // Категория (раздел медицины)
+  speciality String
+
+  // Заголовок + текст вопроса
+  title String
+  body  String
+
+  // Ключевые слова (нормализованные) — для поиска
+  keywords String[] @default([])
+
+  status QuestionStatus @default(OPEN)
+
+  // Фильтр/назначение на конкретного врача (опционально)
+  assignedDoctorId String?
+  assignedDoctor   Doctor? @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
+
+  // Кто ответил (опционально, когда появится логика ответов)
+  answeredByDoctorId String?
+  answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
+
+  files QuestionFile[]
+
+  @@index([speciality])
+  @@index([status])
+  @@index([createdAt])
+  @@index([assignedDoctorId])
+  @@index([answeredByDoctorId])
+}
+
+model QuestionFile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  kind      QuestionFileKind
+  url       String
+  mime      String?
+  sizeBytes Int?
+  sortOrder Int      @default(0)
+
+  @@index([questionId])
+  @@index([kind])
+  @@index([questionId, kind])
+  @@index([questionId, kind, sortOrder])
 }
