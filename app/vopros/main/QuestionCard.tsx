@@ -11,22 +11,19 @@ export type QuestionCardData = {
   id: string;
 
   title: string;
-  bodySnippet: string; // уже короткий текст (или мы обрежем)
+  bodySnippet: string;
   createdAt: string | Date;
 
-  // снизу слева: врач/категория (то, к кому обращается)
   doctorLabel: string;
 
-  // статус сверху справа
   status: QuestionStatusUI;
 
-  // снизу по середине
   priceBadge: PriceBadge;
 };
 
 type Props = {
   q: QuestionCardData;
-  hrefBase?: string; // по умолчанию /vopros
+  hrefBase?: string;
 };
 
 type TgWebApp = {
