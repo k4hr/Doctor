@@ -1,4 +1,4 @@
-/* path: app/vopros/main/QuestionCard.tsx  */
+/* path: app/vopros/main/QuestionCard.tsx */
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -16,19 +16,10 @@ export type QuestionCardData = {
 
   doctorLabel: string;
 
-  // WAITING = ждёт ответа
-  // ANSWERING = есть ответы (кол-во показываем отдельно)
-  // CLOSED = вопрос закрыт
   status: QuestionStatusUI;
-
-  // сколько ответов (0..n). если не передашь — будет 0
   answersCount?: number;
 
-  // если PAID и хочешь показывать цену — передай строкой, например "99 ₽" / "49 ⭐"
-  // если не передашь — покажем "Платно"
   priceText?: string;
-
-  // старое поле оставляем для совместимости
   priceBadge: PriceBadge;
 };
 
@@ -53,12 +44,6 @@ function haptic(type: 'light' | 'medium' = 'light') {
   try {
     tg()?.HapticFeedback?.impactOccurred?.(type);
   } catch {}
-}
-
-function clampText(s: string, max = 110) {
-  const t = String(s || '').trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max - 1).trimEnd() + '…';
 }
 
 function timeAgoRu(input: string | Date) {
@@ -92,7 +77,15 @@ function statusLabel(q: QuestionCardData) {
   if (st === 'ANSWERING') {
     const cnt = Math.max(0, n);
     if (cnt <= 0) return { text: 'Ждёт ответа', tone: 'gray' as const };
-    return { text: `${cnt} ответ${cnt % 10 === 1 && cnt % 100 !== 11 ? '' : cnt % 10 >= 2 && cnt % 10 <= 4 && (cnt % 100 < 10 || cnt % 100 >= 20) ? 'а' : 'ов'}`, tone: 'green' as const };
+
+    const suf =
+      cnt % 10 === 1 && cnt % 100 !== 11
+        ? ''
+        : cnt % 10 >= 2 && cnt % 10 <= 4 && (cnt % 100 < 10 || cnt % 100 >= 20)
+        ? 'а'
+        : 'ов';
+
+    return { text: `${cnt} ответ${suf}`, tone: 'green' as const };
   }
 
   return { text: 'Ждёт ответа', tone: 'gray' as const };
@@ -131,31 +124,28 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
       <button type="button" className="qc" onClick={onOpen} aria-label={`Открыть вопрос: ${q.title}`}>
         <div className="qcTop">
           <h2 className="qcTitle">{q.title}</h2>
+
           <span
-            className={`qcPrice ${ui.priceTone === 'gold' ? 'qcPrice--gold' : 'qcPrice--free'}`}
+            className={`qcPill ${ui.priceTone === 'gold' ? 'qcPill--gold' : 'qcPill--free'}`}
             aria-label={ui.priceText}
           >
             {ui.priceText}
           </span>
         </div>
 
-        <p className="qcSnippet">{clampText(q.bodySnippet, 140)}</p>
+        <p className="qcSnippet">{q.bodySnippet}</p>
 
         <div className="qcBottom">
           <div className="qcLeft">
             <span
-              className={`qcStatus ${
-                ui.statusTone === 'green'
-                  ? 'qcStatus--green'
-                  : ui.statusTone === 'red'
-                  ? 'qcStatus--red'
-                  : 'qcStatus--gray'
+              className={`qcPill ${
+                ui.statusTone === 'green' ? 'qcPill--green' : ui.statusTone === 'red' ? 'qcPill--red' : 'qcPill--gray'
               }`}
             >
               {ui.statusText}
             </span>
 
-            <span className="qcDoctor">{q.doctorLabel}</span>
+            <span className="qcPill qcPill--doctor">{q.doctorLabel}</span>
           </div>
 
           <span className="qcTime">{timeAgoRu(q.createdAt)}</span>
@@ -163,7 +153,16 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
       </button>
 
       <style jsx>{`
+        /* ====== НАСТРОЙКИ ДИЗАЙНА (одни числа — весь вид) ====== */
+        :global(:root) {
+          /* тут ничего не пишем — просто ориентир */
+        }
+
+        /* базовые размеры */
         .qc {
+          /* карточка фикс по высоте, чтобы все были одинаковые */
+          height: 164px;
+
           width: 100%;
           text-align: left;
           cursor: pointer;
@@ -183,8 +182,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           grid-template-rows: auto 1fr auto;
           gap: 8px;
 
-          /* ВАЖНО: фиксированная высота карточек */
-          height: 210px;
           overflow: hidden;
         }
 
@@ -193,71 +190,134 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           box-shadow: 0 6px 18px rgba(18, 28, 45, 0.12);
         }
 
+        /* ====== ВЕРХ ====== */
         .qcTop {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 10px;
-          min-height: 42px; /* чтобы заголовок + цена держали верх */
+
+          /* чтобы верх всегда был одинаковым по высоте */
+          min-height: 40px;
         }
 
+        /* Заголовок = размер плашек + 2 */
         .qcTitle {
           margin: 0;
-          font-size: 18px;
+          font-size: 12px + 2; /* документация: см. ниже */
+          font-size: 12px; /* fallback для styled-jsx */
+          font-size: 12px; /* будет переопределено ниже через реальное значение */
+        }
+
+        /* styled-jsx не умеет выражения, поэтому задаём реально */
+        .qcTitle {
+          font-size: 12px; /* базовый */
+        }
+        /* ВАЖНО: по твоему ТЗ — заголовок на 2 больше, чем плашки.
+           Плашки будут 10px => заголовок 12px. */
+        .qcTitle {
+          font-size: 12px;
           font-weight: 900;
           color: #0b0c10;
           letter-spacing: -0.01em;
           line-height: 1.15;
 
-          /* 2 строки максимум */
+          /* 2 строки максимум, остальное в … */
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
 
-        .qcPrice {
+        /* ====== ОБЩИЙ СТИЛЬ ПЛАШЕК (цена / статус / специальность) ====== */
+        .qcPill {
           flex: 0 0 auto;
-          font-size: 12px;
+
+          /* ПЛАШКИ: шрифт на 2 меньше, чем раньше (было 12 -> стало 10) */
+          font-size: 10px;
           font-weight: 900;
-          padding: 7px 12px;
+
+          /* плашка уже: было 7x12 -> стало 5x10 */
+          padding: 5px 10px;
+
           border-radius: 999px;
           border: 1px solid transparent;
           white-space: nowrap;
-          margin-top: 2px;
+
+          /* одинаковая высота плашек (через line-height) */
+          line-height: 1.1;
         }
 
-        .qcPrice--free {
+        /* Плашка цены (справа сверху) */
+        .qcPill--free {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.10);
           color: rgba(15, 23, 42, 0.70);
         }
 
-        .qcPrice--gold {
+        .qcPill--gold {
           background: rgba(245, 158, 11, 0.12);
           border-color: rgba(245, 158, 11, 0.30);
           color: #92400e;
         }
 
+        /* Плашка статуса (слева снизу, сверху над спец) */
+        .qcPill--green {
+          background: rgba(36, 199, 104, 0.10);
+          border-color: rgba(36, 199, 104, 0.30);
+          color: #166534;
+        }
+
+        .qcPill--gray {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.12);
+          color: rgba(15, 23, 42, 0.70);
+        }
+
+        .qcPill--red {
+          background: rgba(239, 68, 68, 0.10);
+          border-color: rgba(239, 68, 68, 0.26);
+          color: #991b1b;
+        }
+
+        /* Плашка специальности (слева снизу) */
+        .qcPill--doctor {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.12);
+          color: rgba(15, 23, 42, 0.85);
+
+          /* удлиняется по слову, но не ломает карточку */
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* ====== ТЕКСТ ВОПРОСА (snippet) ======
+           По ТЗ: “чуть меньше” и “одинаковым с размером шрифта в плашках”
+           => делаем 10px, как у qcPill
+        */
         .qcSnippet {
           margin: 0;
-          font-size: 14px;
-          line-height: 1.45;
+          font-size: 10px;
+          line-height: 1.55;
           color: rgba(11, 12, 16, 0.75);
 
-          /* держим одинаковую высоту текста */
+          /* ВОПРОС должен влезать в 3 строки, остальное в … */
           display: -webkit-box;
           -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
 
+        /* ====== НИЗ ====== */
         .qcBottom {
           display: grid;
           grid-template-columns: 1fr auto;
           align-items: end;
           gap: 10px;
-          min-height: 44px; /* чтобы низ всегда был “на месте” */
+
+          /* фиксируем низ */
+          min-height: 44px;
         }
 
         .qcLeft {
@@ -268,54 +328,14 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        .qcStatus {
-          font-size: 12px;
-          font-weight: 800;
-          padding: 7px 12px;
-          border-radius: 999px;
-          border: 1px solid transparent;
-          white-space: nowrap;
-        }
-
-        .qcStatus--green {
-          background: rgba(36, 199, 104, 0.1);
-          border-color: rgba(36, 199, 104, 0.3);
-          color: #166534;
-        }
-
-        .qcStatus--gray {
-          background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.7);
-        }
-
-        .qcStatus--red {
-          background: rgba(239, 68, 68, 0.1);
-          border-color: rgba(239, 68, 68, 0.26);
-          color: #991b1b;
-        }
-
-        /* Плашка специальности — длина зависит от слова (как ты просил) */
-        .qcDoctor {
-          padding: 7px 12px;
-          border-radius: 999px;
-          background: rgba(15, 23, 42, 0.04);
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.85);
-          font-weight: 900;
-          font-size: 12px;
-          white-space: nowrap;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
+        /* Время — меньше шрифт */
         .qcTime {
           justify-self: end;
-          color: rgba(15, 23, 42, 0.55);
           white-space: nowrap;
+
+          font-size: 10px;
           font-weight: 800;
-          font-size: 12px;
+          color: rgba(15, 23, 42, 0.55);
           padding-bottom: 2px;
         }
       `}</style>
