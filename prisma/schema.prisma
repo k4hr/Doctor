@@ -21,14 +21,14 @@ enum DoctorFileKind {
   DIPLOMA_PHOTO
 }
 
-/* ✅ NEW */
+// NEW
 enum QuestionStatus {
   OPEN
   IN_PROGRESS
   DONE
 }
 
-/* ✅ NEW */
+// NEW
 enum QuestionFileKind {
   PHOTO
 }
@@ -75,10 +75,10 @@ model Doctor {
 
   files DoctorFile[]
 
-  /* ✅ NEW: вопросы назначенные врачу (фильтр “вопросы этого врача”) */
+  // NEW: вопросы назначенные врачу (фильтр "вопросы этого врача")
   assignedQuestions Question[] @relation("AssignedDoctor")
 
-  /* ✅ NEW: вопросы, на которые врач реально ответил (статистика/рейтинг потом) */
+  // NEW: вопросы, на которые врач реально ответил (статистика/рейтинг потом)
   answeredQuestions Question[] @relation("AnsweredDoctor")
 
   @@index([status])
@@ -106,7 +106,7 @@ model DoctorFile {
   @@index([doctorId, kind, sortOrder])
 }
 
-/* ✅ NEW */
+// NEW
 model Question {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -130,7 +130,7 @@ model Question {
 
   status QuestionStatus @default(OPEN)
 
-  // Фильтр/назначение на конкретного врача (опционально)
+  // Назначение на конкретного врача (опционально)
   assignedDoctorId String?
   assignedDoctor   Doctor? @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
 
