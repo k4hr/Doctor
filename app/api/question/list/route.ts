@@ -18,21 +18,12 @@ function snippet(s: string, max = 170) {
 }
 
 function mapStatusToUi(status: any): 'ANSWERING' | 'WAITING' {
-  // UI сейчас только 2 статуса
-  // IN_PROGRESS => "Врач отвечает", иначе => "Ждёт ответа"
-  if (String(status) === 'IN_PROGRESS') return 'ANSWERING';
-  return 'WAITING';
+  // UI: только 2 статуса
+  return String(status) === 'IN_PROGRESS' ? 'ANSWERING' : 'WAITING';
 }
 
-function mapPriceToUi(q: any): 'FREE' | 'PAID' {
-  // На будущее: если добавишь priceRub/priceStars/isPaid
-  const priceRub = Number(q?.priceRub);
-  const priceStars = Number(q?.priceStars);
-  const isPaid = q?.isPaid === true;
-
-  if (isPaid) return 'PAID';
-  if (Number.isFinite(priceRub) && priceRub > 0) return 'PAID';
-  if (Number.isFinite(priceStars) && priceStars > 0) return 'PAID';
+function mapPriceToUi(_q: any): 'FREE' | 'PAID' {
+  // пока цены не сделали — всегда FREE
   return 'FREE';
 }
 
@@ -44,33 +35,32 @@ export async function POST(req: Request) {
     const cursor = body?.cursor ? String(body.cursor).trim() : '';
 
     const rows = await prisma.question.findMany({
-      where: {}, // ✅ ПУБЛИЧНАЯ ЛЕНТА: показываем все вопросы
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { createdAt: 'desc' },
-      include: {
-        assignedDoctor: { select: { speciality1: true } },
-      },
     });
 
-    const items = rows.map((q: any) => ({
+    const items = rows.map((q) => ({
       id: String(q.id),
       title: String(q.title),
       bodySnippet: snippet(String(q.body), 170),
-      createdAt: q.createdAt?.toISOString?.() || String(q.createdAt),
-      doctorLabel: String(q.assignedDoctor?.speciality1 || q.speciality || '—'),
+      createdAt: q.createdAt.toISOString(),
+      doctorLabel: String(q.speciality || '—'),
       status: mapStatusToUi(q.status),
       priceBadge: mapPriceToUi(q),
     }));
 
     const nextCursor = rows.length ? String(rows[rows.length - 1].id) : null;
 
-    return NextResponse.json({ ok: true, items, nextCursor });
+    return NextResponse.json(
+      { ok: true, items, nextCursor },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    );
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
       { ok: false, error: 'FAILED_TO_LIST', hint: String(e?.message || 'See server logs') },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   }
 }
