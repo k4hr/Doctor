@@ -153,14 +153,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
       </button>
 
       <style jsx>{`
-        /* ====== НАСТРОЙКИ ДИЗАЙНА (одни числа — весь вид) ====== */
-        :global(:root) {
-          /* тут ничего не пишем — просто ориентир */
-        }
-
-        /* базовые размеры */
         .qc {
-          /* карточка фикс по высоте, чтобы все были одинаковые */
           height: 164px;
 
           width: 100%;
@@ -180,7 +173,9 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
 
           display: grid;
           grid-template-rows: auto 1fr auto;
-          gap: 8px;
+
+          /* БЫЛО 8px — из-за этого огромная “дырка” между заголовком и текстом */
+          gap: 4px;
 
           overflow: hidden;
         }
@@ -190,65 +185,50 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           box-shadow: 0 6px 18px rgba(18, 28, 45, 0.12);
         }
 
-        /* ====== ВЕРХ ====== */
         .qcTop {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 10px;
 
-          /* чтобы верх всегда был одинаковым по высоте */
           min-height: 40px;
+
+          /* ДОБАВИЛ: убираем лишнюю вертикаль под заголовком */
+          margin-bottom: 0px;
         }
 
-        /* Заголовок = размер плашек + 2 */
         .qcTitle {
           margin: 0;
-          font-size: 12px + 2; /* документация: см. ниже */
-          font-size: 12px; /* fallback для styled-jsx */
-          font-size: 12px; /* будет переопределено ниже через реальное значение */
-        }
 
-        /* styled-jsx не умеет выражения, поэтому задаём реально */
-        .qcTitle {
-          font-size: 12px; /* базовый */
-        }
-        /* ВАЖНО: по твоему ТЗ — заголовок на 2 больше, чем плашки.
-           Плашки будут 10px => заголовок 12px. */
-        .qcTitle {
+          /* Плашки 10px => заголовок 12px */
           font-size: 12px;
           font-weight: 900;
           color: #0b0c10;
           letter-spacing: -0.01em;
           line-height: 1.15;
 
-          /* 2 строки максимум, остальное в … */
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
 
-        /* ====== ОБЩИЙ СТИЛЬ ПЛАШЕК (цена / статус / специальность) ====== */
         .qcPill {
           flex: 0 0 auto;
 
-          /* ПЛАШКИ: шрифт на 2 меньше, чем раньше (было 12 -> стало 10) */
           font-size: 10px;
           font-weight: 900;
 
-          /* плашка уже: было 7x12 -> стало 5x10 */
+          /* уже и ниже */
           padding: 5px 10px;
 
           border-radius: 999px;
           border: 1px solid transparent;
           white-space: nowrap;
 
-          /* одинаковая высота плашек (через line-height) */
           line-height: 1.1;
         }
 
-        /* Плашка цены (справа сверху) */
         .qcPill--free {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.10);
@@ -261,7 +241,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #92400e;
         }
 
-        /* Плашка статуса (слева снизу, сверху над спец) */
         .qcPill--green {
           background: rgba(36, 199, 104, 0.10);
           border-color: rgba(36, 199, 104, 0.30);
@@ -280,55 +259,51 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #991b1b;
         }
 
-        /* Плашка специальности (слева снизу) */
         .qcPill--doctor {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.12);
           color: rgba(15, 23, 42, 0.85);
 
-          /* удлиняется по слову, но не ломает карточку */
           max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        /* ====== ТЕКСТ ВОПРОСА (snippet) ======
-           По ТЗ: “чуть меньше” и “одинаковым с размером шрифта в плашках”
-           => делаем 10px, как у qcPill
-        */
         .qcSnippet {
+          /* УБИРАЕМ ЛИШНЮЮ ВЕРТИКАЛЬ: текст поджимается к заголовку */
           margin: 0;
+          margin-top: -2px;
+
           font-size: 10px;
-          line-height: 1.55;
+          line-height: 1.5;
           color: rgba(11, 12, 16, 0.75);
 
-          /* ВОПРОС должен влезать в 3 строки, остальное в … */
           display: -webkit-box;
           -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
 
-        /* ====== НИЗ ====== */
         .qcBottom {
           display: grid;
           grid-template-columns: 1fr auto;
           align-items: end;
           gap: 10px;
 
-          /* фиксируем низ */
           min-height: 44px;
         }
 
         .qcLeft {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+
+          /* чуть компактнее, чтобы было “элегантно” */
+          gap: 6px;
+
           align-items: flex-start;
           min-width: 0;
         }
 
-        /* Время — меньше шрифт */
         .qcTime {
           justify-self: end;
           white-space: nowrap;
