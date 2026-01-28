@@ -75,11 +75,21 @@ function fmtDate(d: Date | null | undefined) {
 }
 
 function statusUi(status: string) {
-  // только 2 статуса для UI: "Врач отвечает" и "Ждёт ответа"
+  // UI: только 2 статуса
   if (status === 'IN_PROGRESS') {
-    return { label: 'Врач отвечает', bg: 'rgba(36,199,104,0.10)', fg: '#166534', border: 'rgba(36,199,104,0.30)' };
+    return {
+      label: 'Врач отвечает',
+      bg: 'rgba(36,199,104,0.10)',
+      fg: '#166534',
+      border: 'rgba(36,199,104,0.30)',
+    };
   }
-  return { label: 'Ждёт ответа', bg: 'rgba(15,23,42,0.04)', fg: 'rgba(15,23,42,0.70)', border: 'rgba(15,23,42,0.12)' };
+  return {
+    label: 'Ждёт ответа',
+    bg: 'rgba(15,23,42,0.04)',
+    fg: 'rgba(15,23,42,0.70)',
+    border: 'rgba(15,23,42,0.12)',
+  };
 }
 
 function show(v: any) {
@@ -91,38 +101,14 @@ function show(v: any) {
 export default async function VoprosIdPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
-  // 1) проверяем Telegram initData (как у тебя в админке)
-  const botToken = envClean('TELEGRAM_BOT_TOKEN');
-  const initData = cookies().get('tg_init_data')?.value || '';
-
-  const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
-
-  if (!tgId) {
-    return (
-      <main style={{ padding: 16 }}>
-        <TopBarBack />
-        <h1 style={{ marginTop: 8 }}>Доступ ограничен</h1>
-        <p style={{ opacity: 0.7 }}>
-          Откройте страницу из Telegram WebApp (нужен tg_init_data cookie).
-        </p>
-      </main>
-    );
-  }
-
-  // 2) определяем — это врач? (APPROVED) / пациент?
-  const doctor = await prisma.doctor.findUnique({
-    where: { telegramId: tgId },
-    select: { id: true, status: true, speciality1: true, speciality2: true, speciality3: true },
-  });
-
-  const isApprovedDoctor = !!doctor && doctor.status === DoctorStatus.APPROVED;
-
-  // 3) достаём вопрос + файлы + назначенного врача
+  // 1) тянем вопрос — публично
   const q = await prisma.question.findUnique({
     where: { id },
     include: {
       files: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
-      assignedDoctor: { select: { id: true, firstName: true, lastName: true, middleName: true, speciality1: true } },
+      assignedDoctor: {
+        select: { id: true, firstName: true, lastName: true, middleName: true, speciality1: true },
+      },
     },
   });
 
@@ -136,38 +122,42 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     );
   }
 
-  // 4) доступ:
-  // - автор вопроса всегда видит
-  // - одобренный врач видит только если:
-  //    a) вопрос по его категории (speciality совпадает с одной из его специализаций)
-  //    b) ИЛИ вопрос назначен именно ему (assignedDoctorId)
-  const isAuthor = q.authorTelegramId === tgId;
+  // 2) определяем “кто смотрит” (если есть tg cookie) — ТОЛЬКО ради фото
+  const botToken = envClean('TELEGRAM_BOT_TOKEN');
+  const initData = cookies().get('tg_init_data')?.value || '';
+  const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
 
+  const doctor = tgId
+    ? await prisma.doctor.findUnique({
+        where: { telegramId: tgId },
+        select: { id: true, status: true, speciality1: true, speciality2: true, speciality3: true },
+      })
+    : null;
+
+  const isApprovedDoctor = !!doctor && doctor.status === DoctorStatus.APPROVED;
+  const isAuthor = !!tgId && q.authorTelegramId === tgId;
+
+  // врач может видеть фото:
+  // - по категории (speciality совпадает с одной из специализаций врача)
+  // - или если вопрос назначен этому врачу
   const doctorSpecs = new Set(
-    [doctor?.speciality1, doctor?.speciality2, doctor?.speciality3].filter(Boolean).map((x) => String(x).trim())
+    [doctor?.speciality1, doctor?.speciality2, doctor?.speciality3]
+      .filter(Boolean)
+      .map((x) => String(x).trim())
   );
 
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(String(q.speciality).trim()) : false;
-  const doctorCanSeeByAssignment = isApprovedDoctor && q.assignedDoctorId ? q.assignedDoctorId === doctor?.id : false;
+  const doctorCanSeeByAssignment =
+    isApprovedDoctor && q.assignedDoctorId ? q.assignedDoctorId === doctor?.id : false;
 
-  const canSee = isAuthor || doctorCanSeeByCategory || doctorCanSeeByAssignment;
-
-  if (!canSee) {
-    return (
-      <main style={{ padding: 16 }}>
-        <TopBarBack />
-        <h1 style={{ marginTop: 8 }}>Доступ ограничен</h1>
-        <p style={{ opacity: 0.7 }}>
-          Фото и детали вопроса доступны только автору или врачам выбранной категории.
-        </p>
-      </main>
-    );
-  }
+  const canSeePhotos = isAuthor || doctorCanSeeByCategory || doctorCanSeeByAssignment;
 
   const ui = statusUi(q.status);
 
   const assignedDoctorName = q.assignedDoctor
-    ? [q.assignedDoctor.lastName, q.assignedDoctor.firstName, q.assignedDoctor.middleName].filter(Boolean).join(' ')
+    ? [q.assignedDoctor.lastName, q.assignedDoctor.firstName, q.assignedDoctor.middleName]
+        .filter(Boolean)
+        .join(' ')
     : null;
 
   const photoUrls = q.files
@@ -275,10 +265,13 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
+        {/* ✅ Фото: показываем только тем, кому можно */}
         <div>
           <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
 
-          {photoUrls.length ? (
+          {photoUrls.length === 0 ? (
+            <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
+          ) : canSeePhotos ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {photoUrls.map((u) => (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -298,11 +291,24 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               ))}
             </div>
           ) : (
-            <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 14,
+                background: 'rgba(15,23,42,0.03)',
+                border: '1px solid rgba(15,23,42,0.08)',
+                color: 'rgba(15,23,42,0.70)',
+                fontSize: 12,
+                fontWeight: 700,
+                lineHeight: 1.35,
+              }}
+            >
+              Фото доступны только автору вопроса и врачам выбранной категории.
+            </div>
           )}
         </div>
 
-        {/* на будущее: тут будет блок ответа врача */}
+        {/* на будущее: блок ответа врача */}
         {q.status === QuestionStatus.DONE ? (
           <div style={{ marginTop: 8, padding: 12, borderRadius: 14, background: 'rgba(15,23,42,0.03)' }}>
             <div style={{ fontWeight: 900 }}>Ответ готов</div>
@@ -312,7 +318,13 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       </div>
 
       <div style={{ marginTop: 12, fontSize: 11, opacity: 0.65 }}>
-        {isAuthor ? 'Вы автор этого вопроса.' : isApprovedDoctor ? 'Вы вошли как врач.' : 'Вы вошли как пользователь.'}
+        {!tgId
+          ? 'Открыто публично. (Telegram ID не определён — фото скрыты.)'
+          : isAuthor
+          ? 'Вы автор этого вопроса.'
+          : isApprovedDoctor
+          ? 'Вы вошли как врач.'
+          : 'Вы вошли как пользователь.'}
       </div>
     </main>
   );
