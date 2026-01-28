@@ -7,7 +7,8 @@ import TopBar from '../components/TopBar';
 import MainSearch from '../components/MainSearch';
 import DownBar from '../components/DownBar';
 
-import QuestionCard, { QuestionCardData } from './vopros/main/QuestionCard';
+import QuestionCard from './vopros/main/QuestionCard';
+import { FeedQuestionItem, feedMergeServerItems, useFeedItems } from './lib/questionsStore';
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -20,7 +21,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit & { 
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(input, { ...init, signal: controller.signal });
+    const res = await fetch(input, { ...init, signal: controller.signal, cache: 'no-store' });
     return res;
   } finally {
     clearTimeout(t);
@@ -30,20 +31,22 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit & { 
 export default function FeedPage() {
   const router = useRouter();
 
-  const [items, setItems] = useState<QuestionCardData[]>([]);
+  // ✅ мгновенно показываем то, что уже есть (в т.ч. добавленное из /vopros)
+  const storeItems = useFeedItems();
+
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState('');
 
-  const hasItems = useMemo(() => items && items.length > 0, [items]);
+  const hasItems = useMemo(() => storeItems.length > 0, [storeItems]);
 
   useEffect(() => {
-    const w: any = window;
     try {
-      w?.Telegram?.WebApp?.ready?.();
-      w?.Telegram?.WebApp?.expand?.();
+      (window as any)?.Telegram?.WebApp?.ready?.();
+      (window as any)?.Telegram?.WebApp?.expand?.();
     } catch {}
   }, []);
 
+  // ✅ подгружаем серверную ленту и мерджим со стором (optimistic не “теряем”)
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -59,16 +62,14 @@ export default function FeedPage() {
 
         const j = await res.json().catch(() => ({} as any));
         if (!res.ok || !j?.ok) {
-          setItems([]);
           setInfo(j?.error ? `Ошибка: ${String(j.error)}` : `Ошибка загрузки (${res.status})`);
-          setLoading(false);
           return;
         }
 
-        setItems(Array.isArray(j?.items) ? j.items : []);
+        const items: FeedQuestionItem[] = Array.isArray(j?.items) ? j.items : [];
+        feedMergeServerItems(items);
       } catch (e: any) {
         console.error(e);
-        setItems([]);
         setInfo(e?.name === 'AbortError' ? 'Таймаут: сервер отвечает слишком долго.' : 'Сеть/сервер недоступны.');
       } finally {
         setLoading(false);
@@ -83,10 +84,6 @@ export default function FeedPage() {
     router.push('/vopros');
   };
 
-  const handleSearchClick = () => haptic('light');
-  const handleFiltersClick = () => haptic('light');
-  const handleSortClick = () => haptic('light');
-
   return (
     <main className="feed">
       <TopBar />
@@ -98,26 +95,26 @@ export default function FeedPage() {
           </button>
         </div>
 
-        <MainSearch onClick={handleSearchClick} />
+        <MainSearch onClick={() => haptic('light')} />
 
         <div className="feed-filters-row">
-          <button type="button" className="pill-btn pill-btn--ghost" onClick={handleFiltersClick}>
+          <button type="button" className="pill-btn pill-btn--ghost" onClick={() => haptic('light')}>
             Фильтры
           </button>
-          <button type="button" className="pill-btn pill-btn--outline" onClick={handleSortClick}>
+          <button type="button" className="pill-btn pill-btn--outline" onClick={() => haptic('light')}>
             Платные / Бесплатные
           </button>
         </div>
 
         <section className="feed-list" aria-label="Вопросы">
-          {loading ? <div className="muted">Загружаем вопросы…</div> : null}
+          {loading && !hasItems ? <div className="muted">Загружаем вопросы…</div> : null}
           {!loading && info ? <div className="muted">{info}</div> : null}
           {!loading && !info && !hasItems ? <div className="muted">Пока нет вопросов.</div> : null}
 
-          {!loading && hasItems ? (
+          {hasItems ? (
             <div className="cards">
-              {items.map((q) => (
-                <QuestionCard key={q.id} q={q} hrefBase="/vopros" />
+              {storeItems.map((q) => (
+                <QuestionCard key={q.id} q={q as any} hrefBase="/vopros" />
               ))}
             </div>
           ) : null}
