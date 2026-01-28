@@ -2,7 +2,6 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -123,11 +122,9 @@ export default function AdminQuestionsPage() {
   const [lbUrls, setLbUrls] = useState<string[]>([]);
   const [lbIndex, setLbIndex] = useState(0);
 
-  // чтобы не упереться в строгие типы неизвестного компонента
   const PhotoLightboxAny = PhotoLightbox as any;
 
   useEffect(() => {
-    // ВСЁ, что трогает window/document — только тут
     try {
       const WebApp: any = (window as any)?.Telegram?.WebApp;
       const v = (WebApp?.initData as string) || getInitDataFromCookie();
@@ -178,7 +175,6 @@ export default function AdminQuestionsPage() {
   };
 
   useEffect(() => {
-    // грузим только когда initData появился
     if (initData) {
       load(initData);
     } else {
