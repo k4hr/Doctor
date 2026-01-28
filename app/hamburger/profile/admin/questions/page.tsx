@@ -98,12 +98,28 @@ function short(s: string, max = 220) {
   return t.slice(0, max - 1).trimEnd() + '…';
 }
 
+function statusRu(s: string) {
+  const v = String(s || '').toUpperCase();
+  if (v === 'ANSWERING') return 'Отвечают';
+  if (v === 'WAITING') return 'Ожидает';
+  if (v === 'DONE') return 'Готово';
+  if (v === 'CLOSED') return 'Закрыт';
+  return s || '—';
+}
+
 export default function AdminQuestionsPage() {
   const router = useRouter();
 
   const [items, setItems] = useState<AdminQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [warn, setWarn] = useState('');
+
+  const [lbOpen, setLbOpen] = useState(false);
+  const [lbUrls, setLbUrls] = useState<string[]>([]);
+  const [lbIndex, setLbIndex] = useState(0);
+
+  // чтобы не упереться в строгие типы неизвестного компонента
+  const PhotoLightboxAny = PhotoLightbox as any;
 
   const initData = useMemo(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
@@ -158,8 +174,14 @@ export default function AdminQuestionsPage() {
 
   const openQuestion = (id: string) => {
     haptic('light');
-    // Админ-деталка (её нужно сделать отдельно): /hamburger/profile/admin/questions/[id]
     router.push(`/hamburger/profile/admin/questions/${encodeURIComponent(id)}`);
+  };
+
+  const openLightbox = (urls: string[], index: number) => {
+    if (!urls || urls.length === 0) return;
+    setLbUrls(urls);
+    setLbIndex(Math.max(0, Math.min(index, urls.length - 1)));
+    setLbOpen(true);
   };
 
   const removeQuestion = async (id: string) => {
@@ -170,7 +192,6 @@ export default function AdminQuestionsPage() {
 
     haptic('medium');
 
-    // ✅ мгновенно убираем из UI
     const prev = items;
     setItems((x) => x.filter((q) => q.id !== id));
 
@@ -190,13 +211,13 @@ export default function AdminQuestionsPage() {
 
       if (!res.ok || !j || j.ok !== true) {
         setWarn((j as any)?.hint || (j as any)?.error || 'Ошибка удаления');
-        setItems(prev); // откат
+        setItems(prev);
         haptic('light');
         return;
       }
     } catch {
       setWarn('Ошибка сети при удалении');
-      setItems(prev); // откат
+      setItems(prev);
       haptic('light');
     }
   };
@@ -251,4 +272,101 @@ export default function AdminQuestionsPage() {
               aria-label={`Открыть вопрос: ${q.title}`}
               onClick={() => openQuestion(q.id)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter'
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openQuestion(q.id);
+                }
+              }}
+            >
+              <div className="rowTop">
+                <div className="meta">
+                  <div className="badge">{statusRu(q.status)}</div>
+                  <div className="date">{fmtDateTimeRuMsk(q.createdAt)}</div>
+                </div>
+
+                <div className="rightBtns">
+                  <button
+                    type="button"
+                    className="btnSmall"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      haptic('light');
+                      openQuestion(q.id);
+                    }}
+                  >
+                    Открыть
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btnSmall btnDanger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeQuestion(q.id);
+                    }}
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+
+              <div className="rowMid">
+                <div className="doctor">
+                  <span className="muted">Кому:</span> {q.speciality || '—'}
+                </div>
+                <div className="author">
+                  <span className="muted">Автор:</span> {authorName(q)}
+                </div>
+              </div>
+
+              <h3 className="qTitle">{q.title || 'Без названия'}</h3>
+              <div className="qBody">{short(q.body, 260)}</div>
+
+              {Array.isArray(q.keywords) && q.keywords.length > 0 ? (
+                <div className="tags">
+                  {q.keywords.slice(0, 12).map((k, i) => (
+                    <span key={`${k}-${i}`} className="tag">
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {Array.isArray(q.photoUrls) && q.photoUrls.length > 0 ? (
+                <div className="photos" aria-label="Фотографии">
+                  {q.photoUrls.slice(0, 8).map((url, i) => (
+                    <button
+                      key={`${url}-${i}`}
+                      type="button"
+                      className="photoBtn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptic('light');
+                        openLightbox(q.photoUrls, i);
+                      }}
+                      aria-label={`Открыть фото ${i + 1}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img className="photo" src={url} alt="" loading="lazy" />
+                    </button>
+                  ))}
+                  {q.photoUrls.length > 8 ? (
+                    <div className="more">+{q.photoUrls.length - 8}</div>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ))}
+        </div>
+      )}
+
+      {/* Лайтбокс (через any — чтобы не ловить TypeScript на несоответствии пропсов) */}
+      <PhotoLightboxAny
+        open={lbOpen}
+        urls={lbUrls}
+        startIndex={lbIndex}
+        onClose={() => setLbOpen(false)}
+      />
+    </main>
+  );
+}
