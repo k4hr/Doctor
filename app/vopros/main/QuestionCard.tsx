@@ -1,4 +1,4 @@
-/* path: app/vopros/main/QuestionCard.tsx */
+/* path: app/vopros/main/QuestionCard.tsx  */
 'use client';
 
 import { useRouter } from 'next/navigation';
