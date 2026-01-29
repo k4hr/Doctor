@@ -19,9 +19,11 @@ function withFrameHeaders(res: NextResponse) {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // ✅ Вариант B: upload НЕ обрабатываем middleware-ом вообще.
-  // ВАЖНО: тут именно NextResponse.next() БЕЗ кастомных request headers и БЕЗ frame headers.
-  // Любое вмешательство middleware в этот маршрут может включить body buffering/лимиты.
+  /**
+   * ✅ Вариант B:
+   * /api/question/upload — не трогаем вообще.
+   * Не меняем headers и не добавляем CSP, чтобы не включать лишний buffering/лимиты.
+   */
   if (pathname === '/api/question/upload') {
     return NextResponse.next();
   }
@@ -46,14 +48,16 @@ export function middleware(req: NextRequest) {
     return withFrameHeaders(res);
   }
 
-  // Статические/страничные запросы — просто пропускаем + заголовки для Telegram Web
+  // Страницы/статические — пропускаем + заголовки для Telegram Web
   const res = NextResponse.next();
   return withFrameHeaders(res);
 }
 
 export const config = {
   matcher: [
+    // API маршруты
     '/api/:path*',
+    // страницы, кроме _next и статики
     '/((?!_next|favicon.ico|assets|public|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|txt|xml)).*)',
   ],
 };
