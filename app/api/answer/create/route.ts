@@ -80,6 +80,17 @@ function norm(s: any) {
   return String(s ?? '').trim().toLowerCase();
 }
 
+function cleanText(v: any, maxLen: number) {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen).trimEnd();
+}
+
+function isPrismaUnique(e: any) {
+  return e?.code === 'P2002' || String(e?.message || '').includes('Unique constraint failed');
+}
+
 export async function POST(req: Request) {
   try {
     const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -88,18 +99,17 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== 'object') return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
 
-    const initData = typeof (body as any).initData === 'string' ? String((body as any).initData).trim() : '';
-    const questionId = String((body as any).questionId || '').trim();
-    const answerBody = String((body as any).body || '').trim();
+    const initData = cleanText((body as any).initData, 10000);
+    const questionId = cleanText((body as any).questionId, 200);
+    const answerBody = cleanText((body as any).body, 4000);
 
     if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
     if (!questionId) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'questionId' }, { status: 400 });
-    if (answerBody.length < 20) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'body' }, { status: 400 });
+    if (answerBody.length < 1) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'body' }, { status: 400 });
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
 
-    // врач по telegramId
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId: v.user.id },
       select: { id: true, status: true, speciality1: true, speciality2: true, speciality3: true },
@@ -123,33 +133,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'SPEC_MISMATCH' }, { status: 403 });
     }
 
-    // лимит 10 ответов на вопрос
-    const cnt = await prisma.answer.count({ where: { questionId } });
-    if (cnt >= 10) {
-      return NextResponse.json({ ok: false, error: 'ANSWER_LIMIT_REACHED' }, { status: 409 });
-    }
+    // лимит 10 "живых" ответов
+    const cnt = await prisma.answer.count({ where: { questionId, isDeleted: false } });
+    if (cnt >= 10) return NextResponse.json({ ok: false, error: 'ANSWER_LIMIT_REACHED' }, { status: 409 });
 
-    // один врач = один ответ (у тебя @@unique([questionId, doctorId]))
     const created = await prisma.answer.create({
-      data: {
-        questionId,
-        doctorId: doctor.id,
-        body: answerBody,
-      },
+      data: { questionId, doctorId: doctor.id, body: answerBody },
       select: { id: true, createdAt: true },
     });
 
     return NextResponse.json({ ok: true, id: created.id, createdAt: created.createdAt.toISOString() });
   } catch (e: any) {
-    // ловим уникальность (если врач уже отвечал)
-    const msg = String(e?.message || '');
-    if (msg.includes('Unique constraint failed') || msg.includes('P2002')) {
+    if (isPrismaUnique(e)) {
       return NextResponse.json({ ok: false, error: 'ALREADY_ANSWERED' }, { status: 409 });
     }
-
     console.error(e);
     return NextResponse.json({ ok: false, error: 'FAILED_TO_CREATE_ANSWER' }, { status: 500 });
   }
 }
-
-export const GET = POST;
