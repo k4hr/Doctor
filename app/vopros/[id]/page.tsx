@@ -120,13 +120,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     overflowX: 'hidden',
   };
 
-  const containerStyle: React.CSSProperties = {
-    maxWidth: 720,
-    margin: '0 auto',
-    width: '100%',
-    overflowX: 'hidden',
-  };
-
   const cardStyle: React.CSSProperties = {
     width: '100%',
     maxWidth: '100%',
@@ -160,11 +153,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   if (!q) {
     return (
       <main style={pageStyle}>
-        <div style={containerStyle}>
-          <TopBarBack />
-          <h1 style={{ marginTop: 8, marginBottom: 0 }}>Не найдено</h1>
-          <p style={{ opacity: 0.7, marginTop: 6 }}>Вопрос не найден.</p>
-        </div>
+        <TopBarBack />
+        <h1 style={{ marginTop: 8, marginBottom: 0 }}>Не найдено</h1>
+        <p style={{ opacity: 0.7, marginTop: 6 }}>Вопрос не найден.</p>
       </main>
     );
   }
@@ -211,199 +202,197 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   return (
     <main style={pageStyle}>
-      <div style={containerStyle}>
-        <TopBarBack />
+      <TopBarBack />
 
-        <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
+      <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
-        <div style={cardStyle}>
+      <div style={cardStyle}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            alignItems: 'start',
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto',
-              alignItems: 'start',
-              gap: 10,
+              fontWeight: 900,
+              fontSize: 18,
+              lineHeight: 1.15,
+              letterSpacing: '-0.01em',
               minWidth: 0,
+              ...wrapText,
             }}
           >
-            <div
-              style={{
-                fontWeight: 900,
-                fontSize: 18,
-                lineHeight: 1.15,
-                letterSpacing: '-0.01em',
-                minWidth: 0,
-                ...wrapText,
-              }}
-            >
-              {show(q.title)}
-            </div>
-
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                padding: '7px 12px',
-                borderRadius: 999,
-                whiteSpace: 'nowrap',
-                background: ui.bg,
-                color: ui.fg,
-                border: `1px solid ${ui.border}`,
-              }}
-            >
-              {ui.label}
-            </div>
+            {show(q.title)}
           </div>
 
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto',
+              fontSize: 12,
+              fontWeight: 800,
+              padding: '7px 12px',
+              borderRadius: 999,
+              whiteSpace: 'nowrap',
+              background: ui.bg,
+              color: ui.fg,
+              border: `1px solid ${ui.border}`,
+            }}
+          >
+            {ui.label}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto',
+            alignItems: 'center',
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
               alignItems: 'center',
-              gap: 10,
+              flexWrap: 'wrap',
               minWidth: 0,
             }}
           >
-            <div
+            <span
               style={{
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                minWidth: 0,
+                padding: '6px 10px',
+                borderRadius: 999,
+                background: 'rgba(15,23,42,0.04)',
+                color: 'rgba(15,23,42,0.85)',
+                fontWeight: 800,
+                fontSize: 12,
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
+              {show(q.speciality)}
+            </span>
+
+            {assignedDoctorName ? (
               <span
                 style={{
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  background: 'rgba(15,23,42,0.04)',
-                  color: 'rgba(15,23,42,0.85)',
-                  fontWeight: 800,
                   fontSize: 12,
+                  color: 'rgba(15,23,42,0.65)',
+                  fontWeight: 700,
+                  minWidth: 0,
                   maxWidth: '100%',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}
               >
-                {show(q.speciality)}
+                Врач: {assignedDoctorName}
               </span>
-
-              {assignedDoctorName ? (
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: 'rgba(15,23,42,0.65)',
-                    fontWeight: 700,
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Врач: {assignedDoctorName}
-                </span>
-              ) : null}
-            </div>
-
-            <span
-              style={{
-                fontSize: 12,
-                color: 'rgba(15,23,42,0.55)',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {fmtDateTimeRuMsk(q.createdAt)}
-            </span>
+            ) : null}
           </div>
 
-          <div
+          <span
             style={{
-              fontSize: 14,
-              lineHeight: 1.5,
-              color: 'rgba(11,12,16,0.80)',
-              whiteSpace: 'pre-wrap',
-              ...wrapText,
+              fontSize: 12,
+              color: 'rgba(15,23,42,0.55)',
+              fontWeight: 700,
+              whiteSpace: 'nowrap',
             }}
           >
-            {show(q.body)}
-          </div>
+            {fmtDateTimeRuMsk(q.createdAt)}
+          </span>
+        </div>
 
-          {Array.isArray(q.keywords) && q.keywords.length ? (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2, minWidth: 0 }}>
-              {q.keywords.slice(0, 20).map((k) => (
-                <span
-                  key={k}
-                  style={{
-                    padding: '5px 9px',
-                    borderRadius: 999,
-                    border: '1px solid rgba(15,23,42,0.10)',
-                    background: 'rgba(15,23,42,0.03)',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: 'rgba(15,23,42,0.70)',
-                    maxWidth: '100%',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {k}
-                </span>
-              ))}
-            </div>
-          ) : null}
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: 'rgba(11,12,16,0.80)',
+            whiteSpace: 'pre-wrap',
+            ...wrapText,
+          }}
+        >
+          {show(q.body)}
+        </div>
 
-          <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
-
-          <div style={{ minWidth: 0, overflow: 'hidden' }}>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
-
-            {photoUrls.length === 0 ? (
-              <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
-            ) : canSeePhotos ? (
-              <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                <PhotoLightbox urls={photoUrls} />
-              </div>
-            ) : (
-              <div
+        {Array.isArray(q.keywords) && q.keywords.length ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2, minWidth: 0 }}>
+            {q.keywords.slice(0, 20).map((k) => (
+              <span
+                key={k}
                 style={{
-                  padding: 12,
-                  borderRadius: 14,
+                  padding: '5px 9px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(15,23,42,0.10)',
                   background: 'rgba(15,23,42,0.03)',
-                  border: '1px solid rgba(15,23,42,0.08)',
-                  color: 'rgba(15,23,42,0.70)',
                   fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: 1.35,
-                  ...wrapText,
+                  fontWeight: 800,
+                  color: 'rgba(15,23,42,0.70)',
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                Фото доступны только автору вопроса и врачам выбранной категории.
-              </div>
-            )}
+                {k}
+              </span>
+            ))}
           </div>
+        ) : null}
 
-          {q.status === QuestionStatus.DONE ? (
-            <div style={{ marginTop: 8, padding: 12, borderRadius: 14, background: 'rgba(15,23,42,0.03)' }}>
-              <div style={{ fontWeight: 900 }}>Ответ готов</div>
-              <div style={{ opacity: 0.75, marginTop: 4 }}>Скоро добавим отображение ответа врача.</div>
+        <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
+
+        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+          <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
+
+          {photoUrls.length === 0 ? (
+            <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
+          ) : canSeePhotos ? (
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+              <PhotoLightbox urls={photoUrls} />
             </div>
-          ) : null}
+          ) : (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 14,
+                background: 'rgba(15,23,42,0.03)',
+                border: '1px solid rgba(15,23,42,0.08)',
+                color: 'rgba(15,23,42,0.70)',
+                fontSize: 12,
+                fontWeight: 700,
+                lineHeight: 1.35,
+                ...wrapText,
+              }}
+            >
+              Фото доступны только автору вопроса и врачам выбранной категории.
+            </div>
+          )}
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 11, opacity: 0.65, ...wrapText }}>
-          {!tgId
-            ? 'Открыто публично. (Telegram ID не определён — фото скрыты.)'
-            : isAuthor
-            ? 'Вы автор этого вопроса.'
-            : isApprovedDoctor
-            ? 'Вы вошли как врач.'
-            : 'Вы вошли как пользователь.'}
-        </div>
+        {q.status === QuestionStatus.DONE ? (
+          <div style={{ marginTop: 8, padding: 12, borderRadius: 14, background: 'rgba(15,23,42,0.03)' }}>
+            <div style={{ fontWeight: 900 }}>Ответ готов</div>
+            <div style={{ opacity: 0.75, marginTop: 4 }}>Скоро добавим отображение ответа врача.</div>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 11, opacity: 0.65, ...wrapText }}>
+        {!tgId
+          ? 'Открыто публично. (Telegram ID не определён — фото скрыты.)'
+          : isAuthor
+          ? 'Вы автор этого вопроса.'
+          : isApprovedDoctor
+          ? 'Вы вошли как врач.'
+          : 'Вы вошли как пользователь.'}
       </div>
     </main>
   );
