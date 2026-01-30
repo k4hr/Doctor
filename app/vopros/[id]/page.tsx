@@ -241,11 +241,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   const answers = Array.isArray((q as any).answers) ? ((q as any).answers as any[]) : [];
 
-  const alreadyAnsweredByMe =
-    !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
+  const alreadyAnsweredByMe = !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
 
-  const canAnswer =
-    !!tgId && isApprovedDoctor && doctorCanAnswerBySpec && !alreadyAnsweredByMe && answers.length < 10;
+  const canAnswer = !!tgId && isApprovedDoctor && doctorCanAnswerBySpec && !alreadyAnsweredByMe && answers.length < 10;
 
   // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
@@ -376,7 +374,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <div style={{ marginTop: 14 }}>
         <h2 style={{ margin: '10px 0 10px', fontSize: 16, fontWeight: 950 }}>Ответы врачей</h2>
 
-        {/* ✅ Форма "Ответить" */}
         <AnswerCreate
           questionId={String(q.id)}
           canAnswer={!!canAnswer}
@@ -421,7 +418,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               const expLabel = Number.isFinite(exp) ? `Стаж: ${exp} лет` : 'Стаж: —';
               const ratingLabel = safeRatingLabel(d);
 
-              // ✅ Комментировать можно только: автор вопроса ИЛИ врач, который оставил этот ответ
               const canDoctorComment =
                 isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
@@ -447,7 +443,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
-                  {/* шапка ответа */}
                   <div
                     style={{
                       padding: 12,
@@ -493,10 +488,10 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                         {specs}
                       </div>
 
-                      {/* ✅ СТАЖ БЕЗ ПЛАШКИ */}
+                      {/* ✅ РАССТОЯНИЕ как между ФИ и специальностью */}
                       <div
                         style={{
-                          marginTop: 8,
+                          marginTop: 2,
                           display: 'flex',
                           alignItems: 'center',
                           gap: 10,
@@ -534,7 +529,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     </div>
                   </div>
 
-                  {/* тело ответа */}
                   <div style={{ padding: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)', marginBottom: 8 }}>
                       {fmtDateTimeRuMsk(a.createdAt)}
