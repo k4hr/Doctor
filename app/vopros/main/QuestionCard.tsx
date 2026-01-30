@@ -16,6 +16,9 @@ export type QuestionCardData = {
 
   doctorLabel: string;
 
+  // ✅ новое: строка "Вопрос от ..."
+  authorLabel?: string;
+
   status: QuestionStatusUI;
   answersCount?: number;
 
@@ -98,6 +101,11 @@ function priceLabel(q: QuestionCardData) {
   return { text: 'Бесплатно', tone: 'free' as const };
 }
 
+function authorLabelSafe(q: QuestionCardData) {
+  const s = String(q.authorLabel || '').trim();
+  return s || 'Вопрос от Анонимно';
+}
+
 export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
   const router = useRouter();
 
@@ -145,7 +153,11 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
         </div>
 
         <div className="qcBottom">
-          <span className="qcDoctorText">{q.doctorLabel}</span>
+          <div className="qcMetaLeft">
+            <span className="qcDoctorText">{q.doctorLabel}</span>
+            <span className="qcAuthorText">{authorLabelSafe(q)}</span>
+          </div>
+
           <span className="qcTime">{timeAgoRu(q.createdAt)}</span>
         </div>
       </button>
@@ -195,8 +207,8 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           flex-direction: column;
           justify-content: space-between;
 
-          /* компактнее */
-          height: 92px;
+          /* компактнее, но с местом под "Вопрос от ..." */
+          height: 104px;
           overflow: hidden;
         }
 
@@ -288,11 +300,30 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
+        .qcMetaLeft {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+        }
+
         /* Специальность — текстом, но “собранно” */
         .qcDoctorText {
           font-size: 12px;
           font-weight: 800;
           color: rgba(15, 23, 42, 0.72);
+          line-height: 1.05;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+
+        .qcAuthorText {
+          font-size: 11px;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.58);
           line-height: 1.05;
 
           white-space: nowrap;
