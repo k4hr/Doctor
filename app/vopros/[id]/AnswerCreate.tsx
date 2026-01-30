@@ -97,7 +97,7 @@ export default function AnswerCreate(props: {
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Введите ответ врачу…"
+            placeholder="Введите ответ клиенту…"
             rows={5}
             style={{
               width: '100%',
