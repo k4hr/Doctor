@@ -1,3 +1,4 @@
+/* path: app/hamburger/profile/admin/doctor/[id]/page.tsx */
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
@@ -72,13 +73,21 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function fmtDate(d: Date | null | undefined) {
-  if (!d) return '—';
-  try {
-    return new Date(d).toLocaleString();
-  } catch {
-    return String(d);
-  }
+/** ✅ Москва + формат: 26.01.2026 г. (без времени) */
+function fmtDateRuMskDateOnly(input: Date | string | null | undefined) {
+  if (!input) return '—';
+  const d = input instanceof Date ? input : new Date(input);
+  const ts = d.getTime();
+  if (!Number.isFinite(ts)) return '—';
+
+  const datePart = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(d);
+
+  return `${datePart} г.`;
 }
 
 function show(v: any) {
@@ -129,9 +138,12 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
   const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
   const okAdmin = tgId ? isAdmin(tgId) : false;
 
+  const pageStyle: React.CSSProperties = { padding: 16, overflowX: 'hidden' };
+  const wrapText: React.CSSProperties = { overflowWrap: 'anywhere', wordBreak: 'break-word' };
+
   if (!tgId || !okAdmin) {
     return (
-      <main style={{ padding: 16 }}>
+      <main style={pageStyle}>
         <TopBarBack />
         <h1 style={{ marginTop: 8 }}>Доступ запрещён</h1>
         <p style={{ opacity: 0.7 }}>Нужно открыть из Telegram и иметь права администратора.</p>
@@ -151,7 +163,7 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
 
   if (!doctor) {
     return (
-      <main style={{ padding: 16 }}>
+      <main style={pageStyle}>
         <TopBarBack />
         <h1 style={{ marginTop: 8 }}>Не найдено</h1>
         <p style={{ opacity: 0.7 }}>Анкета врача не найдена.</p>
@@ -180,7 +192,7 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
     .filter(Boolean) as string[];
 
   return (
-    <main style={{ padding: 16 }}>
+    <main style={pageStyle}>
       <TopBarBack />
       <h1 style={{ marginTop: 8 }}>Анкета врача</h1>
 
@@ -191,10 +203,11 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
           borderRadius: 14,
           border: '1px solid #e5e7eb',
           background: '#fff',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ fontWeight: 900, fontSize: 16 }}>{fullName}</div>
-        <div style={{ opacity: 0.75, marginTop: 4 }}>Telegram: {tgName}</div>
+        <div style={{ fontWeight: 900, fontSize: 16, ...wrapText }}>{fullName}</div>
+        <div style={{ opacity: 0.75, marginTop: 4, ...wrapText }}>Telegram: {tgName}</div>
 
         <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ fontWeight: 900 }}>Статус:</div>
@@ -206,21 +219,21 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
               background: ui.bg,
               color: ui.fg,
               border: '1px solid rgba(15,23,42,0.08)',
+              maxWidth: '100%',
+              ...wrapText,
             }}
           >
             {ui.label} <span style={{ opacity: 0.65 }}>({doctor.status})</span>
           </div>
         </div>
 
-        {/* КНОПКИ МОДЕРАЦИИ */}
         <div style={{ marginTop: 12 }}>
           <DoctorAdminActions doctorId={doctor.id} currentStatus={doctor.status} />
         </div>
 
         <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
 
-        {/* ВСЕ ПОЛЯ, КОТОРЫЕ ОН ЗАПОЛНЯЕТ */}
-        <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+        <div style={{ display: 'grid', gap: 10, fontSize: 13, ...wrapText }}>
           <div style={{ fontWeight: 900, fontSize: 14 }}>Личные данные</div>
           <div><b>Фамилия:</b> {show(doctor.lastName)}</div>
           <div><b>Имя:</b> {show(doctor.firstName)}</div>
@@ -262,15 +275,14 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
           <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
 
           <div style={{ fontWeight: 900, fontSize: 14 }}>Системное</div>
-          <div><b>ID:</b> {doctor.id}</div>
-          <div><b>createdAt:</b> {fmtDate(doctor.createdAt)}</div>
-          <div><b>updatedAt:</b> {fmtDate(doctor.updatedAt)}</div>
-          <div><b>submittedAt:</b> {fmtDate(doctor.submittedAt)}</div>
+          <div><b>ID анкеты:</b> <span style={wrapText}>{doctor.id}</span></div>
+          <div><b>Дата создания:</b> {fmtDateRuMskDateOnly(doctor.createdAt)}</div>
+          <div><b>Дата обновления:</b> {fmtDateRuMskDateOnly(doctor.updatedAt)}</div>
+          <div><b>Дата отправки на модерацию:</b> {fmtDateRuMskDateOnly(doctor.submittedAt)}</div>
         </div>
 
         <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
 
-        {/* ФОТО */}
         <div style={{ display: 'grid', gap: 14 }}>
           <div>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>
@@ -292,6 +304,8 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                       borderRadius: 14,
                       border: '1px solid #e5e7eb',
                       background: '#f3f4f6',
+                      maxWidth: '100%',
+                      display: 'block',
                     }}
                   />
                 ))}
@@ -321,6 +335,8 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
                       borderRadius: 14,
                       border: '1px solid #e5e7eb',
                       background: '#f3f4f6',
+                      maxWidth: '100%',
+                      display: 'block',
                     }}
                   />
                 ))}
