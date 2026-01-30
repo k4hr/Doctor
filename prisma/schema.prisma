@@ -1,3 +1,5 @@
+/* path: prisma/schema.prisma */
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -28,6 +30,12 @@ enum QuestionStatus {
 
 enum QuestionFileKind {
   PHOTO
+}
+
+/** Кто написал комментарий под ответом */
+enum AnswerCommentAuthorType {
+  USER
+  DOCTOR
 }
 
 model Doctor {
@@ -73,7 +81,15 @@ model Doctor {
   files DoctorFile[]
 
   assignedQuestions Question[] @relation("AssignedDoctor")
+
+  // ⚠️ Оставил как есть (у тебя уже было). Позже можно убрать/переименовать.
   answeredQuestions Question[] @relation("AnsweredDoctor")
+
+  // ✅ Новое: врач может оставить много ответов (по форумному)
+  answers Answer[]
+
+  // ✅ Новое: врач может писать комментарии под ответами
+  answerComments AnswerComment[]
 
   @@index([status])
   @@index([speciality1])
@@ -110,8 +126,7 @@ model Question {
   authorFirstName  String?
   authorLastName   String?
 
-  // ✅ В БД колонка называется authorisanonymous (lowercase),
-  // а в коде будет q.authorIsAnonymous
+  // ✅ В БД колонка называется authorisanonymous (lowercase)
   authorIsAnonymous Boolean @default(true) @map("authorisanonymous")
 
   speciality String
@@ -126,10 +141,15 @@ model Question {
   assignedDoctorId String?
   assignedDoctor   Doctor? @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
 
+  // ⚠️ Старое поле. При мульти-ответах становится спорным.
+  // Можно оставить как "принятый/первый/лучший" врач, или удалить позже.
   answeredByDoctorId String?
   answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
 
   files QuestionFile[]
+
+  // ✅ Новое: ответы врачей (до 10 — ограничишь в API)
+  answers Answer[]
 
   @@index([speciality])
   @@index([status])
@@ -155,4 +175,54 @@ model QuestionFile {
   @@index([kind])
   @@index([questionId, kind])
   @@index([questionId, kind, sortOrder])
+}
+
+model Answer {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  body String
+
+  // если потом захочешь скрывать/модерировать
+  isDeleted Boolean @default(false)
+
+  comments AnswerComment[]
+
+  @@index([questionId])
+  @@index([doctorId])
+  @@index([questionId, createdAt])
+  @@unique([questionId, doctorId]) // ✅ один врач = один ответ на вопрос (обычно логично)
+}
+
+model AnswerComment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answerId String
+  answer   Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  authorType AnswerCommentAuthorType
+
+  // Комментарий может писать либо врач (doctorId), либо пользователь (telegramId)
+  authorDoctorId   String?
+  authorDoctor     Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
+
+  authorTelegramId String?
+
+  body String
+
+  isDeleted Boolean @default(false)
+
+  @@index([answerId])
+  @@index([authorDoctorId])
+  @@index([authorTelegramId])
+  @@index([answerId, createdAt])
 }
