@@ -1,4 +1,3 @@
-/* path: app/api/question/list/route.ts */
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -18,12 +17,10 @@ function snippet(s: string, max = 170) {
 }
 
 function mapStatusToUi(status: any): 'ANSWERING' | 'WAITING' {
-  // UI: только 2 статуса
   return String(status) === 'IN_PROGRESS' ? 'ANSWERING' : 'WAITING';
 }
 
 function mapPriceToUi(_q: any): 'FREE' | 'PAID' {
-  // пока цены не сделали — всегда FREE
   return 'FREE';
 }
 
@@ -74,7 +71,7 @@ export async function POST(req: Request) {
       bodySnippet: snippet(String(q.body), 170),
       createdAt: q.createdAt.toISOString(),
       doctorLabel: String(q.speciality || '—'),
-      authorLabel: buildAuthorLabel(q), // ✅ новое
+      authorLabel: buildAuthorLabel(q),
       status: mapStatusToUi(q.status),
       priceBadge: mapPriceToUi(q),
     }));
