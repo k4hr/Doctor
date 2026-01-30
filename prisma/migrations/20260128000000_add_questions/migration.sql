@@ -17,6 +17,9 @@ CREATE TABLE "Question" (
   "authorFirstName" TEXT,
   "authorLastName" TEXT,
 
+  -- ✅ новое: выбор анонимности
+  "authorIsAnonymous" BOOLEAN NOT NULL DEFAULT TRUE,
+
   "speciality" TEXT NOT NULL,
 
   "title" TEXT NOT NULL,
