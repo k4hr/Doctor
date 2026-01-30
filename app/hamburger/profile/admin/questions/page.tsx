@@ -18,9 +18,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
-      value
-    )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
 
@@ -418,52 +416,60 @@ export default function AdminQuestionsPage() {
         )}
       </div>
 
-      <PhotoLightboxAny
-        open={lbOpen}
-        urls={lbUrls}
-        startIndex={lbIndex}
-        onClose={() => setLbOpen(false)}
-      />
+      <PhotoLightboxAny open={lbOpen} urls={lbUrls} startIndex={lbIndex} onClose={() => setLbOpen(false)} />
 
       <style jsx>{`
         .aqPage {
           min-height: 100vh;
           background: linear-gradient(180deg, rgba(241, 245, 249, 1), rgba(248, 250, 252, 1));
+          overflow-x: hidden; /* ✅ убираем горизонтальный скролл */
         }
+
+        /* ✅ как в /vopros/[id]: страница на всю ширину, без max-width */
         .aqWrap {
-          max-width: 720px;
-          margin: 0 auto;
+          width: 100%;
           padding: 14px 14px 28px;
+          overflow-x: hidden;
         }
+
         .aqHead {
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
           gap: 12px;
           margin: 10px 0 14px;
+          min-width: 0;
         }
+
         .aqTitle {
           font-size: 28px;
           line-height: 1.15;
           letter-spacing: -0.02em;
           margin: 0;
+          min-width: 0;
         }
+
         .aqActions {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
           justify-content: flex-end;
+          flex-shrink: 0;
         }
+
         .aqBtn {
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: #fff;
           border-radius: 12px;
           padding: 10px 12px;
           font-size: 14px;
+          -webkit-tap-highlight-color: transparent;
         }
+
         .aqBtn:disabled {
           opacity: 0.6;
         }
+
         .aqBtnGhost {
           background: rgba(255, 255, 255, 0.6);
         }
@@ -476,7 +482,10 @@ export default function AdminQuestionsPage() {
           border-radius: 14px;
           margin: 0 0 12px;
           font-size: 14px;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
+
         .aqMuted {
           color: rgba(71, 85, 105, 0.9);
           font-size: 14px;
@@ -486,6 +495,7 @@ export default function AdminQuestionsPage() {
         .aqList {
           display: grid;
           gap: 12px;
+          min-width: 0;
         }
 
         .aqCard {
@@ -497,7 +507,12 @@ export default function AdminQuestionsPage() {
           cursor: pointer;
           user-select: none;
           outline: none;
+
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden; /* ✅ всё держим внутри карточки */
         }
+
         .aqCard:focus {
           box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14), 0 8px 18px rgba(15, 23, 42, 0.06);
         }
@@ -507,6 +522,7 @@ export default function AdminQuestionsPage() {
           grid-template-columns: 54px 1fr;
           gap: 12px;
           align-items: start;
+          min-width: 0;
         }
 
         .aqThumb {
@@ -519,16 +535,24 @@ export default function AdminQuestionsPage() {
           display: flex;
           align-items: center;
           justify-content: center;
+          flex: 0 0 auto;
         }
+
         .aqThumbImg {
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
+          max-width: 100%;
         }
+
         .aqThumbPh {
           font-weight: 700;
           color: rgba(71, 85, 105, 0.9);
+        }
+
+        .aqMain {
+          min-width: 0;
         }
 
         .aqLineTop {
@@ -536,14 +560,18 @@ export default function AdminQuestionsPage() {
           align-items: flex-start;
           justify-content: space-between;
           gap: 10px;
+          min-width: 0;
         }
 
         .aqName {
+          min-width: 0;
           font-size: 16px;
           font-weight: 750;
           line-height: 1.25;
           margin: 0;
           color: rgba(15, 23, 42, 1);
+
+          overflow-wrap: anywhere;
           word-break: break-word;
         }
 
@@ -552,6 +580,7 @@ export default function AdminQuestionsPage() {
           gap: 8px;
           flex-shrink: 0;
         }
+
         .aqMiniBtn {
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: rgba(255, 255, 255, 0.9);
@@ -560,7 +589,10 @@ export default function AdminQuestionsPage() {
           font-size: 12px;
           line-height: 1;
           color: rgba(15, 23, 42, 0.9);
+          -webkit-tap-highlight-color: transparent;
+          white-space: nowrap;
         }
+
         .aqMiniBtnDanger {
           border-color: rgba(239, 68, 68, 0.28);
           background: rgba(239, 68, 68, 0.08);
@@ -573,39 +605,59 @@ export default function AdminQuestionsPage() {
           gap: 8px;
           margin-top: 6px;
           flex-wrap: wrap;
+          min-width: 0;
         }
+
         .aqBadge {
           font-size: 12px;
           font-weight: 700;
           padding: 4px 10px;
           border-radius: 999px;
           border: 1px solid rgba(15, 23, 42, 0.06);
+          white-space: nowrap;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
+
         .aqDot {
           color: rgba(148, 163, 184, 1);
         }
+
         .aqSubText {
           color: rgba(71, 85, 105, 1);
           font-size: 13px;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
         }
 
         .aqMeta {
           margin-top: 8px;
           display: grid;
           gap: 4px;
+          min-width: 0;
         }
+
         .aqMetaRow {
           display: grid;
           grid-template-columns: 54px 1fr;
           gap: 8px;
           font-size: 12px;
           line-height: 1.25;
+          min-width: 0;
         }
+
         .aqMetaKey {
           color: rgba(100, 116, 139, 1);
+          white-space: nowrap;
         }
+
         .aqMetaVal {
           color: rgba(30, 41, 59, 0.92);
+          min-width: 0;
+          overflow-wrap: anywhere;
           word-break: break-word;
         }
 
@@ -614,11 +666,15 @@ export default function AdminQuestionsPage() {
           font-size: 13px;
           line-height: 1.35;
           color: rgba(30, 41, 59, 0.86);
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .aqPhotosLine {
           margin-top: 10px;
+          min-width: 0;
         }
+
         .aqPhotoMore {
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: rgba(241, 245, 249, 1);
@@ -626,6 +682,11 @@ export default function AdminQuestionsPage() {
           padding: 7px 10px;
           font-size: 12px;
           color: rgba(15, 23, 42, 0.85);
+          -webkit-tap-highlight-color: transparent;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         @media (max-width: 420px) {
@@ -635,6 +696,18 @@ export default function AdminQuestionsPage() {
           .aqMiniBtns {
             display: none;
           }
+        }
+      `}</style>
+
+      {/* ✅ страховка на уровне документа от горизонтального скролла */}
+      <style jsx global>{`
+        html,
+        body {
+          overflow-x: hidden;
+        }
+        img {
+          max-width: 100%;
+          height: auto;
         }
       `}</style>
     </main>
