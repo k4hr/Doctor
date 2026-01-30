@@ -23,11 +23,17 @@ type ApiOk = { ok: true; items: DoctorItem[] };
 type ApiErr = { ok: false; error: string };
 type ApiResp = ApiOk | ApiErr;
 
-function doctorLastFirst(d: DoctorItem) {
+function haptic(type: 'light' | 'medium' = 'light') {
+  try {
+    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
+}
+
+function doctorFullName(d: DoctorItem) {
   const ln = String(d?.lastName || '').trim();
   const fn = String(d?.firstName || '').trim();
-  const full = [ln, fn].filter(Boolean).join(' ').trim();
-  return full || '—';
+  const mn = String(d?.middleName || '').trim();
+  return [ln, fn, mn].filter(Boolean).join(' ').trim() || '—';
 }
 
 function doctorSpecsLine(d: DoctorItem) {
@@ -92,7 +98,7 @@ export default function DoctorsBySpecialityPage() {
   }, [speciality]);
 
   return (
-    <main className="doclist">
+    <main className="page">
       <TopBarBack />
 
       <h1 className="title">{speciality}</h1>
@@ -102,41 +108,45 @@ export default function DoctorsBySpecialityPage() {
 
       <section className="list">
         {items.map((d) => {
-          const name = doctorLastFirst(d);
-          const specs = doctorSpecsLine(d);
-          const exp = typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
+          const name = doctorFullName(d);
+          const spec = doctorSpecsLine(d);
+
+          const exp =
+            typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
           const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
+
           const ratingLabel = safeRatingLabel();
 
           return (
             <button
               key={d.id}
               type="button"
-              className="card"
-              onClick={() => router.push(`/hamburger/doctor/${d.id}`)}
+              className="doconline-card"
+              onClick={() => {
+                haptic('light');
+                router.push(`/hamburger/doctor/${d.id}`);
+              }}
             >
-              <div className="head">
-                <div className="avatar" aria-label="Фото врача">
-                  {d.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={d.avatarUrl} alt="" />
-                  ) : (
-                    <div className="avatarPh">{doctorAvatarLetter(d)}</div>
-                  )}
+              <div className="doconline-avatar" aria-label="Фото врача">
+                {d.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.avatarUrl} alt="" />
+                ) : (
+                  <span>{doctorAvatarLetter(d)}</span>
+                )}
+              </div>
+
+              <div className="doconline-main">
+                <div className="doconline-name-row">
+                  <span className="doconline-name">{name}</span>
+                  <span className="doconline-dot" />
                 </div>
 
-                <div className="headInfo">
-                  <div className="name">{name}</div>
-                  <div className="specs">{specs}</div>
+                <span className="doconline-spec">{spec}</span>
 
-                  <div className="row">
-                    <div className="exp">{expLabel}</div>
-
-                    <div className="rating" aria-label="Рейтинг">
-                      <span className="star">⭐</span>
-                      <span>{ratingLabel}</span>
-                    </div>
-                  </div>
+                <div className="doconline-bottom">
+                  <span className="doconline-exp">{expLabel}</span>
+                  <span className="doconline-rating">⭐ {ratingLabel}</span>
                 </div>
               </div>
             </button>
@@ -147,7 +157,7 @@ export default function DoctorsBySpecialityPage() {
       <DownBar />
 
       <style jsx>{`
-        .doclist {
+        .page {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
         }
@@ -173,130 +183,128 @@ export default function DoctorsBySpecialityPage() {
         }
 
         .list {
-          display: grid;
-          gap: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
           padding-bottom: 72px;
           width: 100%;
         }
 
-        /* ✅ КЛЮЧЕВОЕ: кнопка по умолчанию inline/fit-content в некоторых стилях,
-           поэтому принудительно делаем block + 100% и box-sizing */
-        .card {
-          display: block;
+        /* ====== ТОЧНО КАК В "ВРАЧИ ОНЛАЙН" ====== */
+
+        .doconline-card {
           width: 100%;
-          max-width: 100%;
           box-sizing: border-box;
 
-          border-radius: 18px;
-          overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: rgba(255, 255, 255, 0.92);
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.08);
-          text-align: left;
+          padding: 10px 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(34, 197, 94, 0.22);
+          background: rgba(220, 252, 231, 0.75);
+          box-shadow: 0 8px 20px rgba(22, 163, 74, 0.16);
+
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          padding: 0;
+          text-align: left;
         }
 
-        /* ✅ На iOS иногда помогает еще так, чтобы растянуть кнопку */
-        .card {
-          justify-self: stretch;
+        .doconline-card:active {
+          transform: translateY(1px);
+          box-shadow: 0 6px 16px rgba(22, 163, 74, 0.24);
         }
 
-        .card:active {
-          transform: scale(0.995);
-          opacity: 0.96;
-        }
-
-        .head {
-          padding: 12px;
-          background: rgba(34, 197, 94, 0.1);
-          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-          display: flex;
-          gap: 12px;
-          align-items: center;
-        }
-
-        .avatar {
-          width: 52px;
-          height: 52px;
+        .doconline-avatar {
+          width: 44px;
+          height: 44px;
           border-radius: 999px;
+          background: #ffffff;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          font-weight: 700;
+          font-size: 18px;
+          color: #16a34a;
+
+          box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
+          flex-shrink: 0;
           overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: #fff;
-          display: grid;
-          place-items: center;
-          flex: 0 0 auto;
         }
 
-        .avatar img {
+        .doconline-avatar img {
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
         }
 
-        .avatarPh {
-          width: 100%;
-          height: 100%;
-          display: grid;
-          place-items: center;
-          font-weight: 950;
-          font-size: 20px;
-          color: #166534;
-          background: linear-gradient(135deg, rgba(229, 231, 235, 0.9), rgba(243, 244, 246, 1));
-        }
-
-        .headInfo {
+        .doconline-main {
+          flex: 1;
           min-width: 0;
-          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
         }
 
-        .name {
-          font-weight: 950;
-          font-size: 15px;
-          color: rgba(15, 23, 42, 0.92);
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .specs {
-          margin-top: 2px;
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.65);
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .row {
-          margin-top: 2px;
+        .doconline-name-row {
           display: flex;
           align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
+          justify-content: space-between;
+          gap: 8px;
         }
 
-        .exp {
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.78);
-          white-space: nowrap;
-        }
-
-        .rating {
-          margin-left: auto;
-          display: flex;
-          align-items: center;
-          gap: 6px;
+        .doconline-name {
           font-size: 14px;
-          font-weight: 950;
-          color: rgba(15, 23, 42, 0.8);
+          font-weight: 700;
+          color: #022c22;
+          overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
 
-        .star {
-          opacity: 0.9;
+        .doconline-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: #22c55e;
+          box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+          flex-shrink: 0;
+        }
+
+        .doconline-spec {
+          font-size: 12px;
+          color: rgba(15, 23, 42, 0.8);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .doconline-bottom {
+          margin-top: 4px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 11px;
+          gap: 10px;
+        }
+
+        .doconline-exp {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.9);
+          color: #15803d;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+
+        .doconline-rating {
+          color: #166534;
+          font-weight: 600;
+          white-space: nowrap;
         }
       `}</style>
     </main>
