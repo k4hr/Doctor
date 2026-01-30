@@ -149,7 +149,9 @@ function doctorLastFirst(d: any) {
 }
 
 function doctorSpecsLine(d: any) {
-  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
+  const parts = [d?.speciality1, d?.speciality2, d?.speciality3]
+    .filter(Boolean)
+    .map((x) => String(x).trim());
   return parts.length ? parts.join(', ') : '—';
 }
 
@@ -243,22 +245,20 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
 
   const canAnswer =
-    !!tgId &&
-    isApprovedDoctor &&
-    doctorCanAnswerBySpec &&
-    !alreadyAnsweredByMe &&
-    answers.length < 10;
+    !!tgId && isApprovedDoctor && doctorCanAnswerBySpec && !alreadyAnsweredByMe && answers.length < 10;
 
   // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
   const doctorCanSeeByAssignment =
-    isApprovedDoctor && viewerDoctor?.id && q.assignedDoctorId ? String(q.assignedDoctorId) === String(viewerDoctor.id) : false;
+    isApprovedDoctor && viewerDoctor?.id && q.assignedDoctorId
+      ? String(q.assignedDoctorId) === String(viewerDoctor.id)
+      : false;
 
   const canSeePhotos = isAuthor || doctorCanSeeByCategory || doctorCanSeeByAssignment;
 
   const photoUrls = q.files
     .filter((f) => String(f.kind) === 'PHOTO')
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
@@ -366,7 +366,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                 ...wrapText,
               }}
             >
-              Фото доступны только автору вопроса и врачам выбранной категории (или назначенному врачу).
+              Фото доступны только автору вопроса и врачам выбранной категории.
             </div>
           )}
         </div>
@@ -422,7 +422,8 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               const ratingLabel = safeRatingLabel(d);
 
               // ✅ Комментировать можно только: автор вопроса ИЛИ врач, который оставил этот ответ
-              const canDoctorComment = isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
+              const canDoctorComment =
+                isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
 
               const initialComments = Array.isArray(a?.comments)
@@ -473,24 +474,37 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     >
                       {profileUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={profileUrl} alt="doctor" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        <img
+                          src={profileUrl}
+                          alt="doctor"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
                       ) : (
                         <div style={{ fontWeight: 950, fontSize: 20, color: '#166534' }}>{doctorAvatarLetter(d)}</div>
                       )}
                     </div>
 
                     <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-                      <div style={{ fontWeight: 950, fontSize: 15, color: 'rgba(15,23,42,0.92)', ...wrapText }}>{name}</div>
+                      <div style={{ fontWeight: 950, fontSize: 15, color: 'rgba(15,23,42,0.92)', ...wrapText }}>
+                        {name}
+                      </div>
 
-                      <div style={{ marginTop: 2, fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.65)', ...wrapText }}>{specs}</div>
+                      <div style={{ marginTop: 2, fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.65)', ...wrapText }}>
+                        {specs}
+                      </div>
 
-                      <div style={{ marginTop: 8, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {/* ✅ СТАЖ БЕЗ ПЛАШКИ */}
+                      <div
+                        style={{
+                          marginTop: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         <div
                           style={{
-                            padding: '6px 10px',
-                            borderRadius: 999,
-                            background: 'rgba(255,255,255,0.75)',
-                            border: '1px solid rgba(15,23,42,0.10)',
                             fontSize: 12,
                             fontWeight: 900,
                             color: 'rgba(15,23,42,0.78)',
