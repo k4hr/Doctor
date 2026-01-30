@@ -117,20 +117,27 @@ function priceBadgeLabel(q: any): string {
   return 'Бесплатно';
 }
 
-/** Автор как в QuestionCard: ник/имя, иначе Анонимно */
+/** ✅ Автор: если анонимно — НИКОГДА не показываем ник/имя */
 function authorLabelFromQuestion(q: any): string {
+  // ✅ ВАЖНО: у тебя в БД поле называется authorisanonymous
+  const isAnon =
+    q?.authorisanonymous === true ||
+    q?.authorIsAnonymous === true ||
+    q?.author_is_anonymous === true ||
+    q?.isAnonymous === true ||
+    q?.anonymous === true;
+
+  if (isAnon) return 'Вопрос от Анонимно';
+
   const u = String(q?.authorUsername || q?.author_user_name || '').trim();
-  if (u) return `@${u.replace(/^@+/, '')}`;
+  if (u) return `Вопрос от @${u.replace(/^@+/, '')}`;
 
   const first = String(q?.authorFirstName || q?.author_first_name || '').trim();
   const last = String(q?.authorLastName || q?.author_last_name || '').trim();
   const full = [first, last].filter(Boolean).join(' ').trim();
-  if (full) return `${full}`;
+  if (full) return `Вопрос от ${full}`;
 
-  // если у тебя есть явный флаг анонимности — оставим возможность
-  if (q?.isAnonymous === true || q?.anonymous === true) return 'Анонимно';
-
-  return 'Анонимно';
+  return 'Вопрос от Пользователь';
 }
 
 export default async function VoprosIdPage({ params }: { params: { id: string } }) {
@@ -223,7 +230,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
       <div style={cardStyle}>
-        {/* ✅ Одна линия: плашка цены + обычный текст "Вопрос от ..." */}
         <div
           style={{
             display: 'flex',
@@ -269,7 +275,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        {/* ✅ Заголовок на всю ширину */}
         <div
           style={{
             fontWeight: 950,
@@ -283,7 +288,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show(q.title)}
         </div>
 
-        {/* ✅ Текст вопроса сразу после заголовка */}
         <div
           style={{
             fontSize: 14,
@@ -296,7 +300,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show(q.body)}
         </div>
 
-        {/* ✅ Внизу: слева специализация (без плашки), справа время */}
         <div
           style={{
             display: 'flex',
