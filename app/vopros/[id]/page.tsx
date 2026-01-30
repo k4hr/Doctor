@@ -109,14 +109,28 @@ function priceBadgeLabel(q: any): string {
     q?.costRUB ??
     null;
 
-  // если есть явный флаг бесплатности
   if (q?.isFree === true || q?.free === true) return 'Бесплатно';
 
-  // число/строка
   const n = typeof raw === 'number' ? raw : raw != null ? Number(String(raw).replace(',', '.')) : NaN;
-
   if (Number.isFinite(n) && n > 0) return `${Math.round(n)} ₽`;
+
   return 'Бесплатно';
+}
+
+/** Автор как в QuestionCard: ник/имя, иначе Анонимно */
+function authorLabelFromQuestion(q: any): string {
+  const u = String(q?.authorUsername || q?.author_user_name || '').trim();
+  if (u) return `@${u.replace(/^@+/, '')}`;
+
+  const first = String(q?.authorFirstName || q?.author_first_name || '').trim();
+  const last = String(q?.authorLastName || q?.author_last_name || '').trim();
+  const full = [first, last].filter(Boolean).join(' ').trim();
+  if (full) return `${full}`;
+
+  // если у тебя есть явный флаг анонимности — оставим возможность
+  if (q?.isAnonymous === true || q?.anonymous === true) return 'Анонимно';
+
+  return 'Анонимно';
 }
 
 export default async function VoprosIdPage({ params }: { params: { id: string } }) {
@@ -199,7 +213,8 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
-  const priceLabel = priceBadgeLabel(q);
+  const priceLabel = priceBadgeLabel(q as any);
+  const authorText = authorLabelFromQuestion(q as any);
 
   return (
     <main style={pageStyle}>
@@ -208,8 +223,16 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
       <div style={cardStyle}>
-        {/* ✅ Плашка цены/бесплатно — сверху */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', minWidth: 0 }}>
+        {/* ✅ Одна линия: плашка цены + обычный текст "Вопрос от ..." */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
           <span
             style={{
               fontSize: 12,
@@ -220,14 +243,30 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               border: '1px solid rgba(15,23,42,0.10)',
               color: priceLabel === 'Бесплатно' ? '#1e40af' : '#166534',
               whiteSpace: 'nowrap',
-              maxWidth: '100%',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              flex: '0 0 auto',
             }}
             aria-label="Цена"
           >
             {priceLabel}
           </span>
+
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: 'rgba(15,23,42,0.58)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              minWidth: 0,
+              flex: '1 1 auto',
+              textAlign: 'right',
+            }}
+            aria-label="Автор вопроса"
+            title={authorText}
+          >
+            {authorText}
+          </div>
         </div>
 
         {/* ✅ Заголовок на всю ширину */}
