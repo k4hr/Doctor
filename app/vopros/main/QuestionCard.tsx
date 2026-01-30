@@ -179,7 +179,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           flex-direction: column;
 
           /* ✅ фикс высоты как ты хочешь */
-          height: 110px;
+          height: 90px;
           overflow: hidden;
 
           /* ✅ и при этом низ всегда “приклеен” вниз */
