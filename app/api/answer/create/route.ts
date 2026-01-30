@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { DoctorStatus, QuestionStatus } from '@prisma/client';
+import { DoctorStatus } from '@prisma/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -76,11 +76,8 @@ function verifyTelegramWebAppInitData(initData: string, botToken: string, maxAge
   return { ok: true as const, user };
 }
 
-function cleanText(v: any, maxLen: number) {
-  const s = String(v ?? '').trim();
-  if (!s) return '';
-  if (s.length <= maxLen) return s;
-  return s.slice(0, maxLen).trimEnd();
+function norm(s: any) {
+  return String(s ?? '').trim().toLowerCase();
 }
 
 export async function POST(req: Request) {
@@ -89,78 +86,50 @@ export async function POST(req: Request) {
     if (!botToken) return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
 
     const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
-    }
+    if (!body || typeof body !== 'object') return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
 
     const initData = typeof (body as any).initData === 'string' ? String((body as any).initData).trim() : '';
+    const questionId = String((body as any).questionId || '').trim();
+    const answerBody = String((body as any).body || '').trim();
+
     if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
+    if (!questionId) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'questionId' }, { status: 400 });
+    if (answerBody.length < 20) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'body' }, { status: 400 });
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
 
-    const questionId = cleanText((body as any).questionId, 200);
-    const answerBody = cleanText((body as any).body, 12000);
-
-    if (!questionId) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'questionId' }, { status: 400 });
-    if (answerBody.length < 10) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'body' }, { status: 400 });
-
+    // врач по telegramId
     const doctor = await prisma.doctor.findUnique({
       where: { telegramId: v.user.id },
-      select: {
-        id: true,
-        status: true,
-        speciality1: true,
-        speciality2: true,
-        speciality3: true,
-      },
+      select: { id: true, status: true, speciality1: true, speciality2: true, speciality3: true },
     });
 
-    if (!doctor) return NextResponse.json({ ok: false, error: 'NOT_A_DOCTOR' }, { status: 403 });
-    if (doctor.status !== DoctorStatus.APPROVED) {
-      return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_APPROVED' }, { status: 403 });
+    if (!doctor || doctor.status !== DoctorStatus.APPROVED) {
+      return NextResponse.json({ ok: false, error: 'NOT_APPROVED_DOCTOR' }, { status: 403 });
     }
 
     const q = await prisma.question.findUnique({
       where: { id: questionId },
-      select: {
-        id: true,
-        speciality: true,
-        assignedDoctorId: true,
-        status: true,
-      },
+      select: { id: true, speciality: true },
     });
 
     if (!q) return NextResponse.json({ ok: false, error: 'NO_QUESTION' }, { status: 404 });
 
-    const doctorSpecs = new Set(
-      [doctor.speciality1, doctor.speciality2, doctor.speciality3]
-        .filter(Boolean)
-        .map((x) => String(x).trim())
-        .filter(Boolean)
-    );
+    const qSpec = norm(q.speciality);
+    const docSpecs = new Set([doctor.speciality1, doctor.speciality2, doctor.speciality3].map(norm).filter(Boolean));
 
-    const canAnswerByCategory = doctorSpecs.has(String(q.speciality || '').trim());
-    const canAnswerByAssignment = !!q.assignedDoctorId && q.assignedDoctorId === doctor.id;
-
-    if (!canAnswerByCategory && !canAnswerByAssignment) {
-      return NextResponse.json({ ok: false, error: 'FORBIDDEN_BY_CATEGORY' }, { status: 403 });
+    if (!docSpecs.has(qSpec)) {
+      return NextResponse.json({ ok: false, error: 'SPEC_MISMATCH' }, { status: 403 });
     }
 
-    const answersCount = await prisma.answer.count({ where: { questionId } });
-    if (answersCount >= 10) {
-      return NextResponse.json({ ok: false, error: 'LIMIT_REACHED', max: 10 }, { status: 409 });
+    // лимит 10 ответов на вопрос
+    const cnt = await prisma.answer.count({ where: { questionId } });
+    if (cnt >= 10) {
+      return NextResponse.json({ ok: false, error: 'ANSWER_LIMIT_REACHED' }, { status: 409 });
     }
 
-    const already = await prisma.answer.findUnique({
-      where: { questionId_doctorId: { questionId, doctorId: doctor.id } },
-      select: { id: true },
-    });
-
-    if (already) {
-      return NextResponse.json({ ok: false, error: 'ALREADY_ANSWERED', answerId: already.id }, { status: 409 });
-    }
-
+    // один врач = один ответ (у тебя @@unique([questionId, doctorId]))
     const created = await prisma.answer.create({
       data: {
         questionId,
@@ -170,17 +139,14 @@ export async function POST(req: Request) {
       select: { id: true, createdAt: true },
     });
 
-    // ✅ отмечаем, что по вопросу уже есть ответ(ы)
-    await prisma.question.update({
-      where: { id: questionId },
-      data: {
-        status: QuestionStatus.DONE,
-        answeredByDoctorId: q.status === QuestionStatus.DONE ? undefined : doctor.id, // "первый ответивший" как метка
-      },
-    }).catch(() => {});
+    return NextResponse.json({ ok: true, id: created.id, createdAt: created.createdAt.toISOString() });
+  } catch (e: any) {
+    // ловим уникальность (если врач уже отвечал)
+    const msg = String(e?.message || '');
+    if (msg.includes('Unique constraint failed') || msg.includes('P2002')) {
+      return NextResponse.json({ ok: false, error: 'ALREADY_ANSWERED' }, { status: 409 });
+    }
 
-    return NextResponse.json({ ok: true, id: created.id, createdAt: created.createdAt });
-  } catch (e) {
     console.error(e);
     return NextResponse.json({ ok: false, error: 'FAILED_TO_CREATE_ANSWER' }, { status: 500 });
   }
