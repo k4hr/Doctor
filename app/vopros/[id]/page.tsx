@@ -89,27 +89,34 @@ function fmtDateTimeRuMsk(d: Date | null | undefined) {
   return `${datePart} г., ${timePart}`;
 }
 
-function statusUi(status: string) {
-  if (status === 'IN_PROGRESS') {
-    return {
-      label: 'Врач отвечает',
-      bg: 'rgba(36,199,104,0.10)',
-      fg: '#166534',
-      border: 'rgba(36,199,104,0.30)',
-    };
-  }
-  return {
-    label: 'Ждёт ответа',
-    bg: 'rgba(15,23,42,0.04)',
-    fg: 'rgba(15,23,42,0.70)',
-    border: 'rgba(15,23,42,0.12)',
-  };
-}
-
 function show(v: any) {
   if (v === null || v === undefined) return '—';
   const s = String(v);
   return s.trim().length ? s : '—';
+}
+
+/** Цена/Бесплатно: аккуратно читаем любые возможные поля, чтобы не ломать билд */
+function priceBadgeLabel(q: any): string {
+  const raw =
+    q?.price ??
+    q?.priceRub ??
+    q?.priceRUB ??
+    q?.amount ??
+    q?.amountRub ??
+    q?.amountRUB ??
+    q?.cost ??
+    q?.costRub ??
+    q?.costRUB ??
+    null;
+
+  // если есть явный флаг бесплатности
+  if (q?.isFree === true || q?.free === true) return 'Бесплатно';
+
+  // число/строка
+  const n = typeof raw === 'number' ? raw : raw != null ? Number(String(raw).replace(',', '.')) : NaN;
+
+  if (Number.isFinite(n) && n > 0) return `${Math.round(n)} ₽`;
+  return 'Бесплатно';
 }
 
 export default async function VoprosIdPage({ params }: { params: { id: string } }) {
@@ -132,7 +139,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
     display: 'grid',
-    gap: 10,
+    gap: 12,
   };
 
   const wrapText: React.CSSProperties = {
@@ -186,19 +193,13 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   const canSeePhotos = isAuthor || doctorCanSeeByCategory || doctorCanSeeByAssignment;
 
-  const ui = statusUi(String(q.status));
-
-  const assignedDoctorName = q.assignedDoctor
-    ? [q.assignedDoctor.lastName, q.assignedDoctor.firstName, q.assignedDoctor.middleName]
-        .filter(Boolean)
-        .join(' ')
-    : null;
-
   const photoUrls = q.files
     .filter((f) => String(f.kind) === 'PHOTO')
     .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
+
+  const priceLabel = priceBadgeLabel(q);
 
   return (
     <main style={pageStyle}>
@@ -207,114 +208,48 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
       <div style={cardStyle}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            alignItems: 'start',
-            gap: 10,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              fontWeight: 900,
-              fontSize: 18,
-              lineHeight: 1.15,
-              letterSpacing: '-0.01em',
-              minWidth: 0,
-              ...wrapText,
-            }}
-          >
-            {show(q.title)}
-          </div>
-
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              padding: '7px 12px',
-              borderRadius: 999,
-              whiteSpace: 'nowrap',
-              background: ui.bg,
-              color: ui.fg,
-              border: `1px solid ${ui.border}`,
-            }}
-          >
-            {ui.label}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr auto',
-            alignItems: 'center',
-            gap: 10,
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              minWidth: 0,
-            }}
-          >
-            <span
-              style={{
-                padding: '6px 10px',
-                borderRadius: 999,
-                background: 'rgba(15,23,42,0.04)',
-                color: 'rgba(15,23,42,0.85)',
-                fontWeight: 800,
-                fontSize: 12,
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {show(q.speciality)}
-            </span>
-
-            {assignedDoctorName ? (
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'rgba(15,23,42,0.65)',
-                  fontWeight: 700,
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Врач: {assignedDoctorName}
-              </span>
-            ) : null}
-          </div>
-
+        {/* ✅ Плашка цены/бесплатно — сверху */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', minWidth: 0 }}>
           <span
             style={{
               fontSize: 12,
-              color: 'rgba(15,23,42,0.55)',
-              fontWeight: 700,
+              fontWeight: 900,
+              padding: '6px 10px',
+              borderRadius: 999,
+              background: priceLabel === 'Бесплатно' ? 'rgba(59,130,246,0.10)' : 'rgba(34,197,94,0.12)',
+              border: '1px solid rgba(15,23,42,0.10)',
+              color: priceLabel === 'Бесплатно' ? '#1e40af' : '#166534',
               whiteSpace: 'nowrap',
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
+            aria-label="Цена"
           >
-            {fmtDateTimeRuMsk(q.createdAt)}
+            {priceLabel}
           </span>
         </div>
 
+        {/* ✅ Заголовок на всю ширину */}
+        <div
+          style={{
+            fontWeight: 950,
+            fontSize: 20,
+            lineHeight: 1.15,
+            letterSpacing: '-0.01em',
+            marginTop: 2,
+            ...wrapText,
+          }}
+        >
+          {show(q.title)}
+        </div>
+
+        {/* ✅ Текст вопроса сразу после заголовка */}
         <div
           style={{
             fontSize: 14,
-            lineHeight: 1.5,
-            color: 'rgba(11,12,16,0.80)',
+            lineHeight: 1.55,
+            color: 'rgba(11,12,16,0.82)',
             whiteSpace: 'pre-wrap',
             ...wrapText,
           }}
@@ -322,30 +257,42 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show(q.body)}
         </div>
 
-        {Array.isArray(q.keywords) && q.keywords.length ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2, minWidth: 0 }}>
-            {q.keywords.slice(0, 20).map((k) => (
-              <span
-                key={k}
-                style={{
-                  padding: '5px 9px',
-                  borderRadius: 999,
-                  border: '1px solid rgba(15,23,42,0.10)',
-                  background: 'rgba(15,23,42,0.03)',
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: 'rgba(15,23,42,0.70)',
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {k}
-              </span>
-            ))}
+        {/* ✅ Внизу: слева специализация (без плашки), справа время */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 10,
+            flexWrap: 'wrap',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: 'rgba(15,23,42,0.78)',
+              ...wrapText,
+              flex: '1 1 auto',
+              minWidth: 0,
+            }}
+          >
+            {show(q.speciality)}
           </div>
-        ) : null}
+
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'rgba(15,23,42,0.55)',
+              whiteSpace: 'nowrap',
+              flex: '0 0 auto',
+            }}
+          >
+            {fmtDateTimeRuMsk(q.createdAt)}
+          </div>
+        </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
