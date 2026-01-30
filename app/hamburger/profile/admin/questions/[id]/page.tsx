@@ -190,80 +190,112 @@ export default function AdminQuestionIdPage() {
 
   return (
     <main className="page">
-      <TopBarBack />
+      <div className="container">
+        <TopBarBack />
 
-      <div className="head">
-        <h1 className="title">Вопрос</h1>
-        <div className="actions">
-          <button
-            className="btn btnGhost"
-            type="button"
-            onClick={() => {
-              haptic('light');
-              router.push(`/vopros/${encodeURIComponent(id)}`);
-            }}
-          >
-            Открыть публично
-          </button>
-          <button className="btn danger" type="button" onClick={remove}>
-            Удалить
-          </button>
+        <div className="head">
+          <h1 className="title">Вопрос</h1>
+          <div className="actions">
+            <button
+              className="btn btnGhost"
+              type="button"
+              onClick={() => {
+                haptic('light');
+                router.push(`/vopros/${encodeURIComponent(id)}`);
+              }}
+            >
+              Открыть публично
+            </button>
+            <button className="btn danger" type="button" onClick={remove}>
+              Удалить
+            </button>
+          </div>
         </div>
-      </div>
 
-      {warn ? <div className="warn">{warn}</div> : null}
+        {warn ? <div className="warn">{warn}</div> : null}
 
-      {loading ? (
-        <div className="muted">Загрузка…</div>
-      ) : !item ? (
-        <div className="muted">Не найдено</div>
-      ) : (
-        <section className="card">
-          <div className="top">
-            <div className="ttl">{item.title}</div>
-            <span className="pill">{item.status}</span>
-          </div>
-
-          <div className="metaRow">
-            <span className="tag">{item.speciality}</span>
-            <span className="meta">{fmtDateTimeRuMsk(item.createdAt)}</span>
-          </div>
-
-          <div className="metaBlock">
-            <div className="meta">Автор: <b>{authorName(item)}</b></div>
-            <div className="meta">Telegram ID: <span className="mono">{item.authorTelegramId}</span></div>
-            <div className="meta">ID вопроса: <span className="mono">{item.id}</span></div>
-            {item.assignedDoctorId ? (
-              <div className="meta">Назначен врачу: <span className="mono">{item.assignedDoctorId}</span></div>
-            ) : null}
-            {item.answeredByDoctorId ? (
-              <div className="meta">Ответил врач: <span className="mono">{item.answeredByDoctorId}</span></div>
-            ) : null}
-          </div>
-
-          <div className="body">{item.body}</div>
-
-          {Array.isArray(item.keywords) && item.keywords.length ? (
-            <div className="kw">
-              {item.keywords.slice(0, 30).map((k) => (
-                <span key={k} className="kwPill">{k}</span>
-              ))}
+        {loading ? (
+          <div className="muted">Загрузка…</div>
+        ) : !item ? (
+          <div className="muted">Не найдено</div>
+        ) : (
+          <section className="card">
+            <div className="top">
+              <div className="ttl">{item.title}</div>
+              <span className="pill">{item.status}</span>
             </div>
-          ) : null}
 
-          <hr className="hr" />
+            <div className="metaRow">
+              <span className="tag">{item.speciality}</span>
+              <span className="meta">{fmtDateTimeRuMsk(item.createdAt)}</span>
+            </div>
 
-          <div>
-            <div className="photosTitle">Фотографии</div>
-            {item.photoUrls.length ? <PhotoLightbox urls={item.photoUrls} /> : <div className="mutedSmall">Фото нет</div>}
-          </div>
-        </section>
-      )}
+            <div className="metaBlock">
+              <div className="meta">
+                Автор: <b className="break">{authorName(item)}</b>
+              </div>
+
+              <div className="meta">
+                Telegram ID: <span className="mono break">{item.authorTelegramId}</span>
+              </div>
+
+              <div className="meta">
+                ID вопроса: <span className="mono break">{item.id}</span>
+              </div>
+
+              {item.assignedDoctorId ? (
+                <div className="meta">
+                  Назначен врачу: <span className="mono break">{item.assignedDoctorId}</span>
+                </div>
+              ) : null}
+
+              {item.answeredByDoctorId ? (
+                <div className="meta">
+                  Ответил врач: <span className="mono break">{item.answeredByDoctorId}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="body">{item.body}</div>
+
+            {Array.isArray(item.keywords) && item.keywords.length ? (
+              <div className="kw">
+                {item.keywords.slice(0, 30).map((k) => (
+                  <span key={k} className="kwPill">
+                    {k}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <hr className="hr" />
+
+            <div className="photos">
+              <div className="photosTitle">Фотографии</div>
+              {item.photoUrls.length ? (
+                <div className="photosInner">
+                  <PhotoLightbox urls={item.photoUrls} />
+                </div>
+              ) : (
+                <div className="mutedSmall">Фото нет</div>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
 
       <style jsx>{`
         .page {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          overflow-x: hidden; /* ✅ убираем горизонтальный скролл */
+        }
+
+        .container {
+          max-width: 720px;
+          margin: 0 auto;
+          width: 100%;
+          overflow-x: hidden;
         }
 
         .head {
@@ -296,10 +328,11 @@ export default function AdminQuestionIdPage() {
           font-size: 12px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          max-width: 100%;
         }
 
         .btnGhost {
-          background: rgba(17,24,39,0.08);
+          background: rgba(17, 24, 39, 0.08);
           color: #111827;
         }
 
@@ -318,24 +351,33 @@ export default function AdminQuestionIdPage() {
           font-weight: 800;
           font-size: 12px;
           line-height: 1.35;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .muted {
           margin-top: 14px;
-          color: rgba(17,24,39,0.60);
+          color: rgba(17, 24, 39, 0.6);
           font-weight: 700;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .mutedSmall {
           margin-top: 8px;
-          color: rgba(17,24,39,0.55);
+          color: rgba(17, 24, 39, 0.55);
           font-weight: 700;
           font-size: 12px;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .card {
           margin-top: 14px;
-          background: rgba(255,255,255,0.92);
+          background: rgba(255, 255, 255, 0.92);
           border: 1px solid rgba(15, 23, 42, 0.08);
           border-radius: 18px;
           padding: 14px;
@@ -344,20 +386,29 @@ export default function AdminQuestionIdPage() {
           -webkit-backdrop-filter: blur(12px);
           display: grid;
           gap: 10px;
+
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden; /* ✅ всё держим внутри карточки */
         }
 
         .top {
-          display: flex;
-          justify-content: space-between;
+          display: grid;
+          grid-template-columns: 1fr auto;
           gap: 10px;
-          align-items: flex-start;
+          align-items: start;
+          min-width: 0;
         }
 
         .ttl {
+          min-width: 0;
           font-size: 18px;
           font-weight: 900;
           color: #0b0c10;
           line-height: 1.2;
+
+          overflow-wrap: anywhere; /* ✅ длинные слова/строки не тянут ширину */
+          word-break: break-word;
         }
 
         .pill {
@@ -366,7 +417,7 @@ export default function AdminQuestionIdPage() {
           padding: 6px 10px;
           border-radius: 999px;
           background: rgba(15, 23, 42, 0.06);
-          border: 1px solid rgba(15, 23, 42, 0.10);
+          border: 1px solid rgba(15, 23, 42, 0.1);
           color: rgba(15, 23, 42, 0.75);
           white-space: nowrap;
         }
@@ -376,17 +427,23 @@ export default function AdminQuestionIdPage() {
           align-items: center;
           justify-content: space-between;
           gap: 10px;
-          flex-wrap: wrap;
+          flex-wrap: wrap; /* ✅ иначе “вылезет вправо” */
+          min-width: 0;
         }
 
         .tag {
           padding: 6px 10px;
           border-radius: 999px;
-          background: rgba(36, 199, 104, 0.10);
+          background: rgba(36, 199, 104, 0.1);
           border: 1px solid rgba(36, 199, 104, 0.18);
           color: #166534;
           font-weight: 900;
           font-size: 12px;
+
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .meta {
@@ -394,6 +451,10 @@ export default function AdminQuestionIdPage() {
           font-weight: 700;
           font-size: 12px;
           line-height: 1.35;
+          min-width: 0;
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .mono {
@@ -404,6 +465,13 @@ export default function AdminQuestionIdPage() {
         .metaBlock {
           display: grid;
           gap: 4px;
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .break {
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .body {
@@ -411,33 +479,65 @@ export default function AdminQuestionIdPage() {
           line-height: 1.5;
           color: rgba(11, 12, 16, 0.82);
           white-space: pre-wrap;
+
+          overflow-wrap: anywhere; /* ✅ длинные строки не ломают ширину */
+          word-break: break-word;
         }
 
         .kw {
           display: flex;
           flex-wrap: wrap;
           gap: 6px;
+          min-width: 0;
         }
 
         .kwPill {
           padding: 5px 9px;
           border-radius: 999px;
-          border: 1px solid rgba(15,23,42,0.10);
-          background: rgba(15,23,42,0.03);
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: rgba(15, 23, 42, 0.03);
           font-size: 12px;
           font-weight: 900;
-          color: rgba(15,23,42,0.70);
+          color: rgba(15, 23, 42, 0.7);
+
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .hr {
           border: none;
-          border-top: 1px solid rgba(15,23,42,0.08);
+          border-top: 1px solid rgba(15, 23, 42, 0.08);
           margin: 6px 0;
+        }
+
+        .photos {
+          min-width: 0;
+          overflow: hidden; /* ✅ чтобы PhotoLightbox не расширял */
+        }
+
+        .photosInner {
+          min-width: 0;
+          overflow: hidden;
         }
 
         .photosTitle {
           font-weight: 900;
           margin-bottom: 8px;
+        }
+
+        /* ✅ любые картинки внутри — не шире карточки */
+        .card :global(img) {
+          max-width: 100%;
+          height: auto;
+        }
+      `}</style>
+
+      <style jsx global>{`
+        html,
+        body {
+          overflow-x: hidden;
         }
       `}</style>
     </main>
