@@ -15,12 +15,34 @@ type DoctorItem = {
   speciality1: string;
   speciality2: string | null;
   speciality3: string | null;
+  experienceYears: number | null;
   avatarUrl: string | null;
 };
 
 type ApiOk = { ok: true; items: DoctorItem[] };
 type ApiErr = { ok: false; error: string };
 type ApiResp = ApiOk | ApiErr;
+
+function doctorLastFirst(d: DoctorItem) {
+  const ln = String(d?.lastName || '').trim();
+  const fn = String(d?.firstName || '').trim();
+  const full = [ln, fn].filter(Boolean).join(' ').trim();
+  return full || '—';
+}
+
+function doctorSpecsLine(d: DoctorItem) {
+  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
+  return parts.length ? parts.join(', ') : '—';
+}
+
+function doctorAvatarLetter(d: DoctorItem) {
+  const n = String(d?.lastName || d?.firstName || 'D').trim();
+  return (n[0] || 'D').toUpperCase();
+}
+
+function safeRatingLabel() {
+  return '5.0';
+}
 
 export default function DoctorsBySpecialityPage() {
   const router = useRouter();
@@ -45,7 +67,8 @@ export default function DoctorsBySpecialityPage() {
         setLoading(true);
         setWarn('');
 
-        const res = await fetch(`/api/doctors?speciality=${encodeURIComponent(speciality)}`, {
+        // ✅ Поменяли путь на /api/doctor/vrachi
+        const res = await fetch(`/api/doctor/vrachi?speciality=${encodeURIComponent(speciality)}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -79,32 +102,46 @@ export default function DoctorsBySpecialityPage() {
       {warn ? <p className="warn">{warn}</p> : null}
 
       <section className="list">
-        {items.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            className="card"
-            onClick={() => router.push(`/hamburger/doctor/${d.id}`)} // если у тебя будет такая страница
-          >
-            <div className="avatar">
-              {d.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={d.avatarUrl} alt="" />
-              ) : (
-                <div className="avatarPh" />
-              )}
-            </div>
+        {items.map((d) => {
+          const name = doctorLastFirst(d);
+          const specs = doctorSpecsLine(d);
+          const exp = typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
+          const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
+          const ratingLabel = safeRatingLabel();
 
-            <div className="info">
-              <div className="name">
-                {d.lastName} {d.firstName} {d.middleName || ''}
+          return (
+            <button key={d.id} type="button" className="card" onClick={() => router.push(`/hamburger/doctor/${d.id}`)}>
+              <div className="head">
+                <div className="avatar" aria-label="Фото врача">
+                  {d.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={d.avatarUrl} alt="" />
+                  ) : (
+                    <div className="avatarPh">{doctorAvatarLetter(d)}</div>
+                  )}
+                </div>
+
+                <div className="headInfo">
+                  <div className="name">{name}</div>
+                  <div className="specs">{specs}</div>
+
+                  <div className="row">
+                    <div className="exp">{expLabel}</div>
+
+                    <div className="rating" aria-label="Рейтинг">
+                      <span className="star">⭐</span>
+                      <span>{ratingLabel}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="meta">
-                {d.city ? d.city : 'Город не указан'}
+
+              <div className="body">
+                <div className="meta">{d.city ? d.city : 'Город не указан'}</div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </section>
 
       <DownBar />
@@ -136,38 +173,48 @@ export default function DoctorsBySpecialityPage() {
         }
 
         .list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+          display: grid;
+          gap: 12px;
           padding-bottom: 72px;
         }
 
         .card {
           width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 12px;
-          border-radius: 16px;
-          border: 1px solid rgba(156, 163, 175, 0.35);
-          background: #fff;
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.08);
           text-align: left;
-          -webkit-tap-highlight-color: transparent;
           cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          padding: 0;
         }
 
         .card:active {
           transform: scale(0.995);
-          opacity: 0.95;
+          opacity: 0.96;
+        }
+
+        .head {
+          padding: 12px;
+          background: rgba(34, 197, 94, 0.1);
+          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+          display: flex;
+          gap: 12px;
+          align-items: center;
         }
 
         .avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
+          width: 52px;
+          height: 52px;
+          border-radius: 999px;
           overflow: hidden;
-          background: #f3f4f6;
-          flex: 0 0 44px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #fff;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
         }
 
         .avatar img {
@@ -180,26 +227,74 @@ export default function DoctorsBySpecialityPage() {
         .avatarPh {
           width: 100%;
           height: 100%;
-          background: linear-gradient(135deg, #e5e7eb, #f3f4f6);
+          display: grid;
+          place-items: center;
+          font-weight: 950;
+          font-size: 20px;
+          color: #166534;
+          background: linear-gradient(135deg, rgba(229, 231, 235, 0.9), rgba(243, 244, 246, 1));
         }
 
-        .info {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
+        .headInfo {
           min-width: 0;
+          flex: 1 1 auto;
         }
 
         .name {
+          font-weight: 950;
           font-size: 15px;
+          color: rgba(15, 23, 42, 0.92);
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .specs {
+          margin-top: 2px;
+          font-size: 12px;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.65);
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .row {
+          margin-top: 2px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .exp {
+          font-size: 12px;
           font-weight: 900;
-          color: #111827;
-          line-height: 1.2;
+          color: rgba(15, 23, 42, 0.78);
+          white-space: nowrap;
+        }
+
+        .rating {
+          margin-left: auto;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 14px;
+          font-weight: 950;
+          color: rgba(15, 23, 42, 0.8);
+          white-space: nowrap;
+        }
+
+        .star {
+          opacity: 0.9;
+        }
+
+        .body {
+          padding: 12px;
         }
 
         .meta {
           font-size: 12px;
-          color: #6b7280;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.55);
         }
       `}</style>
     </main>
