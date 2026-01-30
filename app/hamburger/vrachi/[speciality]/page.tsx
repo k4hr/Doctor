@@ -67,7 +67,6 @@ export default function DoctorsBySpecialityPage() {
         setLoading(true);
         setWarn('');
 
-        // ✅ Поменяли путь на /api/doctor/vrachi
         const res = await fetch(`/api/doctor/vrachi?speciality=${encodeURIComponent(speciality)}`, {
           method: 'GET',
           cache: 'no-store',
@@ -110,7 +109,12 @@ export default function DoctorsBySpecialityPage() {
           const ratingLabel = safeRatingLabel();
 
           return (
-            <button key={d.id} type="button" className="card" onClick={() => router.push(`/hamburger/doctor/${d.id}`)}>
+            <button
+              key={d.id}
+              type="button"
+              className="card"
+              onClick={() => router.push(`/hamburger/doctor/${d.id}`)}
+            >
               <div className="head">
                 <div className="avatar" aria-label="Фото врача">
                   {d.avatarUrl ? (
@@ -134,10 +138,6 @@ export default function DoctorsBySpecialityPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="body">
-                <div className="meta">{d.city ? d.city : 'Город не указан'}</div>
               </div>
             </button>
           );
@@ -285,16 +285,6 @@ export default function DoctorsBySpecialityPage() {
 
         .star {
           opacity: 0.9;
-        }
-
-        .body {
-          padding: 12px;
-        }
-
-        .meta {
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.55);
         }
       `}</style>
     </main>
