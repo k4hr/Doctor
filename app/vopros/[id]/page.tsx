@@ -149,9 +149,7 @@ function doctorLastFirst(d: any) {
 }
 
 function doctorSpecsLine(d: any) {
-  const parts = [d?.speciality1, d?.speciality2, d?.speciality3]
-    .filter(Boolean)
-    .map((x) => String(x).trim());
+  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
   return parts.length ? parts.join(', ') : '—';
 }
 
@@ -412,12 +410,21 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
             {answers.map((a) => {
               const d = a.doctor;
               const profileUrl = toPublicUrlMaybe(d?.files?.[0]?.url || null);
-              const name = doctorLastFirst(d);
+
+              // ✅ как в "врачи онлайн": полное имя
+              const ln = String(d?.lastName || '').trim();
+              const fn = String(d?.firstName || '').trim();
+              const mn = String(d?.middleName || '').trim();
+              const fullName = [ln, fn, mn].filter(Boolean).join(' ').trim() || '—';
+
               const specs = doctorSpecsLine(d);
+
               const exp = Number(d?.experienceYears);
               const expLabel = Number.isFinite(exp) ? `Стаж: ${exp} лет` : 'Стаж: —';
+
               const ratingLabel = safeRatingLabel(d);
 
+              // ✅ Комментировать можно только: автор вопроса ИЛИ врач, который оставил этот ответ
               const canDoctorComment =
                 isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
@@ -443,27 +450,37 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
+                  {/* ✅ ШАПКА: ТОЧНО КАК "ВРАЧИ ОНЛАЙН", БЕЗ ЗЕЛЕНОГО КРУЖКА */}
                   <div
                     style={{
-                      padding: 12,
-                      background: 'rgba(34,197,94,0.10)',
-                      borderBottom: '1px solid rgba(15,23,42,0.08)',
+                      padding: '10px 12px',
+                      borderRadius: 16,
+                      border: '1px solid rgba(34, 197, 94, 0.22)',
+                      background: 'rgba(220, 252, 231, 0.75)',
+                      boxShadow: '0 8px 20px rgba(22, 163, 74, 0.16)',
                       display: 'flex',
-                      gap: 12,
                       alignItems: 'center',
+                      gap: 10,
+                      cursor: 'default',
+                      WebkitTapHighlightColor: 'transparent',
+                      margin: 12,
                     }}
                   >
                     <div
                       style={{
-                        width: 52,
-                        height: 52,
+                        width: 44,
+                        height: 44,
                         borderRadius: 999,
+                        background: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: '#16a34a',
+                        boxShadow: '0 4px 10px rgba(22, 163, 74, 0.30)',
+                        flexShrink: 0,
                         overflow: 'hidden',
-                        border: '1px solid rgba(15,23,42,0.10)',
-                        background: '#fff',
-                        display: 'grid',
-                        placeItems: 'center',
-                        flex: '0 0 auto',
                       }}
                       aria-label="Фото врача"
                     >
@@ -475,61 +492,62 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                         />
                       ) : (
-                        <div style={{ fontWeight: 950, fontSize: 20, color: '#166534' }}>{doctorAvatarLetter(d)}</div>
+                        <span>{doctorAvatarLetter(d)}</span>
                       )}
                     </div>
 
-                    <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-                      <div style={{ fontWeight: 950, fontSize: 15, color: 'rgba(15,23,42,0.92)', ...wrapText }}>
-                        {name}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: '#022c22',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {fullName}
+                        </span>
+
+                        {/* ❌ НЕТ онлайн-точки */}
+                        <span style={{ width: 10, height: 10, opacity: 0 }} />
                       </div>
 
-                      <div style={{ marginTop: 2, fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.65)', ...wrapText }}>
-                        {specs}
-                      </div>
-
-                      {/* ✅ РАССТОЯНИЕ как между ФИ и специальностью */}
-                      <div
+                      <span
                         style={{
-                          marginTop: 2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          flexWrap: 'wrap',
+                          fontSize: 12,
+                          color: 'rgba(15, 23, 42, 0.80)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        <div
+                        {specs}
+                      </span>
+
+                      <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10 }}>
+                        <span
                           style={{
-                            fontSize: 12,
-                            fontWeight: 900,
-                            color: 'rgba(15,23,42,0.78)',
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: 'rgba(255,255,255,0.90)',
+                            color: '#15803d',
+                            fontWeight: 500,
                             whiteSpace: 'nowrap',
                           }}
                         >
                           {expLabel}
-                        </div>
+                        </span>
 
-                        <div
-                          style={{
-                            marginLeft: 'auto',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            fontSize: 14,
-                            fontWeight: 950,
-                            color: 'rgba(15,23,42,0.80)',
-                            whiteSpace: 'nowrap',
-                          }}
-                          aria-label="Рейтинг"
-                        >
-                          <span style={{ opacity: 0.9 }}>⭐</span>
-                          <span>{ratingLabel}</span>
-                        </div>
+                        <span style={{ color: '#166534', fontWeight: 600, whiteSpace: 'nowrap' }}>⭐ {ratingLabel}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ padding: 12 }}>
+                  {/* тело ответа */}
+                  <div style={{ padding: 12, paddingTop: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)', marginBottom: 8 }}>
                       {fmtDateTimeRuMsk(a.createdAt)}
                     </div>
