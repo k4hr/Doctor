@@ -132,10 +132,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
       <button type="button" className="qc" onClick={onOpen} aria-label={`Открыть вопрос: ${q.title}`}>
         <div className="qcTop">
           <div className="qcTopLeft">
-            {/* ✅ В ЛЕВОМ ВЕРХНЕМ УГЛУ */}
             <div className="qcAuthorTop">{authorLabelSafe(q)}</div>
-
-            {/* ✅ НИЖЕ — ЗАГОЛОВОК */}
             <h2 className="qcTitle">{q.title}</h2>
           </div>
 
@@ -183,10 +180,14 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
 
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
 
-          /* чуть выше, потому что сверху теперь 2 строки: "Вопрос от" + title */
-          height: 110px;
+          /* ✅ убираем "пиздец-пустоту": низ всегда прилипает к верху */
+          justify-content: flex-start;
+
+          /* ✅ высота теперь auto, карточка подстраивается под контент */
+          height: auto;
+          min-height: 92px;
+
           overflow: hidden;
         }
 
@@ -308,6 +309,9 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           align-items: end;
           gap: 10px;
           min-width: 0;
+
+          /* ✅ вот этим мы физически сокращаем расстояние */
+          margin-top: 6px;
         }
 
         .qcDoctorText {
