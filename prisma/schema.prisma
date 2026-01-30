@@ -21,14 +21,12 @@ enum DoctorFileKind {
   DIPLOMA_PHOTO
 }
 
-// NEW
 enum QuestionStatus {
   OPEN
   IN_PROGRESS
   DONE
 }
 
-// NEW
 enum QuestionFileKind {
   PHOTO
 }
@@ -75,10 +73,7 @@ model Doctor {
 
   files DoctorFile[]
 
-  // NEW: вопросы назначенные врачу (фильтр "вопросы этого врача")
   assignedQuestions Question[] @relation("AssignedDoctor")
-
-  // NEW: вопросы, на которые врач реально ответил (статистика/рейтинг потом)
   answeredQuestions Question[] @relation("AnsweredDoctor")
 
   @@index([status])
@@ -106,35 +101,31 @@ model DoctorFile {
   @@index([doctorId, kind, sortOrder])
 }
 
-// NEW
 model Question {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Автор (пациент) — Telegram WebApp user
   authorTelegramId String
   authorUsername   String?
   authorFirstName  String?
   authorLastName   String?
 
-  // Категория (раздел медицины)
+  // ✅ новое: выбор анонимности
+  authorIsAnonymous Boolean @default(true)
+
   speciality String
 
-  // Заголовок + текст вопроса
   title String
   body  String
 
-  // Ключевые слова (нормализованные) — для поиска
   keywords String[] @default([])
 
   status QuestionStatus @default(OPEN)
 
-  // Назначение на конкретного врача (опционально)
   assignedDoctorId String?
   assignedDoctor   Doctor? @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
 
-  // Кто ответил (опционально, когда появится логика ответов)
   answeredByDoctorId String?
   answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
 
