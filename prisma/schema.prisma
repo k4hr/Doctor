@@ -112,7 +112,7 @@ model Question {
   authorLastName   String?
 
   // ✅ новое: выбор анонимности
-  authorIsAnonymous Boolean @default(true)
+  authorisanonymous Boolean @default(true)
 
   speciality String
 
