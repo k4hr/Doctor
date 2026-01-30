@@ -9,6 +9,10 @@ export type FeedQuestionItem = {
   bodySnippet: string;
   createdAt: string; // ISO
   doctorLabel: string;
+
+  // ✅ новое: "Вопрос от ..."
+  authorLabel?: string;
+
   status: 'ANSWERING' | 'WAITING';
   priceBadge: 'FREE' | 'PAID';
   optimistic?: boolean; // локально созданный, пока не подтвердили/не подтянули с сервера
