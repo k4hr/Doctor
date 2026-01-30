@@ -1,5 +1,3 @@
-/* path: prisma/schema.prisma */
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -32,7 +30,7 @@ enum QuestionFileKind {
   PHOTO
 }
 
-/** Кто написал комментарий под ответом */
+// Кто написал комментарий под ответом
 enum AnswerCommentAuthorType {
   USER
   DOCTOR
