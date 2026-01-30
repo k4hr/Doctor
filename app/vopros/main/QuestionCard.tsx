@@ -11,12 +11,10 @@ export type QuestionCardData = {
   id: string;
 
   title: string;
-  bodySnippet: string; // остаётся в данных, но на карточке НЕ показываем
+  bodySnippet: string;
   createdAt: string | Date;
 
   doctorLabel: string;
-
-  // ✅ новое: строка "Вопрос от ..."
   authorLabel?: string;
 
   status: QuestionStatusUI;
@@ -116,7 +114,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
     return {
       statusText: st.text,
       statusTone: st.tone,
-
       priceText: pr.text,
       priceTone: pr.tone,
     };
@@ -181,14 +178,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           display: flex;
           flex-direction: column;
 
-          /* ✅ убираем "пиздец-пустоту": низ всегда прилипает к верху */
-          justify-content: flex-start;
-
-          /* ✅ высота теперь auto, карточка подстраивается под контент */
-          height: auto;
-          min-height: 92px;
-
+          /* ✅ фикс высоты как ты хочешь */
+          height: 110px;
           overflow: hidden;
+
+          /* ✅ и при этом низ всегда “приклеен” вниз */
+          justify-content: space-between;
         }
 
         .qc::after {
@@ -217,6 +212,25 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           align-items: start;
           gap: 10px;
           min-width: 0;
+
+          /* ✅ ключевой фикс “пустоты”:
+             не даём верхнему блоку растягиваться по высоте */
+          flex: 0 0 auto;
+          min-height: 0;
+        }
+
+        /* ✅ нижний блок тоже не растягиваем */
+        .qcBottom {
+          flex: 0 0 auto;
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: end;
+          gap: 10px;
+          min-width: 0;
+          min-height: 0;
+
+          /* чуть плотнее визуально */
+          margin-top: 2px;
         }
 
         .qcTopLeft {
@@ -224,6 +238,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           flex-direction: column;
           gap: 4px;
           min-width: 0;
+          min-height: 0;
         }
 
         .qcAuthorTop {
@@ -244,7 +259,11 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           font-weight: 900;
           color: #0b0c10;
           letter-spacing: -0.01em;
-          line-height: 1.06;
+
+          /* ✅ делаем 2 строки реально “ровно”, чтобы после … не было воздуха */
+          line-height: 16px;
+          height: 32px; /* 2 строки * 16px */
+          max-height: 32px;
 
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -275,43 +294,32 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
 
         .qcPill--free {
           background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.10);
-          color: rgba(15, 23, 42, 0.70);
+          border-color: rgba(15, 23, 42, 0.1);
+          color: rgba(15, 23, 42, 0.7);
         }
 
         .qcPill--gold {
           background: rgba(245, 158, 11, 0.12);
-          border-color: rgba(245, 158, 11, 0.30);
+          border-color: rgba(245, 158, 11, 0.3);
           color: #92400e;
         }
 
         .qcPill--green {
-          background: rgba(36, 199, 104, 0.10);
-          border-color: rgba(36, 199, 104, 0.30);
+          background: rgba(36, 199, 104, 0.1);
+          border-color: rgba(36, 199, 104, 0.3);
           color: #166534;
         }
 
         .qcPill--gray {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.70);
+          color: rgba(15, 23, 42, 0.7);
         }
 
         .qcPill--red {
-          background: rgba(239, 68, 68, 0.10);
+          background: rgba(239, 68, 68, 0.1);
           border-color: rgba(239, 68, 68, 0.26);
           color: #991b1b;
-        }
-
-        .qcBottom {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          align-items: end;
-          gap: 10px;
-          min-width: 0;
-
-          /* ✅ вот этим мы физически сокращаем расстояние */
-          margin-top: 6px;
         }
 
         .qcDoctorText {
