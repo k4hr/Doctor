@@ -131,12 +131,16 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
     <>
       <button type="button" className="qc" onClick={onOpen} aria-label={`Открыть вопрос: ${q.title}`}>
         <div className="qcTop">
-          <h2 className="qcTitle">{q.title}</h2>
+          <div className="qcTopLeft">
+            {/* ✅ В ЛЕВОМ ВЕРХНЕМ УГЛУ */}
+            <div className="qcAuthorTop">{authorLabelSafe(q)}</div>
+
+            {/* ✅ НИЖЕ — ЗАГОЛОВОК */}
+            <h2 className="qcTitle">{q.title}</h2>
+          </div>
 
           <div className="qcRight">
-            <span className={`qcPill ${ui.priceTone === 'gold' ? 'qcPill--gold' : 'qcPill--free'}`}>
-              {ui.priceText}
-            </span>
+            <span className={`qcPill ${ui.priceTone === 'gold' ? 'qcPill--gold' : 'qcPill--free'}`}>{ui.priceText}</span>
 
             <span
               className={`qcPill ${
@@ -153,17 +157,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
         </div>
 
         <div className="qcBottom">
-          <div className="qcMetaLeft">
-            <span className="qcDoctorText">{q.doctorLabel}</span>
-            <span className="qcAuthorText">{authorLabelSafe(q)}</span>
-          </div>
-
+          <span className="qcDoctorText">{q.doctorLabel}</span>
           <span className="qcTime">{timeAgoRu(q.createdAt)}</span>
         </div>
       </button>
 
       <style jsx>{`
-        /* iOS-стайл: плотная компоновка без пустоты */
         .qc {
           width: 100%;
           text-align: left;
@@ -174,15 +173,21 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           background: rgba(255, 255, 255, 0.96);
           border-radius: 18px;
 
-          /* меньше воздуха */
           padding: 10px 12px 9px;
 
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.07);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
 
-          /* hairline divider снизу (как в iOS списках) */
           position: relative;
+
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+
+          /* чуть выше, потому что сверху теперь 2 строки: "Вопрос от" + title */
+          height: 110px;
+          overflow: hidden;
         }
 
         .qc::after {
@@ -195,21 +200,9 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           height: 1px;
           background: rgba(15, 23, 42, 0.08);
 
-          /* 0.5px на retina: “тонкая линия” */
           transform: scaleY(0.5);
           transform-origin: bottom;
           pointer-events: none;
-        }
-
-        /* КЛЮЧ: flex + space-between убирает “пустые этажи” */
-        .qc {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-
-          /* компактнее, но с местом под "Вопрос от ..." */
-          height: 104px;
-          overflow: hidden;
         }
 
         .qc:active {
@@ -225,7 +218,25 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        /* чуть “жирнее iOS”: заголовок плотный */
+        .qcTopLeft {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
+        }
+
+        .qcAuthorTop {
+          font-size: 11px;
+          font-weight: 900;
+          color: rgba(15, 23, 42, 0.58);
+          line-height: 1.05;
+
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+
         .qcTitle {
           margin: 0;
           font-size: 15px;
@@ -245,10 +256,9 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 4px; /* меньше расстояние между “Бесплатно” и “Ждёт ответа” */
+          gap: 4px;
         }
 
-        /* Плашки — более компактные, чтобы не раздували карточку */
         .qcPill {
           flex: 0 0 auto;
 
@@ -300,30 +310,10 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        .qcMetaLeft {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          min-width: 0;
-        }
-
-        /* Специальность — текстом, но “собранно” */
         .qcDoctorText {
           font-size: 12px;
           font-weight: 800;
           color: rgba(15, 23, 42, 0.72);
-          line-height: 1.05;
-
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          min-width: 0;
-        }
-
-        .qcAuthorText {
-          font-size: 11px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.58);
           line-height: 1.05;
 
           white-space: nowrap;
