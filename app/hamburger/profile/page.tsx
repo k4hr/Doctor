@@ -22,13 +22,34 @@ type MeOk = { ok: true; user: TgUser; isAdmin: boolean; via: string };
 type MeErr = { ok: false; error: string; hint?: string };
 type MeResponse = MeOk | MeErr;
 
+type DoctorMeOk = {
+  ok: true;
+  telegramId: string;
+  isDoctor: boolean;
+  doctor: null | {
+    id: string;
+    status: string;
+    statusRu?: string;
+    canAccessDoctorCabinet?: boolean;
+
+    firstName: string | null;
+    lastName: string | null;
+    middleName: string | null;
+    city: string | null;
+    speciality1: string | null;
+    speciality2: string | null;
+    speciality3: string | null;
+  };
+};
+
+type DoctorMeErr = { ok: false; error: string; hint?: string };
+type DoctorMeResponse = DoctorMeOk | DoctorMeErr;
+
 /* -------- cookie helpers (как в старом кабинете) -------- */
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
-      value
-    )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-AgetMax-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
 
@@ -117,7 +138,7 @@ export default function ProfilePage() {
               'Если открываешь из бота кнопкой и всё равно пусто — значит в этом окружении initData не приходит.'
           );
 
-          // dev-фолбэк: ?id=123 при ALLOW_BROWSER_DEBUG=1
+          // dev-фолбэк: ?id=123 при debug=1
           try {
             const u = new URL(window.location.href);
             const id = u.searchParams.get('id');
@@ -137,6 +158,34 @@ export default function ProfilePage() {
           } catch {}
 
           return;
+        }
+
+        // ✅ 0) СНАЧАЛА проверяем: человек подтверждённый врач?
+        // Если да — сразу уводим на /hamburger/profile/doctor
+        try {
+          const rDoc = await fetch('/api/doctor/me', {
+            method: 'GET',
+            headers: {
+              'X-Telegram-Init-Data': initData,
+              'X-Init-Data': initData,
+            },
+            cache: 'no-store',
+          });
+
+          const jDoc = (await rDoc.json().catch(() => null)) as DoctorMeResponse | null;
+
+          const canGoDoctor =
+            !!jDoc &&
+            (jDoc as any).ok === true &&
+            (jDoc as DoctorMeOk).isDoctor === true &&
+            !!(jDoc as DoctorMeOk).doctor?.canAccessDoctorCabinet;
+
+          if (canGoDoctor) {
+            router.replace('/hamburger/profile/doctor');
+            return;
+          }
+        } catch {
+          // если /api/doctor/me упал — не ломаем профиль пользователя, просто идём дальше
         }
 
         // 3) Как в старом проекте: отправляем initData ЗАГОЛОВКАМИ
@@ -166,7 +215,7 @@ export default function ProfilePage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
   const displayName = useMemo(() => getDisplayName(tgUser), [tgUser]);
 
@@ -208,13 +257,8 @@ export default function ProfilePage() {
           <span className="profile-btn-sub">Данные и настройки</span>
         </button>
 
-        {/* ОДНА кнопка админ-меню */}
         {isAdmin && (
-          <button
-            type="button"
-            className="adminMainBtn"
-            onClick={() => go('/hamburger/profile/admin')}
-          >
+          <button type="button" className="adminMainBtn" onClick={() => go('/hamburger/profile/admin')}>
             Админ-меню
           </button>
         )}
@@ -295,7 +339,6 @@ export default function ProfilePage() {
           color: #6b7280;
         }
 
-        /* Зеленая кнопка админки */
         .adminMainBtn {
           margin-top: 6px;
           width: 100%;
