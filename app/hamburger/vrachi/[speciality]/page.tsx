@@ -176,10 +176,17 @@ export default function DoctorsBySpecialityPage() {
           display: grid;
           gap: 12px;
           padding-bottom: 72px;
+          width: 100%;
         }
 
+        /* ✅ КЛЮЧЕВОЕ: кнопка по умолчанию inline/fit-content в некоторых стилях,
+           поэтому принудительно делаем block + 100% и box-sizing */
         .card {
+          display: block;
           width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+
           border-radius: 18px;
           overflow: hidden;
           border: 1px solid rgba(15, 23, 42, 0.1);
@@ -189,6 +196,11 @@ export default function DoctorsBySpecialityPage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           padding: 0;
+        }
+
+        /* ✅ На iOS иногда помогает еще так, чтобы растянуть кнопку */
+        .card {
+          justify-self: stretch;
         }
 
         .card:active {
