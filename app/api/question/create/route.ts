@@ -108,6 +108,10 @@ export async function POST(req: Request) {
     const qBody = String((body as any).body || '').trim();
     const keywords = parseKeywords((body as any).keywords);
 
+    // ✅ новое: выбор анонимности (по умолчанию true)
+    const authorIsAnonymous =
+      typeof (body as any).authorIsAnonymous === 'boolean' ? Boolean((body as any).authorIsAnonymous) : true;
+
     // опционально на будущее: назначение врачу (для “фильтр по врачу”)
     const assignedDoctorId = (body as any).assignedDoctorId ? String((body as any).assignedDoctorId).trim() : null;
 
@@ -128,6 +132,8 @@ export async function POST(req: Request) {
         authorUsername: v.user.username,
         authorFirstName: v.user.first_name,
         authorLastName: v.user.last_name,
+
+        authorIsAnonymous, // ✅ сохранили выбор
 
         speciality,
         title,
