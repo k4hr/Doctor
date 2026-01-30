@@ -15,6 +15,13 @@ type TgWebApp = {
   showAlert?: (msg: string) => void;
 };
 
+type TgUser = {
+  id?: string | number;
+  username?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
 function tg(): TgWebApp | null {
   try {
     return (window as any)?.Telegram?.WebApp || null;
@@ -71,6 +78,38 @@ function getTelegramInitDataSmart(): { initData: string; source: string } {
   return { initData: '', source: 'none' };
 }
 
+function extractTgUserFromInitData(initData: string): TgUser | null {
+  try {
+    const params = new URLSearchParams(String(initData || ''));
+    const userStr = params.get('user');
+    if (!userStr) return null;
+    const u = JSON.parse(userStr);
+    if (!u || !u.id) return null;
+    return {
+      id: u.id,
+      username: u.username ? String(u.username) : null,
+      first_name: u.first_name ? String(u.first_name) : null,
+      last_name: u.last_name ? String(u.last_name) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildAuthorLabel(authorIsAnonymous: boolean, user: TgUser | null): string {
+  if (authorIsAnonymous) return 'Вопрос от Анонимно';
+
+  const uname = (user?.username || '').trim();
+  if (uname) return `Вопрос от @${uname.replace(/^@/, '')}`;
+
+  const fn = (user?.first_name || '').trim();
+  const ln = (user?.last_name || '').trim();
+  const full = [fn, ln].filter(Boolean).join(' ').trim();
+  if (full) return `Вопрос от ${full}`;
+
+  return 'Вопрос от Пользователь';
+}
+
 const MAX_PHOTOS = 10;
 
 function clampFiles(files: FileList | null | undefined, max: number): File[] {
@@ -97,6 +136,9 @@ export default function VoprosPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [keywords, setKeywords] = useState('');
+
+  // ✅ выбор: анонимно / показать имя
+  const [authorIsAnonymous, setAuthorIsAnonymous] = useState(true);
 
   // ✅ опционально (для будущего фильтра “по врачу”), пока скрыто и не обязательно
   const [assignedDoctorId, setAssignedDoctorId] = useState('');
@@ -182,6 +224,7 @@ export default function VoprosPage() {
           body: body.trim(),
           keywords: parseKeywordsClient(keywords),
           assignedDoctorId: assignedDoctorId.trim() || undefined,
+          authorIsAnonymous, // ✅ новое поле
         }),
       });
 
@@ -203,6 +246,9 @@ export default function VoprosPage() {
       const createdAtIso =
         typeof jCreate?.createdAt === 'string' && jCreate.createdAt ? String(jCreate.createdAt) : new Date().toISOString();
 
+      const tgUser = extractTgUserFromInitData(initData);
+      const optimisticAuthorLabel = buildAuthorLabel(authorIsAnonymous, tgUser);
+
       // ✅ МГНОВЕННО добавляем в ленту (optimistic)
       feedUpsertTop({
         id: questionId,
@@ -210,6 +256,7 @@ export default function VoprosPage() {
         bodySnippet: body.trim(),
         createdAt: createdAtIso,
         doctorLabel: speciality.trim() || '—',
+        authorLabel: optimisticAuthorLabel, // ✅ показываем на карточке
         status: 'WAITING',
         priceBadge: 'FREE',
         optimistic: true,
@@ -251,6 +298,7 @@ export default function VoprosPage() {
       setAssignedDoctorId('');
       setPhotos([]);
       setPhotosInputKey((x) => x + 1);
+      setAuthorIsAnonymous(true);
 
       // ✅ просто уходим на главную — там уже есть новый вопрос из стора
       router.push('/');
@@ -314,6 +362,38 @@ export default function VoprosPage() {
               Фото и детали вопроса будут доступны <b>только врачам выбранной категории</b>.
             </p>
           </label>
+
+          <section className="field" aria-label="Приватность автора">
+            <span className="field-label">Показывать автора</span>
+
+            <div className="anonRow" role="group" aria-label="Настройка автора">
+              <button
+                type="button"
+                className={'anonBtn ' + (authorIsAnonymous ? 'anonBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setAuthorIsAnonymous(true);
+                }}
+              >
+                Анонимно
+              </button>
+
+              <button
+                type="button"
+                className={'anonBtn ' + (!authorIsAnonymous ? 'anonBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setAuthorIsAnonymous(false);
+                }}
+              >
+                Моё имя в Telegram
+              </button>
+            </div>
+
+            <p className="field-hint">
+              На главной карточке будет: <b>{authorIsAnonymous ? 'Вопрос от Анонимно' : 'Вопрос от @username/Имя'}</b>
+            </p>
+          </section>
 
           <label className="field">
             <span className="field-label">Заголовок вопроса</span>
@@ -469,6 +549,37 @@ export default function VoprosPage() {
           font-size: 13px;
           font-weight: 600;
           color: #111827;
+        }
+
+        .anonRow {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .anonBtn {
+          width: 100%;
+          border-radius: 12px;
+          padding: 10px 12px;
+          border: 1px solid rgba(15, 23, 42, 0.14);
+          background: rgba(249, 250, 251, 1);
+          color: rgba(17, 24, 39, 0.82);
+          font-weight: 800;
+          font-size: 12px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+
+        .anonBtn--active {
+          border-color: rgba(36, 199, 104, 0.42);
+          background: rgba(36, 199, 104, 0.10);
+          color: #166534;
+          box-shadow: 0 10px 22px rgba(36, 199, 104, 0.14);
+        }
+
+        .anonBtn:active {
+          transform: scale(0.99);
         }
 
         .select-wrap {
