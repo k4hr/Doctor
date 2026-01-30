@@ -73,8 +73,8 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-/** ✅ Москва + формат: 26.01.2026 г. (без времени) */
-function fmtDateRuMskDateOnly(input: Date | string | null | undefined) {
+/** ✅ Москва + формат: 26.01.2026 г., 14:07 (24 часа) */
+function fmtDateTimeRuMsk(input: Date | string | null | undefined) {
   if (!input) return '—';
   const d = input instanceof Date ? input : new Date(input);
   const ts = d.getTime();
@@ -87,7 +87,14 @@ function fmtDateRuMskDateOnly(input: Date | string | null | undefined) {
     year: 'numeric',
   }).format(d);
 
-  return `${datePart} г.`;
+  const timePart = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d);
+
+  return `${datePart} г., ${timePart}`;
 }
 
 function show(v: any) {
@@ -276,9 +283,9 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
 
           <div style={{ fontWeight: 900, fontSize: 14 }}>Системное</div>
           <div><b>ID анкеты:</b> <span style={wrapText}>{doctor.id}</span></div>
-          <div><b>Дата создания:</b> {fmtDateRuMskDateOnly(doctor.createdAt)}</div>
-          <div><b>Дата обновления:</b> {fmtDateRuMskDateOnly(doctor.updatedAt)}</div>
-          <div><b>Дата отправки на модерацию:</b> {fmtDateRuMskDateOnly(doctor.submittedAt)}</div>
+          <div><b>Дата создания:</b> {fmtDateTimeRuMsk(doctor.createdAt)}</div>
+          <div><b>Дата обновления:</b> {fmtDateTimeRuMsk(doctor.updatedAt)}</div>
+          <div><b>Дата отправки на модерацию:</b> {fmtDateTimeRuMsk(doctor.submittedAt)}</div>
         </div>
 
         <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
