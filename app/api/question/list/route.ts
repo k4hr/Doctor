@@ -27,6 +27,21 @@ function mapPriceToUi(_q: any): 'FREE' | 'PAID' {
   return 'FREE';
 }
 
+function buildAuthorLabel(q: any) {
+  const isAnon = q?.authorIsAnonymous !== false; // по умолчанию true
+  if (isAnon) return 'Вопрос от Анонимно';
+
+  const uname = String(q?.authorUsername || '').trim();
+  if (uname) return `Вопрос от @${uname.replace(/^@/, '')}`;
+
+  const fn = String(q?.authorFirstName || '').trim();
+  const ln = String(q?.authorLastName || '').trim();
+  const full = [fn, ln].filter(Boolean).join(' ').trim();
+  if (full) return `Вопрос от ${full}`;
+
+  return 'Вопрос от Пользователь';
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
@@ -38,6 +53,19 @@ export async function POST(req: Request) {
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        createdAt: true,
+        speciality: true,
+        status: true,
+
+        authorIsAnonymous: true,
+        authorUsername: true,
+        authorFirstName: true,
+        authorLastName: true,
+      },
     });
 
     const items = rows.map((q) => ({
@@ -46,6 +74,7 @@ export async function POST(req: Request) {
       bodySnippet: snippet(String(q.body), 170),
       createdAt: q.createdAt.toISOString(),
       doctorLabel: String(q.speciality || '—'),
+      authorLabel: buildAuthorLabel(q), // ✅ новое
       status: mapStatusToUi(q.status),
       priceBadge: mapPriceToUi(q),
     }));
