@@ -43,7 +43,7 @@ export default function StartDoctorBlock() {
                   </div>
 
                   <div className="step">
-                    <div className="stepN">3</div>
+                    <div className="stepN">2</div>
                     <div className="stepT">
                       <b>Загрузите</b> скан диплома о получении медицинского образования
                     </div>
@@ -55,9 +55,7 @@ export default function StartDoctorBlock() {
                     <b>Всё готово!</b> Начните отвечать на вопросы пользователей. От вашей активности зависит ваш рейтинг
                     и заработок.
                   </p>
-                  <p className="p">
-                    Специалисты с высоким рейтингом будут показываться пользователям чаще.
-                  </p>
+                  <p className="p">Специалисты с высоким рейтингом будут показываться пользователям чаще.</p>
                 </div>
               </div>
 
@@ -90,7 +88,7 @@ export default function StartDoctorBlock() {
 
         .sdoc-grid {
           display: grid;
-          grid-template-columns: 160px 1fr;
+          grid-template-columns: 170px 1fr;
           grid-template-areas:
             'title title'
             'img content';
@@ -116,15 +114,16 @@ export default function StartDoctorBlock() {
           text-align: center;
         }
 
+        /* ✅ ВАЖНО: делаем контейнер ПОД ПОРТРЕТ (высокий прямоугольник), а не квадрат */
         .sdoc-imgWrap {
           grid-area: img;
-          width: 160px;
-          height: 160px;
+          width: 170px;
+          aspect-ratio: 3 / 4; /* было квадратом — теперь вытянуто вверх/вниз */
           border-radius: 18px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid rgba(15, 23, 42, 0.08);
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.10);
+          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
           display: grid;
           place-items: center;
         }
@@ -132,7 +131,7 @@ export default function StartDoctorBlock() {
         .sdoc-img {
           width: 100%;
           height: 100%;
-          object-fit: contain; /* ✅ полностью помещаем */
+          object-fit: contain; /* ✅ фото помещается полностью */
           display: block;
           background: #ffffff;
         }
@@ -184,14 +183,14 @@ export default function StartDoctorBlock() {
           font-size: 14px;
           line-height: 1.4;
           color: rgba(17, 24, 39, 0.88);
-          text-align: left; /* ✅ ровное выравнивание текста */
+          text-align: left;
         }
 
         .sdoc-text {
           font-size: 14px;
           line-height: 1.5;
-          color: rgba(17, 24, 39, 0.80);
-          text-align: left; /* ✅ ровное выравнивание текста */
+          color: rgba(17, 24, 39, 0.8);
+          text-align: left;
         }
 
         .p {
@@ -226,11 +225,11 @@ export default function StartDoctorBlock() {
 
         @media (max-width: 520px) {
           .sdoc-grid {
-            grid-template-columns: 140px 1fr;
+            grid-template-columns: 150px 1fr;
           }
           .sdoc-imgWrap {
-            width: 140px;
-            height: 140px;
+            width: 150px;
+            aspect-ratio: 3 / 4;
           }
           .sdoc-cols {
             grid-template-columns: 1fr;
@@ -240,11 +239,11 @@ export default function StartDoctorBlock() {
 
         @media (max-width: 380px) {
           .sdoc-grid {
-            grid-template-columns: 122px 1fr;
+            grid-template-columns: 132px 1fr;
           }
           .sdoc-imgWrap {
-            width: 122px;
-            height: 122px;
+            width: 132px;
+            aspect-ratio: 3 / 4;
           }
           .sdoc-title {
             font-size: 20px;
