@@ -6,6 +6,7 @@ import OvrachaxBlock from './DownBarUtil/ovrachax';
 import VozmojnostiBlock from './DownBarUtil/vozmojnosti';
 import MiniInfoBlock from './DownBarUtil/miniinfo';
 import OtziviBlock from './DownBarUtil/otzivi';
+import StartDoctorBlock from './DownBarUtil/startdoctor';
 
 /**
  * Общий DownBar — просто блок в конце страницы.
@@ -17,6 +18,7 @@ export default function DownBar() {
         <VrachiOnlineBlock />
         <OvrachaxBlock />
         <VozmojnostiBlock />
+        <StartDoctorBlock />
         <MiniInfoBlock />
         <OtziviBlock />
       </section>
