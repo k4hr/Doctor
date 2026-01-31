@@ -22,6 +22,10 @@ export default function StartDoctorBlock() {
       <section className="sdoc">
         <div className="sdoc-card">
           <div className="sdoc-grid">
+            <div className="sdoc-titleWrap">
+              <h2 className="sdoc-title">Простой старт для врачей</h2>
+            </div>
+
             <div className="sdoc-imgWrap" aria-label="Картинка">
               {/* Положи файл в /public, например: /public/startdoctor.png */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -29,26 +33,33 @@ export default function StartDoctorBlock() {
             </div>
 
             <div className="sdoc-content">
-              <h2 className="sdoc-title">Простой старт для врачей</h2>
+              <div className="sdoc-cols">
+                <div className="sdoc-steps">
+                  <div className="step">
+                    <div className="stepN">1</div>
+                    <div className="stepT">
+                      <b>Зарегистрируйтесь</b> и заполните свой профиль, загрузите фото
+                    </div>
+                  </div>
 
-              <ul className="sdoc-list">
-                <li className="sdoc-li">
-                  <span className="dot" />
-                  <span>Зарегистрируйтесь и заполните свой профиль, загрузите фото</span>
-                </li>
-                <li className="sdoc-li">
-                  <span className="dot" />
-                  <span>Загрузите скан диплома о получении медицинского образования</span>
-                </li>
-              </ul>
+                  <div className="step">
+                    <div className="stepN">3</div>
+                    <div className="stepT">
+                      <b>Загрузите</b> скан диплома о получении медицинского образования
+                    </div>
+                  </div>
+                </div>
 
-              <p className="sdoc-text">
-                Всё готово! Начните отвечать на вопросы пользователей. От вашей активности зависит ваш рейтинг и
-                заработок.
-                <br />
-                <br />
-                Специалисты с высоким рейтингом будут показываться пользователям чаще.
-              </p>
+                <div className="sdoc-text">
+                  <p className="p">
+                    <b>Всё готово!</b> Начните отвечать на вопросы пользователей. От вашей активности зависит ваш рейтинг
+                    и заработок.
+                  </p>
+                  <p className="p">
+                    Специалисты с высоким рейтингом будут показываться пользователям чаще.
+                  </p>
+                </div>
+              </div>
 
               <button type="button" className="sdoc-btn" onClick={go}>
                 Я ВРАЧ
@@ -68,88 +79,130 @@ export default function StartDoctorBlock() {
           border-radius: 22px;
           overflow: hidden;
           border: 1px solid rgba(15, 23, 42, 0.08);
-          background: radial-gradient(circle at top left, rgba(236, 253, 245, 1) 0, rgba(209, 250, 229, 0.8) 40%, #ffffff 92%);
+          background: radial-gradient(
+            circle at top left,
+            rgba(236, 253, 245, 1) 0,
+            rgba(209, 250, 229, 0.78) 40%,
+            #ffffff 92%
+          );
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
         }
 
         .sdoc-grid {
           display: grid;
-          grid-template-columns: 132px 1fr;
+          grid-template-columns: 160px 1fr;
+          grid-template-areas:
+            'title title'
+            'img content';
           gap: 14px;
           padding: 14px;
+          align-items: stretch;
+        }
+
+        .sdoc-titleWrap {
+          grid-area: title;
+          display: flex;
+          justify-content: center;
           align-items: center;
+          padding: 6px 6px 2px;
+        }
+
+        .sdoc-title {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 900;
+          color: #111827;
+          letter-spacing: -0.01em;
+          text-align: center;
         }
 
         .sdoc-imgWrap {
-          width: 132px;
-          height: 132px;
+          grid-area: img;
+          width: 160px;
+          height: 160px;
           border-radius: 18px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid rgba(15, 23, 42, 0.08);
           box-shadow: 0 6px 14px rgba(15, 23, 42, 0.10);
-          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
         }
 
         .sdoc-img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain; /* ✅ полностью помещаем */
           display: block;
+          background: #ffffff;
         }
 
         .sdoc-content {
+          grid-area: content;
           min-width: 0;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 12px;
+          padding-top: 2px;
         }
 
-        .sdoc-title {
-          margin: 0;
-          font-size: 20px;
-          font-weight: 900;
-          color: #111827;
-          letter-spacing: -0.01em;
+        .sdoc-cols {
+          display: grid;
+          grid-template-columns: 1.05fr 1fr;
+          gap: 18px;
+          align-items: start;
         }
 
-        .sdoc-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
+        .sdoc-steps {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 14px;
         }
 
-        .sdoc-li {
-          display: flex;
-          gap: 10px;
-          align-items: flex-start;
-          font-size: 14px;
-          line-height: 1.35;
-          color: rgba(55, 65, 81, 0.92);
+        .step {
+          display: grid;
+          grid-template-columns: 42px 1fr;
+          gap: 12px;
+          align-items: start;
         }
 
-        .dot {
-          margin-top: 6px;
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          background: #24c768;
-          box-shadow: 0 6px 14px rgba(36, 199, 104, 0.30);
+        .stepN {
+          width: 42px;
+          height: 42px;
+          border-radius: 10px;
+          border: 2px solid rgba(15, 23, 42, 0.45);
+          background: rgba(255, 255, 255, 0.75);
+          display: grid;
+          place-items: center;
+          font-weight: 900;
+          font-size: 18px;
+          color: rgba(17, 24, 39, 0.92);
           flex: 0 0 auto;
         }
 
+        .stepT {
+          font-size: 14px;
+          line-height: 1.4;
+          color: rgba(17, 24, 39, 0.88);
+          text-align: left; /* ✅ ровное выравнивание текста */
+        }
+
         .sdoc-text {
-          margin: 0;
-          font-size: 13px;
-          line-height: 1.45;
-          color: rgba(17, 24, 39, 0.75);
+          font-size: 14px;
+          line-height: 1.5;
+          color: rgba(17, 24, 39, 0.80);
+          text-align: left; /* ✅ ровное выравнивание текста */
+        }
+
+        .p {
+          margin: 0 0 12px;
+        }
+
+        .p:last-child {
+          margin-bottom: 0;
         }
 
         .sdoc-btn {
-          margin-top: 6px;
           width: 100%;
           border: none;
           border-radius: 16px;
@@ -171,13 +224,30 @@ export default function StartDoctorBlock() {
           opacity: 0.95;
         }
 
-        @media (max-width: 380px) {
+        @media (max-width: 520px) {
           .sdoc-grid {
-            grid-template-columns: 118px 1fr;
+            grid-template-columns: 140px 1fr;
           }
           .sdoc-imgWrap {
-            width: 118px;
-            height: 118px;
+            width: 140px;
+            height: 140px;
+          }
+          .sdoc-cols {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .sdoc-grid {
+            grid-template-columns: 122px 1fr;
+          }
+          .sdoc-imgWrap {
+            width: 122px;
+            height: 122px;
+          }
+          .sdoc-title {
+            font-size: 20px;
           }
         }
       `}</style>
