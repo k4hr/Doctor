@@ -21,48 +21,36 @@ export default function StartDoctorBlock() {
     <>
       <section className="sdoc">
         <div className="sdoc-card">
-          <div className="sdoc-grid">
-            <div className="sdoc-titleWrap">
-              <h2 className="sdoc-title">Простой старт для врачей</h2>
-            </div>
+          <h2 className="sdoc-title">Простой старт для врачей</h2>
 
-            <div className="sdoc-imgWrap" aria-label="Картинка">
-              {/* Положи файл в /public, например: /public/startdoctor.png */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="sdoc-img" src="/startdoctor.png" alt="" />
-            </div>
-
-            <div className="sdoc-content">
-              <div className="sdoc-cols">
-                <div className="sdoc-steps">
-                  <div className="step">
-                    <div className="stepN">1</div>
-                    <div className="stepT">
-                      <b>Зарегистрируйтесь</b> и заполните свой профиль, загрузите фото
-                    </div>
-                  </div>
-
-                  <div className="step">
-                    <div className="stepN">2</div>
-                    <div className="stepT">
-                      <b>Загрузите</b> скан диплома о получении медицинского образования
-                    </div>
-                  </div>
-                </div>
-
-                <div className="sdoc-text">
-                  <p className="p">
-                    <b>Всё готово!</b> Начните отвечать на вопросы пользователей. От вашей активности зависит ваш рейтинг
-                    и заработок.
-                  </p>
-                  <p className="p">Специалисты с высоким рейтингом будут показываться пользователям чаще.</p>
+          <div className="sdoc-body">
+            <div className="sdoc-steps">
+              <div className="step">
+                <div className="stepN">1</div>
+                <div className="stepT">
+                  <b>Зарегистрируйтесь</b> и заполните свой профиль, загрузите фото
                 </div>
               </div>
 
-              <button type="button" className="sdoc-btn" onClick={go}>
-                Я ВРАЧ
-              </button>
+              <div className="step">
+                <div className="stepN">2</div>
+                <div className="stepT">
+                  <b>Загрузите</b> скан диплома о получении медицинского образования
+                </div>
+              </div>
             </div>
+
+            <div className="sdoc-text">
+              <p className="p">
+                <b>Всё готово!</b> Начните отвечать на вопросы пользователей. От вашей активности зависит ваш рейтинг и
+                заработок.
+              </p>
+              <p className="p">Специалисты с высоким рейтингом будут показываться пользователям чаще.</p>
+            </div>
+
+            <button type="button" className="sdoc-btn" onClick={go}>
+              Я ВРАЧ
+            </button>
           </div>
         </div>
       </section>
@@ -84,29 +72,12 @@ export default function StartDoctorBlock() {
             #ffffff 92%
           );
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
-        }
-
-        .sdoc-grid {
-          display: grid;
-          grid-template-columns: 170px 1fr;
-          grid-template-areas:
-            'title title'
-            'img content';
-          gap: 14px;
-          padding: 14px;
-          align-items: stretch;
-        }
-
-        .sdoc-titleWrap {
-          grid-area: title;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 6px 6px 2px;
+          padding: 16px 14px 14px;
+          box-sizing: border-box;
         }
 
         .sdoc-title {
-          margin: 0;
+          margin: 0 0 12px;
           font-size: 22px;
           font-weight: 900;
           color: #111827;
@@ -114,48 +85,16 @@ export default function StartDoctorBlock() {
           text-align: center;
         }
 
-        /* ✅ ВАЖНО: делаем контейнер ПОД ПОРТРЕТ (высокий прямоугольник), а не квадрат */
-        .sdoc-imgWrap {
-          grid-area: img;
-          width: 170px;
-          aspect-ratio: 3 / 4; /* было квадратом — теперь вытянуто вверх/вниз */
-          border-radius: 18px;
-          overflow: hidden;
-          background: rgba(255, 255, 255, 0.9);
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
-          display: grid;
-          place-items: center;
-        }
-
-        .sdoc-img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain; /* ✅ фото помещается полностью */
-          display: block;
-          background: #ffffff;
-        }
-
-        .sdoc-content {
-          grid-area: content;
-          min-width: 0;
+        .sdoc-body {
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          padding-top: 2px;
-        }
-
-        .sdoc-cols {
-          display: grid;
-          grid-template-columns: 1.05fr 1fr;
-          gap: 18px;
-          align-items: start;
+          gap: 14px;
         }
 
         .sdoc-steps {
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 12px;
         }
 
         .step {
@@ -194,7 +133,7 @@ export default function StartDoctorBlock() {
         }
 
         .p {
-          margin: 0 0 12px;
+          margin: 0 0 10px;
         }
 
         .p:last-child {
@@ -223,30 +162,16 @@ export default function StartDoctorBlock() {
           opacity: 0.95;
         }
 
-        @media (max-width: 520px) {
-          .sdoc-grid {
-            grid-template-columns: 150px 1fr;
-          }
-          .sdoc-imgWrap {
-            width: 150px;
-            aspect-ratio: 3 / 4;
-          }
-          .sdoc-cols {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-        }
-
         @media (max-width: 380px) {
-          .sdoc-grid {
-            grid-template-columns: 132px 1fr;
-          }
-          .sdoc-imgWrap {
-            width: 132px;
-            aspect-ratio: 3 / 4;
-          }
           .sdoc-title {
             font-size: 20px;
+          }
+          .step {
+            grid-template-columns: 40px 1fr;
+          }
+          .stepN {
+            width: 40px;
+            height: 40px;
           }
         }
       `}</style>
