@@ -15,7 +15,9 @@ function haptic(type: 'light' | 'medium' = 'light') {
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+      value
+    )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
 function getCookie(name: string): string {
@@ -72,6 +74,23 @@ type DoctorMeOk = {
 type DoctorMeErr = { ok: false; error: string; hint?: string };
 type DoctorMeResponse = DoctorMeOk | DoctorMeErr;
 
+type ReviewItem = {
+  id: string;
+  createdAt: string; // ISO
+  rating: number; // 1..5
+  text: string | null;
+  isVerified: boolean;
+};
+
+type ReviewsOk = {
+  ok: true;
+  doctorId: string | null;
+  rating: { value: number; count: number };
+  items: ReviewItem[];
+};
+type ReviewsErr = { ok: false; error: string; hint?: string };
+type ReviewsResponse = ReviewsOk | ReviewsErr;
+
 function fullName(d: DoctorDto | null) {
   const a = String(d?.lastName ?? '').trim();
   const b = String(d?.firstName ?? '').trim();
@@ -80,7 +99,9 @@ function fullName(d: DoctorDto | null) {
 }
 
 function specsLine(d: DoctorDto | null) {
-  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
+  const parts = [d?.speciality1, d?.speciality2, d?.speciality3]
+    .filter(Boolean)
+    .map((x) => String(x).trim());
   return parts.length ? parts.join(', ') : '—';
 }
 
@@ -100,6 +121,69 @@ function formatInt(n: any) {
   return String(Math.trunc(x));
 }
 
+function round1(x: number) {
+  return Math.round(x * 10) / 10;
+}
+
+function fmtRating(x: any) {
+  const n = typeof x === 'number' ? x : Number(x);
+  const v = Number.isFinite(n) ? round1(n) : 0;
+  return v.toFixed(1).replace('.', ',');
+}
+
+function fmtDateRu(iso: string) {
+  try {
+    const d = new Date(iso);
+    const ts = d.getTime();
+    if (!Number.isFinite(ts)) return '';
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
+function Stars({ value }: { value: number }) {
+  const v = Number.isFinite(value) ? Math.max(0, Math.min(5, value)) : 0;
+  const pct = (v / 5) * 100;
+
+  return (
+    <span className="stars" aria-label={`Рейтинг ${v.toFixed(1)}`}>
+      <span className="starsBase">★★★★★</span>
+      <span className="starsFill" style={{ width: `${pct}%` }}>
+        ★★★★★
+      </span>
+
+      <style jsx>{`
+        .stars {
+          position: relative;
+          display: inline-block;
+          font-size: 18px;
+          line-height: 1;
+          letter-spacing: 2px;
+          user-select: none;
+        }
+        .starsBase {
+          color: rgba(17, 24, 39, 0.18);
+          font-weight: 900;
+        }
+        .starsFill {
+          position: absolute;
+          left: 0;
+          top: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          color: #f59e0b;
+          font-weight: 900;
+        }
+      `}</style>
+    </span>
+  );
+}
+
 export default function DoctorProfilePage() {
   const router = useRouter();
 
@@ -108,23 +192,32 @@ export default function DoctorProfilePage() {
   const [doctor, setDoctor] = useState<DoctorDto | null>(null);
   const [tab, setTab] = useState<'about' | 'reviews'>('about');
 
+  const [initData, setInitData] = useState<string>('');
+
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsWarn, setReviewsWarn] = useState('');
+  const [reviewsItems, setReviewsItems] = useState<ReviewItem[]>([]);
+  const [ratingAvg, setRatingAvg] = useState(0);
+  const [ratingCount, setRatingCount] = useState(0);
+
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
       WebApp?.ready?.();
     } catch {}
 
-    const initData = (WebApp?.initData as string) || getInitDataFromCookie();
+    const idata = (WebApp?.initData as string) || getInitDataFromCookie();
     if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
       setCookie('tg_init_data', WebApp.initData, 3);
     }
+    setInitData(idata || '');
 
     (async () => {
       try {
         setLoading(true);
         setWarn('');
 
-        if (!initData) {
+        if (!idata) {
           setWarn('Нет initData от Telegram. Открой из бота.');
           router.replace('/hamburger/profile');
           return;
@@ -133,8 +226,8 @@ export default function DoctorProfilePage() {
         const rDoc = await fetch('/api/doctor/me', {
           method: 'GET',
           headers: {
-            'X-Telegram-Init-Data': initData,
-            'X-Init-Data': initData,
+            'X-Telegram-Init-Data': idata,
+            'X-Init-Data': idata,
           },
           cache: 'no-store',
         });
@@ -163,19 +256,70 @@ export default function DoctorProfilePage() {
     })();
   }, [router]);
 
+  // грузим отзывы, когда знаем doctor.id
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!doctor?.id) return;
+        if (!initData) return;
+
+        setReviewsLoading(true);
+        setReviewsWarn('');
+
+        const r = await fetch(`/api/doctor/reviews?doctorId=${encodeURIComponent(doctor.id)}&limit=50`, {
+          method: 'GET',
+          headers: {
+            'X-Telegram-Init-Data': initData,
+            'X-Init-Data': initData,
+          },
+          cache: 'no-store',
+        });
+
+        const j = (await r.json().catch(() => null)) as ReviewsResponse | null;
+
+        if (!r.ok || !j || (j as any).ok !== true) {
+          setReviewsWarn((j as any)?.hint || (j as any)?.error || 'Не удалось загрузить отзывы');
+          setReviewsItems([]);
+          setRatingAvg(0);
+          setRatingCount(0);
+          return;
+        }
+
+        const ok = j as ReviewsOk;
+        setReviewsItems(ok.items || []);
+        setRatingAvg(typeof ok.rating?.value === 'number' ? ok.rating.value : 0);
+        setRatingCount(typeof ok.rating?.count === 'number' ? ok.rating.count : (ok.items?.length || 0));
+        setReviewsWarn('');
+      } catch (e) {
+        console.error(e);
+        setReviewsWarn('Ошибка сети/сервера при загрузке отзывов');
+        setReviewsItems([]);
+        setRatingAvg(0);
+        setRatingCount(0);
+      } finally {
+        setReviewsLoading(false);
+      }
+    })();
+  }, [doctor?.id, initData]);
+
   const name = useMemo(() => (loading ? '...' : fullName(doctor)), [doctor, loading]);
   const specs = useMemo(() => specsLine(doctor), [doctor]);
 
   const expYears = doctor?.experienceYears ?? null;
   const consults = doctor?.stats?.consultationsCount ?? 0;
-  const reviews = doctor?.stats?.reviewsCount ?? 0;
+  const reviewsStat = doctor?.stats?.reviewsCount ?? 0;
 
-  const ratingValue = '5.0'; // пока статично как у тебя везде
+  const ratingLabel = useMemo(() => fmtRating(ratingAvg), [ratingAvg]);
+  const starsValue = useMemo(() => {
+    const v = typeof ratingAvg === 'number' && Number.isFinite(ratingAvg) ? ratingAvg : 0;
+    return Math.max(0, Math.min(5, v));
+  }, [ratingAvg]);
 
   const onLeaveReview = () => {
     haptic('light');
     if (doctor?.id) {
-      router.push(`/hamburger/doctor/${doctor.id}`); // если у тебя там будет “оставить отзыв”
+      // сюда потом прикрутишь реальный экран “оставить отзыв”
+      router.push(`/hamburger/doctor/${doctor.id}`);
     }
   };
 
@@ -197,12 +341,17 @@ export default function DoctorProfilePage() {
         <div className="specs">{specs}</div>
 
         <div className="ratingRow" aria-label="Рейтинг">
-          <span className="stars">★★★★★</span>
+          <Stars value={starsValue} />
         </div>
 
-        {/* ✅ строка под звёздами */}
-        <button type="button" className="leaveReview" onClick={onLeaveReview}>
-          оставить отзыв
+        {/* ✅ вместо “оставить отзыв” показываем рейтинг */}
+        <div className="ratingText">
+          Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
+        </div>
+
+        {/* кнопку оставим ниже — удобнее, чем прятать */}
+        <button type="button" className="leaveReviewBtn" onClick={onLeaveReview}>
+          Оставить отзыв
         </button>
       </section>
 
@@ -222,7 +371,7 @@ export default function DoctorProfilePage() {
         <div className="divider" />
 
         <div className="stat">
-          <div className="statVal">{formatInt(reviews)}</div>
+          <div className="statVal">{formatInt(reviewsStat || ratingCount)}</div>
           <div className="statLab">отзывов</div>
         </div>
       </section>
@@ -277,14 +426,47 @@ export default function DoctorProfilePage() {
             </div>
           </>
         ) : (
-          <div className="block">
-            <div className="blockTitle">Отзывы</div>
-            <div className="blockText" style={{ opacity: 0.75 }}>
-              Пока отзывов нет (или модуль отзывов ещё не подключён).
-              <br />
-              Рейтинг: <b>{ratingValue}</b>
+          <>
+            <div className="reviewsHeader">
+              <div className="reviewsTitle">Отзывы</div>
+              <div className="reviewsMeta">
+                <span className="metaStars">
+                  <Stars value={starsValue} />
+                </span>
+                <span className="metaText">
+                  {ratingLabel} · {formatInt(ratingCount)} отзывов
+                </span>
+              </div>
             </div>
-          </div>
+
+            <button type="button" className="leaveReviewBtnWide" onClick={onLeaveReview}>
+              Оставить отзыв
+            </button>
+
+            {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
+            {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
+
+            {!reviewsLoading && !reviewsItems.length ? (
+              <p className="muted">Пока отзывов нет.</p>
+            ) : null}
+
+            <div className="reviewsList">
+              {reviewsItems.map((r) => (
+                <div key={r.id} className="reviewCard">
+                  <div className="reviewTop">
+                    <span className="reviewStars">
+                      <Stars value={Math.max(0, Math.min(5, Number(r.rating) || 0))} />
+                    </span>
+                    <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
+                  </div>
+
+                  {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
+
+                  {r.isVerified ? <div className="badgeOk">проверен</div> : null}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
@@ -358,26 +540,31 @@ export default function DoctorProfilePage() {
           gap: 10px;
         }
 
-        .stars {
-          letter-spacing: 1px;
-          color: #f59e0b;
-          font-size: 16px;
+        .ratingText {
+          margin-top: 6px;
+          font-size: 13px;
           font-weight: 900;
+          color: rgba(17, 24, 39, 0.78);
         }
 
-        .leaveReview {
-          margin-top: 6px;
+        .ratingCount {
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.45);
+        }
+
+        .leaveReviewBtn {
+          margin-top: 10px;
           border: none;
           background: transparent;
           color: #6d28d9;
-          font-weight: 900;
+          font-weight: 950;
           font-size: 13px;
           text-decoration: underline;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
         }
 
-        .leaveReview:active {
+        .leaveReviewBtn:active {
           opacity: 0.7;
           transform: scale(0.99);
         }
@@ -485,6 +672,120 @@ export default function DoctorProfilePage() {
           white-space: pre-wrap;
           overflow-wrap: anywhere;
           word-break: break-word;
+        }
+
+        .reviewsHeader {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 10px;
+        }
+
+        .reviewsTitle {
+          font-size: 14px;
+          font-weight: 950;
+          color: #111827;
+        }
+
+        .reviewsMeta {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .metaText {
+          font-size: 13px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.65);
+        }
+
+        .leaveReviewBtnWide {
+          width: 100%;
+          border: none;
+          border-radius: 14px;
+          padding: 12px 12px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          background: #24c768;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 950;
+          text-align: center;
+          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
+          margin-bottom: 10px;
+        }
+
+        .leaveReviewBtnWide:active {
+          transform: scale(0.99);
+          opacity: 0.95;
+        }
+
+        .warnSmall {
+          margin: 0 0 8px;
+          font-size: 12px;
+          line-height: 1.35;
+          color: #ef4444;
+          font-weight: 800;
+        }
+
+        .muted {
+          margin: 0 0 10px;
+          font-size: 13px;
+          color: rgba(17, 24, 39, 0.55);
+          font-weight: 800;
+        }
+
+        .reviewsList {
+          display: grid;
+          gap: 10px;
+        }
+
+        .reviewCard {
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 14px;
+          padding: 10px 10px;
+          background: rgba(249, 250, 251, 0.9);
+        }
+
+        .reviewTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 6px;
+        }
+
+        .reviewDate {
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.45);
+          white-space: nowrap;
+        }
+
+        .reviewText {
+          font-size: 13px;
+          line-height: 1.45;
+          color: rgba(17, 24, 39, 0.78);
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .reviewText.muted {
+          color: rgba(17, 24, 39, 0.45);
+        }
+
+        .badgeOk {
+          margin-top: 8px;
+          display: inline-block;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: rgba(34, 197, 94, 0.14);
+          border: 1px solid rgba(22, 163, 74, 0.22);
+          color: #166534;
+          font-weight: 950;
+          font-size: 12px;
         }
       `}</style>
     </main>
