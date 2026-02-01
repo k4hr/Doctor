@@ -89,6 +89,13 @@ model Doctor {
   // ✅ Новое: врач может писать комментарии под ответами
   answerComments AnswerComment[]
 
+  // ✅ Рейтинг (агрегаты по отзывам)
+  ratingSum   Int @default(0) // сумма всех оценок 1..5
+  ratingCount Int @default(0) // количество отзывов
+
+  // ✅ Отзывы о враче
+  reviews DoctorReview[]
+
   @@index([status])
   @@index([speciality1])
   @@index([city])
@@ -149,6 +156,9 @@ model Question {
   // ✅ Новое: ответы врачей (до 10 — ограничишь в API)
   answers Answer[]
 
+  // ✅ Отзывы могут быть привязаны к вопросу (опционально)
+  reviews DoctorReview[]
+
   @@index([speciality])
   @@index([status])
   @@index([createdAt])
@@ -193,6 +203,9 @@ model Answer {
 
   comments AnswerComment[]
 
+  // ✅ Отзывы могут быть привязаны к конкретному ответу (опционально)
+  reviews DoctorReview[]
+
   @@index([questionId])
   @@index([doctorId])
   @@index([questionId, createdAt])
@@ -223,4 +236,38 @@ model AnswerComment {
   @@index([authorDoctorId])
   @@index([authorTelegramId])
   @@index([answerId, createdAt])
+}
+
+model DoctorReview {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String
+  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  // Кто оставил отзыв (обычный пользователь)
+  authorTelegramId String
+
+  // 1..5 (в API валидируешь)
+  rating Int
+
+  // Текст отзыва (опционально)
+  text String?
+
+  // Можно привязать отзыв к конкретному вопросу/ответу (после "принял ответ")
+  questionId String?
+  question   Question? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  answerId String?
+  answer   Answer? @relation(fields: [answerId], references: [id], onDelete: SetNull)
+
+  // На будущее (модерация/оплата/подтверждение)
+  isVerified Boolean @default(false)
+
+  @@index([doctorId])
+  @@index([doctorId, createdAt])
+  @@index([authorTelegramId])
+  @@index([questionId])
+  @@index([answerId])
 }
