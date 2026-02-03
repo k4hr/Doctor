@@ -190,8 +190,6 @@ export default function DoctorsBySpecialityPage() {
           width: 100%;
         }
 
-        /* ====== ТОЧНО КАК В "ВРАЧИ ОНЛАЙН" ====== */
-
         .doconline-card {
           width: 100%;
           box-sizing: border-box;
