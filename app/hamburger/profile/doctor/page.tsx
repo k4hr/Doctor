@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../../components/TopBarBack';
 
+// ✅ badges
+import DocumentBadge from '../../../../components/bage/document';
+import ProBadge from '../../../../components/bage/pro';
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -15,9 +19,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
-      value
-    )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
 function getCookie(name: string): string {
@@ -99,9 +101,7 @@ function fullName(d: DoctorDto | null) {
 }
 
 function specsLine(d: DoctorDto | null) {
-  const parts = [d?.speciality1, d?.speciality2, d?.speciality3]
-    .filter(Boolean)
-    .map((x) => String(x).trim());
+  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
   return parts.length ? parts.join(', ') : '—';
 }
 
@@ -200,6 +200,9 @@ export default function DoctorProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
+  // ✅ только для визуальной проверки бейджа PRO (потом заменишь на doctor.isPro)
+  const isProPreview = true;
+
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
@@ -288,7 +291,7 @@ export default function DoctorProfilePage() {
         const ok = j as ReviewsOk;
         setReviewsItems(ok.items || []);
         setRatingAvg(typeof ok.rating?.value === 'number' ? ok.rating.value : 0);
-        setRatingCount(typeof ok.rating?.count === 'number' ? ok.rating.count : (ok.items?.length || 0));
+        setRatingCount(typeof ok.rating?.count === 'number' ? ok.rating.count : ok.items?.length || 0);
         setReviewsWarn('');
       } catch (e) {
         console.error(e);
@@ -318,7 +321,6 @@ export default function DoctorProfilePage() {
   const onLeaveReview = () => {
     haptic('light');
     if (doctor?.id) {
-      // сюда потом прикрутишь реальный экран “оставить отзыв”
       router.push(`/hamburger/doctor/${doctor.id}`);
     }
   };
@@ -344,12 +346,16 @@ export default function DoctorProfilePage() {
           <Stars value={starsValue} />
         </div>
 
-        {/* ✅ вместо “оставить отзыв” показываем рейтинг */}
         <div className="ratingText">
           Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
         </div>
 
-        {/* кнопку оставим ниже — удобнее, чем прятать */}
+        {/* ✅ БЕЙДЖИ — для проверки внешнего вида */}
+        <div className="badgesRow" aria-label="Бейджи">
+          <DocumentBadge size="sm" />
+          {isProPreview ? <ProBadge size="sm" /> : null}
+        </div>
+
         <button type="button" className="leaveReviewBtn" onClick={onLeaveReview}>
           Оставить отзыв
         </button>
@@ -379,19 +385,11 @@ export default function DoctorProfilePage() {
       {warn ? <p className="warn">{warn}</p> : null}
 
       <section className="tabs">
-        <button
-          type="button"
-          className={tab === 'about' ? 'tab tabActive' : 'tab'}
-          onClick={() => setTab('about')}
-        >
+        <button type="button" className={tab === 'about' ? 'tab tabActive' : 'tab'} onClick={() => setTab('about')}>
           О враче
         </button>
 
-        <button
-          type="button"
-          className={tab === 'reviews' ? 'tab tabActive' : 'tab'}
-          onClick={() => setTab('reviews')}
-        >
+        <button type="button" className={tab === 'reviews' ? 'tab tabActive' : 'tab'} onClick={() => setTab('reviews')}>
           Отзывы
         </button>
       </section>
@@ -446,9 +444,7 @@ export default function DoctorProfilePage() {
             {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
             {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
 
-            {!reviewsLoading && !reviewsItems.length ? (
-              <p className="muted">Пока отзывов нет.</p>
-            ) : null}
+            {!reviewsLoading && !reviewsItems.length ? <p className="muted">Пока отзывов нет.</p> : null}
 
             <div className="reviewsList">
               {reviewsItems.map((r) => (
@@ -460,7 +456,11 @@ export default function DoctorProfilePage() {
                     <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
                   </div>
 
-                  {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
+                  {r.text ? (
+                    <div className="reviewText">{r.text}</div>
+                  ) : (
+                    <div className="reviewText muted">Без текста</div>
+                  )}
 
                   {r.isVerified ? <div className="badgeOk">проверен</div> : null}
                 </div>
@@ -550,6 +550,15 @@ export default function DoctorProfilePage() {
         .ratingCount {
           font-weight: 900;
           color: rgba(17, 24, 39, 0.45);
+        }
+
+        /* ✅ row for badges */
+        .badgesRow {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 8px;
         }
 
         .leaveReviewBtn {
