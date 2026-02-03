@@ -1,6 +1,7 @@
 /* path: app/vopros/[id]/page.tsx */
 import type React from 'react';
 import crypto from 'crypto';
+import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import TopBarBack from '../../../components/TopBarBack';
@@ -320,7 +321,16 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        <div style={{ fontWeight: 950, fontSize: 20, lineHeight: 1.15, letterSpacing: '-0.01em', marginTop: 2, ...wrapText }}>
+        <div
+          style={{
+            fontWeight: 950,
+            fontSize: 20,
+            lineHeight: 1.15,
+            letterSpacing: '-0.01em',
+            marginTop: 2,
+            ...wrapText,
+          }}
+        >
           {show(q.title)}
         </div>
 
@@ -411,7 +421,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               const d = a.doctor;
               const profileUrl = toPublicUrlMaybe(d?.files?.[0]?.url || null);
 
-              // ✅ как в "врачи онлайн": полное имя
               const ln = String(d?.lastName || '').trim();
               const fn = String(d?.firstName || '').trim();
               const mn = String(d?.middleName || '').trim();
@@ -439,6 +448,8 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                   }))
                 : [];
 
+              const doctorHref = d?.id ? `/hamburger/doctor/${String(d.id)}` : '#';
+
               return (
                 <div
                   key={String(a.id)}
@@ -450,101 +461,110 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
-                  {/* ✅ ШАПКА: ТОЧНО КАК "ВРАЧИ ОНЛАЙН", БЕЗ ЗЕЛЕНОГО КРУЖКА */}
-                  <div
+                  {/* ✅ ШАПКА (КЛИКАБЕЛЬНАЯ): ведёт в профиль врача */}
+                  <Link
+                    href={doctorHref}
                     style={{
-                      padding: '10px 12px',
-                      borderRadius: 16,
-                      border: '1px solid rgba(34, 197, 94, 0.22)',
-                      background: 'rgba(220, 252, 231, 0.75)',
-                      boxShadow: '0 8px 20px rgba(22, 163, 74, 0.16)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      cursor: 'default',
+                      display: 'block',
+                      textDecoration: 'none',
+                      color: 'inherit',
                       WebkitTapHighlightColor: 'transparent',
-                      margin: 12,
                     }}
                   >
                     <div
                       style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 999,
-                        background: '#ffffff',
+                        padding: '10px 12px',
+                        borderRadius: 16,
+                        border: '1px solid rgba(34, 197, 94, 0.22)',
+                        background: 'rgba(220, 252, 231, 0.75)',
+                        boxShadow: '0 8px 20px rgba(22, 163, 74, 0.16)',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: 18,
-                        color: '#16a34a',
-                        boxShadow: '0 4px 10px rgba(22, 163, 74, 0.30)',
-                        flexShrink: 0,
-                        overflow: 'hidden',
+                        gap: 10,
+                        cursor: 'pointer',
+                        margin: 12,
                       }}
-                      aria-label="Фото врача"
                     >
-                      {profileUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={profileUrl}
-                          alt="doctor"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
-                      ) : (
-                        <span>{doctorAvatarLetter(d)}</span>
-                      )}
-                    </div>
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 999,
+                          background: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: 18,
+                          color: '#16a34a',
+                          boxShadow: '0 4px 10px rgba(22, 163, 74, 0.30)',
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                        }}
+                        aria-label="Фото врача"
+                      >
+                        {profileUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={profileUrl}
+                            alt="doctor"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : (
+                          <span>{doctorAvatarLetter(d)}</span>
+                        )}
+                      </div>
 
-                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: '#022c22',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {fullName}
+                          </span>
+
+                          {/* ❌ НЕТ онлайн-точки */}
+                          <span style={{ width: 10, height: 10, opacity: 0 }} />
+                        </div>
+
                         <span
                           style={{
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: '#022c22',
+                            fontSize: 12,
+                            color: 'rgba(15, 23, 42, 0.80)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {fullName}
+                          {specs}
                         </span>
 
-                        {/* ❌ НЕТ онлайн-точки */}
-                        <span style={{ width: 10, height: 10, opacity: 0 }} />
-                      </div>
+                        <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10 }}>
+                          <span
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              background: 'rgba(255,255,255,0.90)',
+                              color: '#15803d',
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {expLabel}
+                          </span>
 
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: 'rgba(15, 23, 42, 0.80)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {specs}
-                      </span>
-
-                      <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10 }}>
-                        <span
-                          style={{
-                            padding: '2px 8px',
-                            borderRadius: 999,
-                            background: 'rgba(255,255,255,0.90)',
-                            color: '#15803d',
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {expLabel}
-                        </span>
-
-                        <span style={{ color: '#166534', fontWeight: 600, whiteSpace: 'nowrap' }}>⭐ {ratingLabel}</span>
+                          <span style={{ color: '#166534', fontWeight: 600, whiteSpace: 'nowrap' }}>⭐ {ratingLabel}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
 
                   {/* тело ответа */}
                   <div style={{ padding: 12, paddingTop: 0 }}>
