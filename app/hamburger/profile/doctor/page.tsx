@@ -338,7 +338,7 @@ export default function DoctorProfilePage() {
         {/* ✅ кнопка-штучка (вход в кабинет) */}
         <button type="button" className="cabinetBtn" onClick={onOpenCabinet} aria-label="Личный кабинет врача">
           <span className="cabinetIcon" aria-hidden="true">
-            ☝️
+            📂
           </span>
         </button>
 
