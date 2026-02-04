@@ -1,4 +1,4 @@
-/* path: prisma/schema.prisma */
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -37,7 +37,7 @@ enum AnswerCommentAuthorType {
   DOCTOR
 }
 
-/* ✅ Финансы врача */
+// ✅ Финансы врача
 enum DoctorTxType {
   IN
   OUT
@@ -118,7 +118,7 @@ model Doctor {
   // ✅ Отзывы о враче
   reviews DoctorReview[]
 
-  /* ✅ Финансы */
+  // ✅ Финансы
   wallet       DoctorWallet?
   transactions DoctorTransaction[]
   payouts      DoctorPayoutRequest[]
@@ -130,17 +130,17 @@ model Doctor {
 }
 
 model DoctorFile {
-  id        String         @id @default(cuid())
-  createdAt DateTime       @default(now())
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
 
-  doctorId  String
-  doctor    Doctor         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   kind      DoctorFileKind
   url       String
   mime      String?
   sizeBytes Int?
-  sortOrder Int            @default(0)
+  sortOrder Int @default(0)
 
   @@index([doctorId])
   @@index([kind])
@@ -204,7 +204,7 @@ model QuestionFile {
   url       String
   mime      String?
   sizeBytes Int?
-  sortOrder Int      @default(0)
+  sortOrder Int @default(0)
 
   @@index([questionId])
   @@index([kind])
@@ -271,7 +271,7 @@ model DoctorReview {
   updatedAt DateTime @updatedAt
 
   doctorId String
-  doctor   Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   // Кто оставил отзыв (обычный пользователь)
   authorTelegramId String
@@ -299,7 +299,7 @@ model DoctorReview {
   @@index([answerId])
 }
 
-/* ✅ 1:1 кошелек врача */
+// ✅ 1:1 кошелек врача
 model DoctorWallet {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -315,7 +315,7 @@ model DoctorWallet {
   @@index([doctorId])
 }
 
-/* ✅ транзакции по кошельку */
+// ✅ транзакции по кошельку
 model DoctorTransaction {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -340,7 +340,7 @@ model DoctorTransaction {
   @@index([doctorId, status, createdAt])
 }
 
-/* ✅ заявки на вывод */
+// ✅ заявки на вывод
 model DoctorPayoutRequest {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
