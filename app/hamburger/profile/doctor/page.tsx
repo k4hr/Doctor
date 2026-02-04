@@ -203,6 +203,11 @@ export default function DoctorProfilePage() {
   // ✅ только для визуальной проверки бейджа PRO (потом заменишь на doctor.isPro)
   const isProPreview = true;
 
+  const onOpenCabinet = () => {
+    haptic('light');
+    router.push('/hamburger/profile/doctor/settings');
+  };
+
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
@@ -330,6 +335,13 @@ export default function DoctorProfilePage() {
       <TopBarBack />
 
       <section className="hero">
+        {/* ✅ кнопка-штучка (вход в кабинет) */}
+        <button type="button" className="cabinetBtn" onClick={onOpenCabinet} aria-label="Личный кабинет врача">
+          <span className="cabinetIcon" aria-hidden="true">
+            ☝️
+          </span>
+        </button>
+
         <div className="avatarWrap" aria-label="Фото врача">
           {doctor?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -456,11 +468,7 @@ export default function DoctorProfilePage() {
                     <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
                   </div>
 
-                  {r.text ? (
-                    <div className="reviewText">{r.text}</div>
-                  ) : (
-                    <div className="reviewText muted">Без текста</div>
-                  )}
+                  {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
 
                   {r.isVerified ? <div className="badgeOk">проверен</div> : null}
                 </div>
@@ -488,6 +496,35 @@ export default function DoctorProfilePage() {
           flex-direction: column;
           align-items: center;
           text-align: center;
+          position: relative;
+        }
+
+        /* ✅ иконка в правом верхнем углу */
+        .cabinetBtn {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(249, 250, 251, 0.92);
+          box-shadow: 0 10px 20px rgba(18, 28, 45, 0.08);
+          display: grid;
+          place-items: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .cabinetBtn:active {
+          transform: scale(0.98);
+          opacity: 0.95;
+        }
+
+        .cabinetIcon {
+          font-size: 22px;
+          line-height: 1;
+          filter: grayscale(0.1);
         }
 
         .avatarWrap {
@@ -552,7 +589,6 @@ export default function DoctorProfilePage() {
           color: rgba(17, 24, 39, 0.45);
         }
 
-        /* ✅ row for badges */
         .badgesRow {
           margin-top: 10px;
           display: flex;
