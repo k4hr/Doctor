@@ -136,11 +136,7 @@ function fmtDateRu(iso: string) {
     const d = new Date(iso);
     const ts = d.getTime();
     if (!Number.isFinite(ts)) return '';
-    return new Intl.DateTimeFormat('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(d);
+    return new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
   } catch {
     return '';
   }
@@ -194,6 +190,8 @@ export default function DoctorProfilePage() {
 
   const [initData, setInitData] = useState<string>('');
 
+  const [canOpenCabinet, setCanOpenCabinet] = useState(false);
+
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsWarn, setReviewsWarn] = useState('');
   const [reviewsItems, setReviewsItems] = useState<ReviewItem[]>([]);
@@ -205,6 +203,12 @@ export default function DoctorProfilePage() {
 
   const onOpenCabinet = () => {
     haptic('light');
+
+    if (!canOpenCabinet) {
+      setWarn('Кабинет доступен только подтверждённым врачам.');
+      return;
+    }
+
     router.push('/hamburger/profile/doctor/settings');
   };
 
@@ -224,6 +228,7 @@ export default function DoctorProfilePage() {
       try {
         setLoading(true);
         setWarn('');
+        setCanOpenCabinet(false);
 
         if (!idata) {
           setWarn('Нет initData от Telegram. Открой из бота.');
@@ -233,27 +238,33 @@ export default function DoctorProfilePage() {
 
         const rDoc = await fetch('/api/doctor/me', {
           method: 'GET',
-          headers: {
-            'X-Telegram-Init-Data': idata,
-            'X-Init-Data': idata,
-          },
+          headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
           cache: 'no-store',
         });
 
         const jDoc = (await rDoc.json().catch(() => null)) as DoctorMeResponse | null;
 
-        const canStayHere =
+        const ok =
           !!jDoc &&
           (jDoc as any).ok === true &&
           (jDoc as DoctorMeOk).isDoctor === true &&
-          !!(jDoc as DoctorMeOk).doctor?.canAccessDoctorCabinet;
+          !!(jDoc as DoctorMeOk).doctor;
 
-        if (!canStayHere) {
+        if (!ok) {
           router.replace('/hamburger/profile');
           return;
         }
 
-        setDoctor((jDoc as DoctorMeOk).doctor);
+        const d = (jDoc as DoctorMeOk).doctor;
+        setDoctor(d);
+
+        // ✅ ВЫРАВНИВАЕМ С SETTINGS/BALANCE: кабинет только для APPROVED
+        const isApproved = String(d?.status || '').toUpperCase() === 'APPROVED';
+        setCanOpenCabinet(isApproved);
+
+        if (!isApproved) {
+          setWarn('Документы ещё не подтверждены. Кабинет (баланс/вывод/история) станет доступен после APPROVED.');
+        }
       } catch (e) {
         console.error(e);
         setWarn('Ошибка запроса /api/doctor/me');
@@ -276,10 +287,7 @@ export default function DoctorProfilePage() {
 
         const r = await fetch(`/api/doctor/reviews?doctorId=${encodeURIComponent(doctor.id)}&limit=50`, {
           method: 'GET',
-          headers: {
-            'X-Telegram-Init-Data': initData,
-            'X-Init-Data': initData,
-          },
+          headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
           cache: 'no-store',
         });
 
@@ -335,8 +343,14 @@ export default function DoctorProfilePage() {
       <TopBarBack />
 
       <section className="hero">
-        {/* ✅ кнопка-штучка (вход в кабинет) */}
-        <button type="button" className="cabinetBtn" onClick={onOpenCabinet} aria-label="Личный кабинет врача">
+        <button
+          type="button"
+          className="cabinetBtn"
+          onClick={onOpenCabinet}
+          aria-label="Личный кабинет врача"
+          disabled={!canOpenCabinet}
+          title={!canOpenCabinet ? 'Доступно после подтверждения' : 'Кабинет'}
+        >
           <span className="cabinetIcon" aria-hidden="true">
             📂
           </span>
@@ -362,7 +376,6 @@ export default function DoctorProfilePage() {
           Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
         </div>
 
-        {/* ✅ БЕЙДЖИ — для проверки внешнего вида */}
         <div className="badgesRow" aria-label="Бейджи">
           <DocumentBadge size="sm" />
           {isProPreview ? <ProBadge size="sm" /> : null}
@@ -455,7 +468,6 @@ export default function DoctorProfilePage() {
 
             {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
             {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
-
             {!reviewsLoading && !reviewsItems.length ? <p className="muted">Пока отзывов нет.</p> : null}
 
             <div className="reviewsList">
@@ -499,7 +511,6 @@ export default function DoctorProfilePage() {
           position: relative;
         }
 
-        /* ✅ иконка в правом верхнем углу */
         .cabinetBtn {
           position: absolute;
           top: 10px;
@@ -515,16 +526,17 @@ export default function DoctorProfilePage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
         }
-
-        .cabinetBtn:active {
+        .cabinetBtn:disabled {
+          opacity: 0.55;
+          cursor: default;
+        }
+        .cabinetBtn:active:not(:disabled) {
           transform: scale(0.98);
           opacity: 0.95;
         }
-
         .cabinetIcon {
           font-size: 22px;
           line-height: 1;
-          filter: grayscale(0.1);
         }
 
         .avatarWrap {
@@ -608,7 +620,6 @@ export default function DoctorProfilePage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
         }
-
         .leaveReviewBtn:active {
           opacity: 0.7;
           transform: scale(0.99);
