@@ -331,7 +331,8 @@ model DoctorTransaction {
   title     String?
   meta      Json?
 
-  payoutId String?
+  // ✅ FIX: чтобы связь payout <-> transaction была 1:1, payoutId должен быть unique
+  payoutId String? @unique
   payout   DoctorPayoutRequest? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
   @@index([doctorId])
