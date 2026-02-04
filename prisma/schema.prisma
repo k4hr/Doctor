@@ -1,3 +1,4 @@
+/* path: prisma/schema.prisma */
 generator client {
   provider = "prisma-client-js"
 }
@@ -34,6 +35,27 @@ enum QuestionFileKind {
 enum AnswerCommentAuthorType {
   USER
   DOCTOR
+}
+
+/* ✅ Финансы врача */
+enum DoctorTxType {
+  IN
+  OUT
+}
+
+enum DoctorTxStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELED
+}
+
+enum DoctorPayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+  CANCELED
 }
 
 model Doctor {
@@ -95,6 +117,11 @@ model Doctor {
 
   // ✅ Отзывы о враче
   reviews DoctorReview[]
+
+  /* ✅ Финансы */
+  wallet       DoctorWallet?
+  transactions DoctorTransaction[]
+  payouts      DoctorPayoutRequest[]
 
   @@index([status])
   @@index([speciality1])
@@ -270,4 +297,67 @@ model DoctorReview {
   @@index([authorTelegramId])
   @@index([questionId])
   @@index([answerId])
+}
+
+/* ✅ 1:1 кошелек врача */
+model DoctorWallet {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String @unique
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  // Храним в рублях (Int). Если захочешь копейки — сделаем в копейках.
+  balanceRub Int @default(0) // доступно к выводу
+  pendingRub Int @default(0) // в обработке на вывод
+
+  @@index([doctorId])
+}
+
+/* ✅ транзакции по кошельку */
+model DoctorTransaction {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  type   DoctorTxType
+  status DoctorTxStatus @default(PENDING)
+
+  amountRub Int
+  title     String?
+  meta      Json?
+
+  payoutId String?
+  payout   DoctorPayoutRequest? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([doctorId])
+  @@index([doctorId, createdAt])
+  @@index([doctorId, type, createdAt])
+  @@index([doctorId, status, createdAt])
+}
+
+/* ✅ заявки на вывод */
+model DoctorPayoutRequest {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  amountRub Int
+  status    DoctorPayoutStatus @default(PENDING)
+
+  // реквизиты/метод можно хранить в JSON (позже прикрутим карту/счёт)
+  details Json?
+
+  transaction DoctorTransaction?
+
+  @@index([doctorId])
+  @@index([doctorId, createdAt])
+  @@index([doctorId, status, createdAt])
 }
