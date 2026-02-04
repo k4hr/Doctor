@@ -32,6 +32,7 @@ function getInitDataFromCookie(): string {
   return getCookie('tg_init_data');
 }
 
+/* API types */
 type BalanceOk = { ok: true; doctorId: string; balanceRub: number; pendingRub: number };
 type BalanceErr = { ok: false; error: string; hint?: string };
 type BalanceResp = BalanceOk | BalanceErr;
@@ -60,7 +61,7 @@ type TxOk = { ok: true; doctorId: string; items: TxItem[] };
 type TxErr = { ok: false; error: string; hint?: string };
 type TxResp = TxOk | TxErr;
 
-type PayoutOk = { ok: true; payoutId: string };
+type PayoutOk = { ok: true; payoutId: string; transactionId: string };
 type PayoutErr = { ok: false; error: string; hint?: string };
 type PayoutResp = PayoutOk | PayoutErr;
 
@@ -69,6 +70,7 @@ function fmtMoneyRub(v: any) {
   const x = Number.isFinite(n) ? n : 0;
   return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(x);
 }
+
 function fmtDateTimeRu(iso: string) {
   try {
     const d = new Date(iso);
@@ -80,6 +82,22 @@ function fmtDateTimeRu(iso: string) {
   } catch {
     return '—';
   }
+}
+
+function statusRu(s: string) {
+  const v = String(s || '').toUpperCase().trim();
+  if (v === 'SUCCESS') return 'успешно';
+  if (v === 'PENDING') return 'в обработке';
+  if (v === 'FAILED') return 'ошибка';
+  if (v === 'CANCELED') return 'отменено';
+  return v || '—';
+}
+
+function clampInt(x: any, min = 0, max = 10_000_000) {
+  const n = typeof x === 'number' ? x : Number(x);
+  if (!Number.isFinite(n)) return min;
+  const v = Math.trunc(n);
+  return Math.min(max, Math.max(min, v));
 }
 
 export default function DoctorSettingsPage() {
@@ -107,6 +125,12 @@ export default function DoctorSettingsPage() {
   const [txWarn, setTxWarn] = useState('');
   const [txItems, setTxItems] = useState<TxItem[]>([]);
 
+  /* payout modal */
+  const [payoutOpen, setPayoutOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState<string>('');
+  const [payoutDetails, setPayoutDetails] = useState<string>('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+
   const titleName = useMemo(() => (doctorId ? `Врач #${doctorId.slice(0, 6)}` : 'Врач'), [doctorId]);
 
   useEffect(() => {
@@ -132,7 +156,6 @@ export default function DoctorSettingsPage() {
           return;
         }
 
-        // ✅ проверяем доступ через API баланса (он же вернёт doctorId)
         const r = await fetch('/api/doctor/balance', {
           method: 'GET',
           headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
@@ -147,9 +170,10 @@ export default function DoctorSettingsPage() {
           return;
         }
 
-        setDoctorId((j as BalanceOk).doctorId);
-        setBalanceRub((j as BalanceOk).balanceRub || 0);
-        setPendingRub((j as BalanceOk).pendingRub || 0);
+        const ok = j as BalanceOk;
+        setDoctorId(ok.doctorId);
+        setBalanceRub(ok.balanceRub || 0);
+        setPendingRub(ok.pendingRub || 0);
       } catch (e) {
         console.error(e);
         setWarn('Ошибка проверки доступа');
@@ -171,6 +195,7 @@ export default function DoctorSettingsPage() {
         headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
         cache: 'no-store',
       });
+
       const j = (await r.json().catch(() => null)) as BalanceResp | null;
 
       if (!r.ok || !j || (j as any).ok !== true) {
@@ -178,9 +203,10 @@ export default function DoctorSettingsPage() {
         return;
       }
 
-      setDoctorId((j as BalanceOk).doctorId);
-      setBalanceRub((j as BalanceOk).balanceRub || 0);
-      setPendingRub((j as BalanceOk).pendingRub || 0);
+      const ok = j as BalanceOk;
+      setDoctorId(ok.doctorId);
+      setBalanceRub(ok.balanceRub || 0);
+      setPendingRub(ok.pendingRub || 0);
     } catch (e) {
       console.error(e);
       setBalanceWarn('Ошибка сети/сервера при загрузке баланса');
@@ -209,8 +235,9 @@ export default function DoctorSettingsPage() {
         return;
       }
 
-      setDoctorId((j as AnswersOk).doctorId);
-      setAnswers((j as AnswersOk).items || []);
+      const ok = j as AnswersOk;
+      setDoctorId(ok.doctorId);
+      setAnswers(ok.items || []);
     } catch (e) {
       console.error(e);
       setAnswersWarn('Ошибка сети/сервера при загрузке ответов');
@@ -241,8 +268,9 @@ export default function DoctorSettingsPage() {
         return;
       }
 
-      setDoctorId((j as TxOk).doctorId);
-      setTxItems((j as TxOk).items || []);
+      const ok = j as TxOk;
+      setDoctorId(ok.doctorId);
+      setTxItems(ok.items || []);
     } catch (e) {
       console.error(e);
       setTxWarn('Ошибка сети/сервера при загрузке транзакций');
@@ -267,18 +295,37 @@ export default function DoctorSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txTab]);
 
-  async function requestPayout() {
+  function openPayoutModal() {
+    haptic('light');
+    setBalanceWarn('');
+    const max = clampInt(balanceRub, 0, 10_000_000);
+    setPayoutAmount(max > 0 ? String(max) : '');
+    setPayoutDetails('');
+    setPayoutOpen(true);
+  }
+
+  async function submitPayout() {
     haptic('light');
     if (!initData) return;
 
-    const amount = Math.max(0, Math.floor(balanceRub));
+    const amount = clampInt(payoutAmount, 1, 10_000_000);
     if (amount <= 0) {
-      setBalanceWarn('Баланс 0 ₽ — вывод недоступен');
+      setBalanceWarn('Укажи сумму для вывода');
+      return;
+    }
+    if (amount > clampInt(balanceRub, 0, 10_000_000)) {
+      setBalanceWarn('Сумма больше доступного баланса');
       return;
     }
 
+    let detailsObj: any = undefined;
+    const detailsStr = String(payoutDetails || '').trim();
+    if (detailsStr) {
+      detailsObj = { comment: detailsStr };
+    }
+
     try {
-      setBalanceLoading(true);
+      setPayoutSubmitting(true);
       setBalanceWarn('');
 
       const r = await fetch('/api/doctor/payout/request', {
@@ -288,7 +335,7 @@ export default function DoctorSettingsPage() {
           'X-Telegram-Init-Data': initData,
           'X-Init-Data': initData,
         },
-        body: JSON.stringify({ amountRub: amount }),
+        body: JSON.stringify({ amountRub: amount, details: detailsObj }),
       });
 
       const j = (await r.json().catch(() => null)) as PayoutResp | null;
@@ -298,23 +345,75 @@ export default function DoctorSettingsPage() {
         return;
       }
 
+      setPayoutOpen(false);
       setBalanceWarn('Заявка на вывод создана ✅');
       await loadBalance();
+
+      if (tab === 'tx') {
+        await loadTx();
+      }
     } catch (e) {
       console.error(e);
       setBalanceWarn('Ошибка сети/сервера при создании заявки');
     } finally {
-      setBalanceLoading(false);
+      setPayoutSubmitting(false);
     }
   }
+
+  const totalRub = useMemo(() => clampInt(balanceRub, 0, 10_000_000) + clampInt(pendingRub, 0, 10_000_000), [balanceRub, pendingRub]);
 
   return (
     <main className="page">
       <TopBarBack />
 
       <section className="hero">
-        <div className="title">Кабинет врача</div>
-        <div className="sub">{loading ? 'Загрузка…' : titleName}</div>
+        <div className="heroTop">
+          <div>
+            <div className="title">Личный кабинет врача</div>
+            <div className="sub">{loading ? 'Загрузка…' : titleName}</div>
+          </div>
+
+          {/* быстрые кнопки */}
+          <div className="heroActions" aria-label="Быстрые действия">
+            <button
+              type="button"
+              className="iconBtn"
+              onClick={() => {
+                haptic('light');
+                setTab('balance');
+              }}
+              aria-label="Баланс"
+              title="Баланс"
+            >
+              ₽
+            </button>
+            <button
+              type="button"
+              className="iconBtn"
+              onClick={() => {
+                haptic('light');
+                setTab('answers');
+              }}
+              aria-label="Ответы"
+              title="Ответы"
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              className="iconBtn"
+              onClick={() => {
+                haptic('light');
+                setTab('tx');
+              }}
+              aria-label="История"
+              title="История"
+            >
+              ⇄
+            </button>
+          </div>
+        </div>
+
         {warn ? <div className="warn">{warn}</div> : null}
       </section>
 
@@ -333,39 +432,68 @@ export default function DoctorSettingsPage() {
       <section className="content">
         {tab === 'balance' ? (
           <div className="card">
-            <div className="cardTitle">Баланс</div>
-
-            <div className="moneyBox">
-              <div className="money">{fmtMoneyRub(balanceRub)}</div>
-              <div className="moneyLab">доступно</div>
+            <div className="cardTitleRow">
+              <div className="cardTitle">Баланс</div>
+              <button type="button" className="linkBtn" disabled={balanceLoading} onClick={loadBalance}>
+                Обновить
+              </button>
             </div>
 
-            <div className="moneyBox small">
-              <div className="money small">{fmtMoneyRub(pendingRub)}</div>
-              <div className="moneyLab small">в обработке</div>
+            <div className="grid2">
+              <div className="moneyBox">
+                <div className="money">{fmtMoneyRub(balanceRub)}</div>
+                <div className="moneyLab">доступно</div>
+              </div>
+
+              <div className="moneyBox">
+                <div className="money">{fmtMoneyRub(pendingRub)}</div>
+                <div className="moneyLab">в обработке</div>
+              </div>
+            </div>
+
+            <div className="total">
+              Всего (доступно + в обработке): <b>{fmtMoneyRub(totalRub)}</b>
             </div>
 
             {balanceWarn ? <div className="warnSmall">{balanceWarn}</div> : null}
 
             <div className="btnRow">
-              <button type="button" className="btnPrimary" disabled={balanceLoading} onClick={requestPayout}>
+              <button
+                type="button"
+                className="btnPrimary"
+                disabled={balanceLoading || clampInt(balanceRub, 0, 10_000_000) <= 0}
+                onClick={openPayoutModal}
+              >
                 {balanceLoading ? 'Подождите…' : 'Вывод средств'}
               </button>
-              <button type="button" className="btnGhost" disabled={balanceLoading} onClick={loadBalance}>
-                Обновить
+
+              <button
+                type="button"
+                className="btnGhost"
+                disabled={balanceLoading}
+                onClick={() => {
+                  haptic('light');
+                  router.push('/hamburger/profile/doctor');
+                }}
+              >
+                Профиль врача
               </button>
             </div>
 
             <div className="hint">
-              Сейчас баланс/история — заглушки, потому что в Prisma-схеме нет моделей кошелька/транзакций. Но привязка идёт к
-              твоему doctorId.
+              Вывод создаёт заявку (PENDING) и переводит деньги из “доступно” в “в обработке”. Дальше ты сможешь подтверждать/выплачивать в админке.
             </div>
           </div>
         ) : null}
 
         {tab === 'answers' ? (
           <div className="card">
-            <div className="cardTitle">Ответы врача</div>
+            <div className="cardTitleRow">
+              <div className="cardTitle">Ответы врача</div>
+              <button type="button" className="linkBtn" disabled={answersLoading} onClick={loadAnswers}>
+                Обновить
+              </button>
+            </div>
 
             {answersWarn ? <div className="warnSmall">{answersWarn}</div> : null}
             {answersLoading ? <div className="muted">Загрузка…</div> : null}
@@ -396,21 +524,18 @@ export default function DoctorSettingsPage() {
 
         {tab === 'tx' ? (
           <div className="card">
-            <div className="cardTitle">История транзакций</div>
+            <div className="cardTitleRow">
+              <div className="cardTitle">История транзакций</div>
+              <button type="button" className="linkBtn" disabled={txLoading} onClick={loadTx}>
+                Обновить
+              </button>
+            </div>
 
             <div className="subtabs">
-              <button
-                type="button"
-                className={txTab === 'in' ? 'subtab subtabActive' : 'subtab'}
-                onClick={() => setTxTab('in')}
-              >
+              <button type="button" className={txTab === 'in' ? 'subtab subtabActive' : 'subtab'} onClick={() => setTxTab('in')}>
                 Поступления
               </button>
-              <button
-                type="button"
-                className={txTab === 'out' ? 'subtab subtabActive' : 'subtab'}
-                onClick={() => setTxTab('out')}
-              >
+              <button type="button" className={txTab === 'out' ? 'subtab subtabActive' : 'subtab'} onClick={() => setTxTab('out')}>
                 Выводы
               </button>
             </div>
@@ -424,24 +549,79 @@ export default function DoctorSettingsPage() {
                 <div key={t.id} className="tx">
                   <div className="txTop">
                     <div className="txTitle">{t.title || (t.type === 'IN' ? 'Поступление' : 'Вывод')}</div>
-                    <div className="txAmount">{fmtMoneyRub(t.amountRub)}</div>
+                    <div className="txAmount">{t.type === 'OUT' ? `− ${fmtMoneyRub(t.amountRub)}` : fmtMoneyRub(t.amountRub)}</div>
                   </div>
                   <div className="txBottom">
                     <div className="txDate">{fmtDateTimeRu(t.createdAt)}</div>
-                    <div className="txStatus">{t.status}</div>
+                    <div className="txStatus">{statusRu(t.status)}</div>
                   </div>
                 </div>
               ))}
             </div>
-
-            <div className="btnRow" style={{ marginTop: 10 }}>
-              <button type="button" className="btnGhost" disabled={txLoading} onClick={loadTx}>
-                Обновить
-              </button>
-            </div>
           </div>
         ) : null}
       </section>
+
+      {/* payout modal */}
+      {payoutOpen ? (
+        <div
+          className="modalOverlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            setPayoutOpen(false);
+          }}
+        >
+          <div
+            className="modal"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="modalTitle">Вывод средств</div>
+            <div className="modalSub">
+              Доступно: <b>{fmtMoneyRub(balanceRub)}</b>
+            </div>
+
+            <label className="field">
+              <div className="label">Сумма (₽)</div>
+              <input
+                className="input"
+                inputMode="numeric"
+                placeholder="Например: 500"
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
+              />
+            </label>
+
+            <label className="field">
+              <div className="label">Комментарий (карта/телефон/реквизиты — позже)</div>
+              <textarea
+                className="textarea"
+                placeholder="Пока это просто комментарий. Позже подключим реальные реквизиты."
+                value={payoutDetails}
+                onChange={(e) => setPayoutDetails(e.target.value)}
+              />
+            </label>
+
+            <div className="btnRow" style={{ marginTop: 12 }}>
+              <button type="button" className="btnPrimary" disabled={payoutSubmitting} onClick={submitPayout}>
+                {payoutSubmitting ? 'Отправка…' : 'Создать заявку'}
+              </button>
+              <button
+                type="button"
+                className="btnGhost"
+                disabled={payoutSubmitting}
+                onClick={() => {
+                  setPayoutOpen(false);
+                }}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <style jsx>{`
         .page {
@@ -458,6 +638,33 @@ export default function DoctorSettingsPage() {
           border: 1px solid rgba(15, 23, 42, 0.06);
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
         }
+        .heroTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .heroActions {
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .iconBtn {
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: rgba(15, 23, 42, 0.02);
+          color: rgba(17, 24, 39, 0.85);
+          font-weight: 950;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .iconBtn:active {
+          transform: scale(0.98);
+          opacity: 0.9;
+        }
+
         .title {
           font-size: 18px;
           font-weight: 950;
@@ -512,11 +719,38 @@ export default function DoctorSettingsPage() {
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.04);
           padding: 12px;
         }
+        .cardTitleRow {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
         .cardTitle {
           font-size: 14px;
           font-weight: 950;
           color: #111827;
-          margin-bottom: 10px;
+        }
+        .linkBtn {
+          border: none;
+          background: transparent;
+          color: #6d28d9;
+          font-weight: 950;
+          font-size: 13px;
+          text-decoration: underline;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .linkBtn:disabled {
+          opacity: 0.6;
+          cursor: default;
+          text-decoration: none;
+        }
+
+        .grid2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
         }
 
         .moneyBox {
@@ -529,27 +763,25 @@ export default function DoctorSettingsPage() {
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(249, 250, 251, 0.9);
         }
-        .moneyBox.small {
-          margin-top: 8px;
-          padding: 10px 10px;
-          opacity: 0.9;
-        }
         .money {
-          font-size: 22px;
+          font-size: 18px;
           font-weight: 950;
           color: #111827;
           letter-spacing: -0.02em;
-        }
-        .money.small {
-          font-size: 18px;
+          text-align: center;
+          line-height: 1.2;
         }
         .moneyLab {
           font-size: 12px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.55);
         }
-        .moneyLab.small {
-          font-size: 11px;
+
+        .total {
+          margin-top: 10px;
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.65);
         }
 
         .btnRow {
@@ -588,6 +820,10 @@ export default function DoctorSettingsPage() {
           font-size: 14px;
           font-weight: 950;
           text-align: center;
+        }
+        .btnGhost:disabled {
+          opacity: 0.6;
+          cursor: default;
         }
 
         .hint {
@@ -743,6 +979,81 @@ export default function DoctorSettingsPage() {
           background: rgba(15, 23, 42, 0.03);
           color: rgba(17, 24, 39, 0.7);
           white-space: nowrap;
+          text-transform: lowercase;
+        }
+
+        /* modal */
+        .modalOverlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(2, 6, 23, 0.48);
+          display: grid;
+          place-items: center;
+          padding: 16px;
+          z-index: 1000;
+        }
+        .modal {
+          width: 100%;
+          max-width: 520px;
+          background: #fff;
+          border-radius: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
+          padding: 14px;
+        }
+        .modalTitle {
+          font-size: 16px;
+          font-weight: 950;
+          color: #111827;
+        }
+        .modalSub {
+          margin-top: 4px;
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.6);
+        }
+        .field {
+          margin-top: 10px;
+          display: grid;
+          gap: 6px;
+        }
+        .label {
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.7);
+        }
+        .input {
+          width: 100%;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          border-radius: 14px;
+          padding: 12px;
+          font-size: 14px;
+          font-weight: 900;
+          outline: none;
+          background: rgba(249, 250, 251, 0.9);
+          color: #111827;
+        }
+        .textarea {
+          width: 100%;
+          min-height: 90px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          border-radius: 14px;
+          padding: 12px;
+          font-size: 13px;
+          font-weight: 900;
+          outline: none;
+          background: rgba(249, 250, 251, 0.9);
+          color: #111827;
+          resize: vertical;
+        }
+
+        @media (max-width: 360px) {
+          .grid2 {
+            grid-template-columns: 1fr;
+          }
+          .btnRow {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </main>
