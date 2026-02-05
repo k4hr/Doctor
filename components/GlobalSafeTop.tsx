@@ -5,8 +5,9 @@ export default function GlobalSafeTop() {
   return (
     <style jsx global>{`
       :root {
-        /* ✅ ничего не добавляем сверху, иначе появится воздух и всё съедет */
-        --lm-safe-top: 0px;
+        /* ✅ ФОЛБЭК. Если TelegramNoSwipeInit поставит --lm-safe-top, он перекроет это значение.
+           Если НЕ поставит — будет работать iOS safe-area. */
+        --lm-safe-top: env(safe-area-inset-top, 0px);
       }
     `}</style>
   );
