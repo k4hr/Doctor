@@ -27,8 +27,9 @@
 
   --tg-viewport-height: 100vh;
 
-  /* ✅ важно: сверху НЕ добавляем никакие safe-area/спейсеры */
-  --lm-safe-top: 0px;
+  /* ✅ Safe top ДОЛЖЕН быть.
+     Фолбэк через iOS safe-area, а точное значение лучше выставит TelegramNoSwipeInit (JS). */
+  --lm-safe-top: env(safe-area-inset-top, 0px);
 }
 
 /* ===== Базовые стили ===== */
@@ -67,8 +68,13 @@ body {
 
 /* Контейнер страницы — основной scroll-container */
 .lm-page {
-  /* ✅ как было “нормально”: 16px, чтобы совпадало с TopBar (-16px) */
-  padding: 16px;
+  /* ✅ оставляем твой базовый отступ 16px (важно для TopBar margin: 0 -16px) */
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 16px;
+
+  /* ✅ добавляем safe-top ТОЛЬКО сверху */
+  padding-top: calc(var(--lm-safe-top, 0px) + 16px);
 
   max-width: 900px;
   margin: 0 auto;
