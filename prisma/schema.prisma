@@ -98,6 +98,9 @@ model Doctor {
   achievements      String?
   publications      String?
 
+  // ✅ НОВОЕ: ручной онлайн/оффлайн
+  isOnline Boolean @default(false)
+
   files DoctorFile[]
 
   assignedQuestions Question[] @relation("AssignedDoctor")
@@ -127,6 +130,7 @@ model Doctor {
   @@index([speciality1])
   @@index([city])
   @@index([submittedAt])
+  @@index([isOnline])
 }
 
 model DoctorFile {
