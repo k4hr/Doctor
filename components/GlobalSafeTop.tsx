@@ -5,21 +5,9 @@ export default function GlobalSafeTop() {
   return (
     <style jsx global>{`
       :root {
-        --lm-header-offset: 56px;
-        --lm-safe-top: max(env(safe-area-inset-top), var(--lm-header-offset));
-      }
-
-      body::before {
-        content: '';
-        display: block;
-        height: var(--lm-safe-top);
-        pointer-events: none; /* 🔥 КРИТИЧЕСКИ ВАЖНО */
-      }
-
-      @media (min-width: 1024px) {
-        :root {
-          --lm-header-offset: 40px;
-        }
+        /* Telegram/iOS safe-area сверху.
+           Никаких "56px принудительно", иначе будет двойной отступ. */
+        --lm-safe-top: env(safe-area-inset-top, 0px);
       }
     `}</style>
   );
