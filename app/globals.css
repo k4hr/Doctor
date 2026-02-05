@@ -34,7 +34,7 @@
   --tg-viewport-height: 100vh;
 
   /* ✅ Safe-area сверху (выставит GlobalSafeTop) */
-  --lm-safe-top: env(safe-area-inset-top, 0px);
+  --lm-safe-top: 0px;
 }
 
 /* ===== Базовые стили ===== */
@@ -74,12 +74,7 @@ body {
 
 /* Контейнер страницы — теперь это основной scroll-container */
 .lm-page {
-  /* ✅ вместо padding: 20px; делаем safe-top + обычные отступы */
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 20px;
-  padding-top: calc(var(--lm-safe-top, 0px) + 20px);
-
+  padding: 20px;
   max-width: 900px;
   margin: 0 auto;
 
