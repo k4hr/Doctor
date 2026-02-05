@@ -1,3 +1,4 @@
+/* path: app/hamburger/profile/doctor/settings/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -36,6 +37,10 @@ type BalanceOk = { ok: true; doctorId: string; balanceRub: number; pendingRub: n
 type BalanceErr = { ok: false; error: string; hint?: string };
 type BalanceResp = BalanceOk | BalanceErr;
 
+type OnlineOk = { ok: true; doctorId: string; isOnline: boolean };
+type OnlineErr = { ok: false; error: string; hint?: string };
+type OnlineResp = OnlineOk | OnlineErr;
+
 function fmtMoneyRub(v: any) {
   const n = typeof v === 'number' ? v : Number(v);
   const x = Number.isFinite(n) ? n : 0;
@@ -59,6 +64,9 @@ export default function DoctorSettingsHomePage() {
   const [doctorId, setDoctorId] = useState<string>('');
   const [balanceRub, setBalanceRub] = useState(0);
   const [pendingRub, setPendingRub] = useState(0);
+
+  const [onlineLoading, setOnlineLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
 
   const totalRub = useMemo(
     () => clampInt(balanceRub, 0, 10_000_000) + clampInt(pendingRub, 0, 10_000_000),
@@ -91,6 +99,54 @@ export default function DoctorSettingsHomePage() {
     setPendingRub(ok.pendingRub || 0);
   }
 
+  async function loadOnline(idata: string) {
+    const r = await fetch('/api/doctor/online', {
+      method: 'GET',
+      headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
+      cache: 'no-store',
+    });
+
+    const j = (await r.json().catch(() => null)) as OnlineResp | null;
+
+    if (!r.ok || !j || (j as any).ok !== true) {
+      return;
+    }
+
+    setIsOnline(!!(j as OnlineOk).isOnline);
+  }
+
+  async function setOnline(idata: string, v: boolean) {
+    setOnlineLoading(true);
+    setWarn('');
+    try {
+      const r = await fetch('/api/doctor/online', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': idata,
+          'X-Init-Data': idata,
+        },
+        body: JSON.stringify({ isOnline: v }),
+      });
+
+      const j = (await r.json().catch(() => null)) as OnlineResp | null;
+
+      if (!r.ok || !j || (j as any).ok !== true) {
+        const msg = (j as any)?.hint || (j as any)?.error || 'Не удалось сохранить статус';
+        setWarn(String(msg));
+        await loadOnline(idata);
+        return;
+      }
+
+      setIsOnline(!!(j as OnlineOk).isOnline);
+    } catch (e: any) {
+      setWarn(String(e?.message || 'Ошибка сети при сохранении статуса'));
+      await loadOnline(idata);
+    } finally {
+      setOnlineLoading(false);
+    }
+  }
+
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
@@ -115,6 +171,7 @@ export default function DoctorSettingsHomePage() {
         }
 
         await loadBalance(idata);
+        await loadOnline(idata);
       } catch (e: any) {
         console.error(e);
         setWarn(String(e?.message || 'Ошибка проверки доступа'));
@@ -132,6 +189,7 @@ export default function DoctorSettingsHomePage() {
       setWarn('');
       setLoading(true);
       await loadBalance(initData);
+      await loadOnline(initData);
     } catch (e: any) {
       console.error(e);
       setWarn(String(e?.message || 'Не удалось обновить'));
@@ -181,6 +239,41 @@ export default function DoctorSettingsHomePage() {
           {warn ? <div className="warn">{warn}</div> : null}
         </section>
 
+        {/* ✅ онлайн/оффлайн сразу после баланса */}
+        <section className="onlineCard" aria-label="Статус онлайн">
+          <div className="onlineTop">
+            <div className="onlineTitle">Статус</div>
+            <div className="onlineHint">{onlineLoading ? 'Сохранение…' : 'Показывается в “Врачи онлайн”'}</div>
+          </div>
+
+          <div className="onlineSwitch" role="group" aria-label="Онлайн переключатель">
+            <button
+              type="button"
+              className={isOnline ? 'os osActive' : 'os'}
+              disabled={onlineLoading || !initData}
+              onClick={() => {
+                haptic('light');
+                if (!initData) return;
+                setOnline(initData, true);
+              }}
+            >
+              В сети
+            </button>
+            <button
+              type="button"
+              className={!isOnline ? 'os osActiveOff' : 'os'}
+              disabled={onlineLoading || !initData}
+              onClick={() => {
+                haptic('light');
+                if (!initData) return;
+                setOnline(initData, false);
+              }}
+            >
+              Не в сети
+            </button>
+          </div>
+        </section>
+
         {/* кнопки как на скрине */}
         <section className="menu" aria-label="Меню кабинета">
           <button type="button" className="menuItem" onClick={() => go('/hamburger/profile/doctor/settings/questions')}>
@@ -218,12 +311,13 @@ export default function DoctorSettingsHomePage() {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
+          overflow-x: hidden;
         }
 
-        /* держим всё в “колонке” как на скрине, без растяжки */
         .wrap {
           max-width: 430px;
           margin: 0 auto;
+          overflow-x: hidden;
         }
 
         .title {
@@ -246,6 +340,7 @@ export default function DoctorSettingsHomePage() {
           padding: 14px;
           border: 1px solid rgba(15, 23, 42, 0.06);
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
+          overflow: hidden;
         }
 
         .balanceTop {
@@ -290,6 +385,8 @@ export default function DoctorSettingsHomePage() {
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(249, 250, 251, 0.9);
+          min-width: 0;
+          overflow: hidden;
         }
         .money {
           font-size: 16px;
@@ -297,11 +394,19 @@ export default function DoctorSettingsHomePage() {
           color: #111827;
           letter-spacing: -0.02em;
           line-height: 1.2;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .moneyLab {
           font-size: 12px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.55);
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .total {
@@ -317,6 +422,71 @@ export default function DoctorSettingsHomePage() {
           line-height: 1.35;
           color: #ef4444;
           font-weight: 800;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        .onlineCard {
+          margin-top: 12px;
+          background: #fff;
+          border-radius: 18px;
+          padding: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
+          overflow: hidden;
+        }
+        .onlineTop {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+          min-width: 0;
+        }
+        .onlineTitle {
+          font-size: 16px;
+          font-weight: 950;
+          color: #111827;
+        }
+        .onlineHint {
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.55);
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .onlineSwitch {
+          margin-top: 10px;
+          background: rgba(15, 23, 42, 0.04);
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 14px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          overflow: hidden;
+        }
+        .os {
+          padding: 12px 10px;
+          border: none;
+          background: transparent;
+          font-size: 14px;
+          font-weight: 950;
+          color: rgba(17, 24, 39, 0.6);
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .os:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+        .osActive {
+          background: #24c768;
+          color: #fff;
+        }
+        .osActiveOff {
+          background: rgba(15, 23, 42, 0.1);
+          color: rgba(17, 24, 39, 0.85);
         }
 
         .menu {
@@ -328,6 +498,7 @@ export default function DoctorSettingsHomePage() {
           padding: 12px;
           display: grid;
           gap: 10px;
+          overflow: hidden;
         }
 
         .menuItem {
@@ -339,6 +510,7 @@ export default function DoctorSettingsHomePage() {
           padding: 14px 14px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          overflow: hidden;
         }
         .menuItem:active {
           transform: scale(0.99);
@@ -348,6 +520,7 @@ export default function DoctorSettingsHomePage() {
         .menuText {
           display: grid;
           gap: 2px;
+          min-width: 0;
         }
         .menuTitle {
           font-size: 16px;
