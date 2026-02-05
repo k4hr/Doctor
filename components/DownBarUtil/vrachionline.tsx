@@ -20,6 +20,10 @@ type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
 type ApiErr = { ok: false; error: string; hint?: string };
 type ApiResp = ApiOk | ApiErr;
 
+type UiDoctor = ApiDoctor & { __placeholder?: boolean };
+
+const UI_LIMIT = 7;
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -71,31 +75,34 @@ function avatarLetter(d: ApiDoctor) {
   return ch.toUpperCase();
 }
 
+function makePlaceholders(n: number): UiDoctor[] {
+  return Array.from({ length: n }).map((_, i) => ({
+    id: `placeholder-${i}`,
+    firstName: 'Имя',
+    lastName: 'Фамилия',
+    middleName: null,
+    speciality1: 'Специальность',
+    speciality2: null,
+    speciality3: null,
+    experienceYears: null,
+    avatarUrl: null,
+    __placeholder: true,
+  }));
+}
+
 /** Блок "Врачи онлайн" для доунбара (реальные данные) */
 export default function VrachiOnlineBlock() {
   const router = useRouter();
 
+  const [initData, setInitData] = useState<string>('');
   const [items, setItems] = useState<ApiDoctor[]>([]);
   const [count, setCount] = useState<number>(0);
 
-  const initData = useMemo(() => {
-    const WebApp: any = (window as any)?.Telegram?.WebApp;
+  async function load(idata: string) {
     try {
-      WebApp?.ready?.();
-    } catch {}
-
-    const idata = (WebApp?.initData as string) || getInitDataFromCookie();
-    if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
-      setCookie('tg_init_data', WebApp.initData, 3);
-    }
-    return String(idata || '');
-  }, []);
-
-  async function load() {
-    try {
-      const r = await fetch('/api/doctors/online?limit=30', {
+      const r = await fetch(`/api/doctors/online?limit=${UI_LIMIT}`, {
         method: 'GET',
-        headers: initData ? { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData } : undefined,
+        headers: idata ? { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata } : undefined,
         cache: 'no-store',
       });
 
@@ -117,16 +124,38 @@ export default function VrachiOnlineBlock() {
   }
 
   useEffect(() => {
-    load();
-    // Если хочешь “живое” — раскомментируй:
-    // const t = setInterval(load, 15000);
-    // return () => clearInterval(t);
+    // ✅ window только здесь, чтобы не падал build/SSR
+    const WebApp: any = (window as any)?.Telegram?.WebApp;
+    try {
+      WebApp?.ready?.();
+    } catch {}
+
+    const idata = (WebApp?.initData as string) || getInitDataFromCookie();
+
+    if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+      setCookie('tg_init_data', WebApp.initData, 3);
+    }
+
+    const finalIdata = String(idata || '');
+    setInitData(finalIdata);
+
+    load(finalIdata);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleDoctorClick = (id: string) => {
+  const uiItems: UiDoctor[] = useMemo(() => {
+    const list = Array.isArray(items) ? items.slice(0, UI_LIMIT) : [];
+    if (list.length >= UI_LIMIT) return list;
+
+    const need = UI_LIMIT - list.length;
+    return [...list, ...makePlaceholders(need)];
+  }, [items]);
+
+  const handleDoctorClick = (d: UiDoctor) => {
+    if (d.__placeholder) return;
     haptic('light');
-    router.push(`/hamburger/doctor/${encodeURIComponent(id)}`);
+    router.push(`/hamburger/doctor/${encodeURIComponent(d.id)}`);
   };
 
   const handleAllDoctorsClick = () => {
@@ -143,10 +172,16 @@ export default function VrachiOnlineBlock() {
         </header>
 
         <div className="doconline-list">
-          {items.map((d) => (
-            <button key={d.id} type="button" className="doconline-card" onClick={() => handleDoctorClick(d.id)}>
+          {uiItems.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              className={d.__placeholder ? 'doconline-card doconline-card--ph' : 'doconline-card'}
+              onClick={() => handleDoctorClick(d)}
+              disabled={d.__placeholder}
+            >
               <div className="doconline-avatar" aria-label="Аватар врача">
-                {d.avatarUrl ? (
+                {d.avatarUrl && !d.__placeholder ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={d.avatarUrl} alt="doctor" className="doconline-avatar-img" />
                 ) : (
@@ -159,7 +194,6 @@ export default function VrachiOnlineBlock() {
                   <span className="doconline-name" title={nameLastFirst(d)}>
                     {nameLastFirst(d)}
                   </span>
-                  {/* ❌ зелёную точку убрали */}
                 </div>
 
                 <span className="doconline-spec" title={specLine(d)}>
@@ -175,7 +209,7 @@ export default function VrachiOnlineBlock() {
           ))}
         </div>
 
-        <button type="button" className="doconline-all" onClick={handleAllDoctorsClick}>
+        <button type="button" className="doconline-all" onClick={handleAllDoctorsClick} disabled={!initData}>
           Все врачи
         </button>
       </section>
@@ -232,6 +266,14 @@ export default function VrachiOnlineBlock() {
           text-align: left;
           min-width: 0;
           overflow: hidden;
+        }
+
+        .doconline-card:disabled {
+          cursor: default;
+        }
+
+        .doconline-card--ph {
+          opacity: 0.6;
         }
 
         .doconline-card:active {
@@ -341,6 +383,11 @@ export default function VrachiOnlineBlock() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 8px 18px rgba(22, 163, 74, 0.12);
+        }
+
+        .doconline-all:disabled {
+          opacity: 0.6;
+          cursor: default;
         }
 
         .doconline-all:active {
