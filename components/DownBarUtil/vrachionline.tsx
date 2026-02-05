@@ -1,39 +1,24 @@
 /* path: components/DownBarUtil/vrachionline.tsx */
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export type Doctor = {
-  id: number;
-  name: string;
-  speciality: string;
-  experience: string;
-  rating: string;
+type ApiDoctor = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  middleName: string | null;
+  speciality1: string | null;
+  speciality2: string | null;
+  speciality3: string | null;
+  experienceYears: number | null;
+  avatarUrl: string | null;
 };
 
-const DOCTORS_ONLINE: Doctor[] = [
-  {
-    id: 1,
-    name: 'Константин Тищенко',
-    speciality: 'Ортопед, Травматолог',
-    experience: 'Стаж: 35 лет',
-    rating: '5.0',
-  },
-  {
-    id: 2,
-    name: 'Елена Абрамович',
-    speciality: 'Гинеколог, Акушер',
-    experience: 'Стаж: 7 лет',
-    rating: '5.0',
-  },
-  {
-    id: 3,
-    name: 'Марина Фатнева',
-    speciality: 'Невролог, Рентгенолог',
-    experience: 'Стаж: 5 лет',
-    rating: '5.0',
-  },
-];
+type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
+type ApiErr = { ok: false; error: string; hint?: string };
+type ApiResp = ApiOk | ApiErr;
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -41,13 +26,107 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-/** Блок "Врачи онлайн" для доунбара (заглушка) */
+/* cookie helpers (чтобы API пускало через initData) */
+function setCookie(name: string, value: string, days = 3) {
+  try {
+    const maxAge = days * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  } catch {}
+}
+function getCookie(name: string): string {
+  try {
+    const rows = document.cookie ? document.cookie.split('; ') : [];
+    for (const row of rows) {
+      const [k, ...rest] = row.split('=');
+      if (decodeURIComponent(k) === name) return decodeURIComponent(rest.join('='));
+    }
+  } catch {}
+  return '';
+}
+function getInitDataFromCookie(): string {
+  return getCookie('tg_init_data');
+}
+
+function nameLastFirst(d: ApiDoctor) {
+  const ln = String(d.lastName || '').trim();
+  const fn = String(d.firstName || '').trim();
+  const full = [ln, fn].filter(Boolean).join(' ').trim();
+  return full || 'Врач';
+}
+
+function specLine(d: ApiDoctor) {
+  const parts = [d.speciality1, d.speciality2, d.speciality3].filter(Boolean).map((x) => String(x).trim());
+  return parts.length ? parts.join(', ') : '—';
+}
+
+function expLabel(d: ApiDoctor) {
+  const n = typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
+  return n != null ? `Стаж: ${n} лет` : 'Стаж: —';
+}
+
+function avatarLetter(d: ApiDoctor) {
+  const ln = String(d.lastName || '').trim();
+  const fn = String(d.firstName || '').trim();
+  const ch = (ln || fn || 'D')[0] || 'D';
+  return ch.toUpperCase();
+}
+
+/** Блок "Врачи онлайн" для доунбара (реальные данные) */
 export default function VrachiOnlineBlock() {
   const router = useRouter();
 
-  const handleDoctorClick = (id: number) => {
+  const [items, setItems] = useState<ApiDoctor[]>([]);
+  const [count, setCount] = useState<number>(0);
+
+  const initData = useMemo(() => {
+    const WebApp: any = (window as any)?.Telegram?.WebApp;
+    try {
+      WebApp?.ready?.();
+    } catch {}
+
+    const idata = (WebApp?.initData as string) || getInitDataFromCookie();
+    if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+      setCookie('tg_init_data', WebApp.initData, 3);
+    }
+    return String(idata || '');
+  }, []);
+
+  async function load() {
+    try {
+      const r = await fetch('/api/doctors/online?limit=30', {
+        method: 'GET',
+        headers: initData ? { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData } : undefined,
+        cache: 'no-store',
+      });
+
+      const j = (await r.json().catch(() => null)) as ApiResp | null;
+      if (!r.ok || !j || (j as any).ok !== true) {
+        setItems([]);
+        setCount(0);
+        return;
+      }
+
+      const ok = j as ApiOk;
+      const list = Array.isArray(ok.items) ? ok.items : [];
+      setItems(list);
+      setCount(typeof ok.count === 'number' ? ok.count : list.length);
+    } catch {
+      setItems([]);
+      setCount(0);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // Если хочешь “живое” — раскомментируй:
+    // const t = setInterval(load, 15000);
+    // return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDoctorClick = (id: string) => {
     haptic('light');
-    console.log('open doctor', id);
+    router.push(`/hamburger/doctor/${encodeURIComponent(id)}`);
   };
 
   const handleAllDoctorsClick = () => {
@@ -60,41 +139,43 @@ export default function VrachiOnlineBlock() {
       <section className="doconline">
         <header className="doconline-header">
           <h2 className="doconline-title">Врачи онлайн</h2>
-          <span className="doconline-counter">369</span>
+          <span className="doconline-counter">{count}</span>
         </header>
 
         <div className="doconline-list">
-          {DOCTORS_ONLINE.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              className="doconline-card"
-              onClick={() => handleDoctorClick(d.id)}
-            >
-              <div className="doconline-avatar">
-                <span>{d.name[0]}</span>
+          {items.map((d) => (
+            <button key={d.id} type="button" className="doconline-card" onClick={() => handleDoctorClick(d.id)}>
+              <div className="doconline-avatar" aria-label="Аватар врача">
+                {d.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={d.avatarUrl} alt="doctor" className="doconline-avatar-img" />
+                ) : (
+                  <span>{avatarLetter(d)}</span>
+                )}
               </div>
+
               <div className="doconline-main">
                 <div className="doconline-name-row">
-                  <span className="doconline-name">{d.name}</span>
-                  <span className="doconline-dot" />
+                  <span className="doconline-name" title={nameLastFirst(d)}>
+                    {nameLastFirst(d)}
+                  </span>
+                  {/* ❌ зелёную точку убрали */}
                 </div>
-                <span className="doconline-spec">{d.speciality}</span>
+
+                <span className="doconline-spec" title={specLine(d)}>
+                  {specLine(d)}
+                </span>
+
                 <div className="doconline-bottom">
-                  <span className="doconline-exp">{d.experience}</span>
-                  <span className="doconline-rating">⭐ {d.rating}</span>
+                  <span className="doconline-exp">{expLabel(d)}</span>
+                  <span className="doconline-rating">⭐ 5.0</span>
                 </div>
               </div>
             </button>
           ))}
         </div>
 
-        {/* Кнопка "Все врачи" под списком */}
-        <button
-          type="button"
-          className="doconline-all"
-          onClick={handleAllDoctorsClick}
-        >
+        <button type="button" className="doconline-all" onClick={handleAllDoctorsClick}>
           Все врачи
         </button>
       </section>
@@ -102,6 +183,7 @@ export default function VrachiOnlineBlock() {
       <style jsx>{`
         .doconline {
           margin-top: 18px;
+          overflow-x: hidden;
         }
 
         .doconline-header {
@@ -109,6 +191,7 @@ export default function VrachiOnlineBlock() {
           align-items: center;
           gap: 8px;
           margin-bottom: 8px;
+          min-width: 0;
         }
 
         .doconline-title {
@@ -125,6 +208,8 @@ export default function VrachiOnlineBlock() {
           color: #15803d;
           font-size: 13px;
           font-weight: 600;
+          white-space: nowrap;
+          flex: 0 0 auto;
         }
 
         .doconline-list {
@@ -144,7 +229,9 @@ export default function VrachiOnlineBlock() {
           gap: 10px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          text-align: left; /* чтобы спец-ть была как у имени */
+          text-align: left;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .doconline-card:active {
@@ -165,6 +252,14 @@ export default function VrachiOnlineBlock() {
           color: #16a34a;
           box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
           flex-shrink: 0;
+          overflow: hidden;
+        }
+
+        .doconline-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         .doconline-main {
@@ -172,6 +267,8 @@ export default function VrachiOnlineBlock() {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .doconline-name-row {
@@ -179,26 +276,28 @@ export default function VrachiOnlineBlock() {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
+          min-width: 0;
         }
 
         .doconline-name {
           font-size: 14px;
           font-weight: 700;
           color: #022c22;
-        }
-
-        .doconline-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: #22c55e;
-          box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
-          flex-shrink: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+          max-width: 100%;
         }
 
         .doconline-spec {
           font-size: 12px;
           color: rgba(15, 23, 42, 0.8);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+          max-width: 100%;
         }
 
         .doconline-bottom {
@@ -207,6 +306,8 @@ export default function VrachiOnlineBlock() {
           justify-content: space-between;
           align-items: center;
           font-size: 11px;
+          gap: 10px;
+          min-width: 0;
         }
 
         .doconline-exp {
@@ -215,11 +316,15 @@ export default function VrachiOnlineBlock() {
           background: rgba(255, 255, 255, 0.9);
           color: #15803d;
           font-weight: 500;
+          white-space: nowrap;
+          flex: 0 0 auto;
         }
 
         .doconline-rating {
           color: #166534;
           font-weight: 600;
+          white-space: nowrap;
+          flex: 0 0 auto;
         }
 
         .doconline-all {
