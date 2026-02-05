@@ -1,3 +1,5 @@
+/* path: app/globals.css */
+
 /* ===== Палитра и базовая (всегда СВЕТЛАЯ) тема ===== */
 :root {
   /* Сообщаем браузеру и нативным контролам, что UI светлый */
@@ -27,11 +29,21 @@
   /* Совместимость с твоими модификаторами */
   --pro: var(--brand);
   --proplus: #f59e0b;
+
+  /* Переменная для высоты в Telegram WebView (будет выставляться JS) */
+  --tg-viewport-height: 100vh;
 }
 
 /* ===== Базовые стили ===== */
 html, body { height: 100%; }
 *, *::before, *::after { box-sizing: border-box; }
+
+/* Важно: убираем window/body-scroll, чтобы жест “дотянул вверх → свернуть” не уходил в Telegram */
+html {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  height: 100%;
+}
 
 body {
   color: var(--text);
@@ -41,6 +53,10 @@ body {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+
+  height: 100%;
+  overflow: hidden;           /* ключевой фикс */
+  overscroll-behavior: none;  /* гасим “резинку” на уровне body */
 }
 
 /* Светлая «живая» подложка (ауры как на iOS) */
@@ -53,8 +69,17 @@ body {
   filter: blur(0px);
 }
 
-/* Контейнер страницы */
-.lm-page { padding: 20px; max-width: 900px; margin: 0 auto; }
+/* Контейнер страницы — теперь это основной scroll-container */
+.lm-page {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+
+  height: var(--tg-viewport-height, 100vh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* не отдаём “протягивание” наружу */
+}
 
 /* Заголовки */
 h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
@@ -220,7 +245,6 @@ input, textarea, select,
 .lm-composer__field textarea {
   font-size: 16px !important;
 }
-html { -webkit-text-size-adjust: 100%; }
 
 /* ===================================================== */
 /* ЕДИНАЯ ВЫСОТА CTA-КНОПОК В КАРТОЧКАХ ИНСТРУМЕНТОВ     */
