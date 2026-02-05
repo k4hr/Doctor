@@ -31,17 +31,21 @@ function getInitDataFromCookie(): string {
   return getCookie('tg_init_data');
 }
 
-type AnswerItem = {
-  id: string;
+type QItem = {
   questionId: string;
-  createdAt: string;
-  body: string;
   questionTitle: string | null;
   questionSpeciality: string | null;
+  questionStatus: 'OPEN' | 'IN_PROGRESS' | 'DONE';
+  questionCreatedAt: string;
+  questionUpdatedAt: string;
+  lastAnswerId: string;
+  lastAnswerCreatedAt: string;
+  lastAnswerBody: string;
 };
-type AnswersOk = { ok: true; doctorId: string; items: AnswerItem[] };
-type AnswersErr = { ok: false; error: string; hint?: string };
-type AnswersResp = AnswersOk | AnswersErr;
+
+type Ok = { ok: true; doctorId: string; scope: 'active' | 'archive'; items: QItem[] };
+type Err = { ok: false; error: string; hint?: string };
+type Resp = Ok | Err;
 
 function fmtDateTimeRu(iso: string) {
   try {
@@ -56,6 +60,14 @@ function fmtDateTimeRu(iso: string) {
   }
 }
 
+function statusRu(s: string) {
+  const v = String(s || '').toUpperCase().trim();
+  if (v === 'OPEN') return 'Открыт';
+  if (v === 'IN_PROGRESS') return 'В работе';
+  if (v === 'DONE') return 'Закрыт';
+  return v || '—';
+}
+
 export default function DoctorQuestionsPage() {
   const router = useRouter();
 
@@ -63,8 +75,28 @@ export default function DoctorQuestionsPage() {
   const [loading, setLoading] = useState(true);
   const [warn, setWarn] = useState('');
 
-  const [items, setItems] = useState<AnswerItem[]>([]);
-  const titleSub = useMemo(() => (loading ? 'Загрузка…' : 'Актуальные и архив'), [loading]);
+  const [scope, setScope] = useState<'active' | 'archive'>('active');
+  const [items, setItems] = useState<QItem[]>([]);
+
+  const titleSub = useMemo(() => (scope === 'active' ? 'Актуальные (не закрыты)' : 'Архив (закрытые)'), [scope]);
+
+  async function load(idata: string, sc: 'active' | 'archive') {
+    const r = await fetch(`/api/doctor/questions?scope=${encodeURIComponent(sc)}&limit=200`, {
+      method: 'GET',
+      headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
+      cache: 'no-store',
+    });
+
+    const j = (await r.json().catch(() => null)) as Resp | null;
+
+    if (!r.ok || !j || (j as any).ok !== true) {
+      setItems([]);
+      const msg = (j as any)?.hint || (j as any)?.error || 'Не удалось загрузить вопросы';
+      throw new Error(msg);
+    }
+
+    setItems((j as Ok).items || []);
+  }
 
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
@@ -89,30 +121,33 @@ export default function DoctorQuestionsPage() {
           return;
         }
 
-        const r = await fetch('/api/doctor/answers?limit=200', {
-          method: 'GET',
-          headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
-          cache: 'no-store',
-        });
-
-        const j = (await r.json().catch(() => null)) as AnswersResp | null;
-
-        if (!r.ok || !j || (j as any).ok !== true) {
-          setWarn((j as any)?.hint || (j as any)?.error || 'Не удалось загрузить вопросы');
-          setItems([]);
-          return;
-        }
-
-        setItems((j as AnswersOk).items || []);
-      } catch (e) {
+        await load(idata, scope);
+      } catch (e: any) {
         console.error(e);
-        setWarn('Ошибка сети/сервера при загрузке вопросов');
-        setItems([]);
+        setWarn(String(e?.message || 'Ошибка загрузки'));
       } finally {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  useEffect(() => {
+    if (!initData) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setWarn('');
+        await load(initData, scope);
+      } catch (e: any) {
+        console.error(e);
+        setWarn(String(e?.message || 'Ошибка загрузки'));
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   async function refresh() {
     haptic('light');
@@ -120,24 +155,10 @@ export default function DoctorQuestionsPage() {
     try {
       setLoading(true);
       setWarn('');
-
-      const r = await fetch('/api/doctor/answers?limit=200', {
-        method: 'GET',
-        headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
-        cache: 'no-store',
-      });
-
-      const j = (await r.json().catch(() => null)) as AnswersResp | null;
-
-      if (!r.ok || !j || (j as any).ok !== true) {
-        setWarn((j as any)?.hint || (j as any)?.error || 'Не удалось обновить');
-        return;
-      }
-
-      setItems((j as AnswersOk).items || []);
-    } catch (e) {
+      await load(initData, scope);
+    } catch (e: any) {
       console.error(e);
-      setWarn('Ошибка обновления');
+      setWarn(String(e?.message || 'Не удалось обновить'));
     } finally {
       setLoading(false);
     }
@@ -151,10 +172,33 @@ export default function DoctorQuestionsPage() {
         <div className="head">
           <div>
             <div className="title">Вопросы</div>
-            <div className="sub">{titleSub}</div>
+            <div className="sub">{loading ? 'Загрузка…' : titleSub}</div>
           </div>
           <button type="button" className="linkBtn" onClick={refresh} disabled={loading}>
             Обновить
+          </button>
+        </div>
+
+        <div className="switch">
+          <button
+            type="button"
+            className={scope === 'active' ? 'sw swActive' : 'sw'}
+            onClick={() => {
+              haptic('light');
+              setScope('active');
+            }}
+          >
+            Активные
+          </button>
+          <button
+            type="button"
+            className={scope === 'archive' ? 'sw swActive' : 'sw'}
+            onClick={() => {
+              haptic('light');
+              setScope('archive');
+            }}
+          >
+            Архив
           </button>
         </div>
 
@@ -163,22 +207,27 @@ export default function DoctorQuestionsPage() {
         {!loading && items.length === 0 ? <div className="muted">Пока ничего нет.</div> : null}
 
         <div className="list">
-          {items.map((a) => (
+          {items.map((q) => (
             <button
-              key={a.id}
+              key={q.questionId}
               type="button"
               className="item"
               onClick={() => {
                 haptic('light');
-                router.push(`/vopros/${encodeURIComponent(a.questionId)}`);
+                router.push(`/vopros/${encodeURIComponent(q.questionId)}`);
               }}
             >
               <div className="top">
-                <div className="t">{a.questionTitle || 'Вопрос'}</div>
-                <div className="d">{fmtDateTimeRu(a.createdAt)}</div>
+                <div className="t">{q.questionTitle || 'Вопрос'}</div>
+                <div className="d">{fmtDateTimeRu(q.lastAnswerCreatedAt || q.questionUpdatedAt)}</div>
               </div>
-              <div className="m">{a.questionSpeciality || '—'}</div>
-              <div className="b">{a.body || ''}</div>
+
+              <div className="row2">
+                <div className="m">{q.questionSpeciality || '—'}</div>
+                <div className="badge">{statusRu(q.questionStatus)}</div>
+              </div>
+
+              <div className="b">{q.lastAnswerBody || ''}</div>
             </button>
           ))}
         </div>
@@ -227,6 +276,32 @@ export default function DoctorQuestionsPage() {
           cursor: default;
           text-decoration: none;
         }
+
+        .switch {
+          margin-top: 10px;
+          background: #fff;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.04);
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          overflow: hidden;
+        }
+        .sw {
+          padding: 12px 10px;
+          border: none;
+          background: transparent;
+          font-size: 14px;
+          font-weight: 950;
+          color: rgba(17, 24, 39, 0.55);
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .swActive {
+          background: #24c768;
+          color: #fff;
+        }
+
         .warn {
           margin-top: 10px;
           font-size: 12px;
@@ -240,6 +315,7 @@ export default function DoctorQuestionsPage() {
           color: rgba(17, 24, 39, 0.55);
           font-weight: 800;
         }
+
         .list {
           margin-top: 12px;
           display: grid;
@@ -280,13 +356,32 @@ export default function DoctorQuestionsPage() {
           color: rgba(17, 24, 39, 0.45);
           white-space: nowrap;
         }
-        .m {
+        .row2 {
           margin-top: 6px;
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: center;
+          min-width: 0;
+        }
+        .m {
           font-size: 12px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.6);
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
+          min-width: 0;
+        }
+        .badge {
+          flex: 0 0 auto;
+          font-size: 11px;
+          font-weight: 950;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: rgba(15, 23, 42, 0.03);
+          color: rgba(17, 24, 39, 0.75);
           white-space: nowrap;
         }
         .b {
