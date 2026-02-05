@@ -21,10 +21,9 @@ export default function TopBar() {
       <style jsx>{`
         .app-topbar {
           position: sticky;
-          top: calc(env(safe-area-inset-top, 0px) + 52px);
+          top: 0; /* ✅ без +52px, иначе бар съезжает вниз */
           z-index: 1000;
 
-          /* Растягиваем панель на ширину экрана за счёт отступов main (16px) */
           margin: 0 -16px 8px;
           padding: 10px 16px 12px;
 
