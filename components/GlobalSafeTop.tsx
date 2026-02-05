@@ -5,9 +5,9 @@ export default function GlobalSafeTop() {
   return (
     <style jsx global>{`
       :root {
-        /* Telegram/iOS safe-area сверху.
-           Никаких "56px принудительно", иначе будет двойной отступ. */
-        --lm-safe-top: env(safe-area-inset-top, 0px);
+        /* В Telegram WebView на iOS чаще всего не нужно добавлять safe-area сверху.
+           Мы убираем его полностью, чтобы не было "воздуха" над твоим топбаром. */
+        --lm-safe-top: 0px;
       }
     `}</style>
   );
