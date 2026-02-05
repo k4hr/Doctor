@@ -99,7 +99,8 @@ model Doctor {
   publications      String?
 
   // ✅ НОВОЕ: ручной онлайн/оффлайн
-  isOnline Boolean @default(false)
+  // В БД колонка была создана как "isonline" (lowercase), поэтому маппим:
+  isOnline Boolean @default(false) @map("isonline")
 
   files DoctorFile[]
 
