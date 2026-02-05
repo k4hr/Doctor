@@ -2,38 +2,32 @@
 
 /* ===== Палитра и базовая (всегда СВЕТЛАЯ) тема ===== */
 :root {
-  /* Сообщаем браузеру и нативным контролам, что UI светлый */
   color-scheme: light;
 
-  --text: #0B0C10;          /* основной текст */
+  --text: #0B0C10;
   --fg: #0B0C10;
 
-  --subtle: rgba(11,12,16,.55); /* вторичный текст */
+  --subtle: rgba(11,12,16,.55);
   --border: rgba(10,12,20,.08);
 
-  /* Светлый фон + «воздух» */
   --bg1: #F5F7FA;
   --bg2: #FFFFFF;
 
-  /* Стеклянные карточки */
-  --card-bg: rgba(255,255,255,.68);         /* светлое стекло */
-  --card-border: rgba(10,12,20,.08);        /* тонкий светлый бордер */
-  --card-hover: rgba(45,126,247,.06);       /* лёгкий бренд-блик при hover */
+  --card-bg: rgba(255,255,255,.68);
+  --card-border: rgba(10,12,20,.08);
+  --card-hover: rgba(45,126,247,.06);
   --radius: 16px;
-  --shadow: 0 8px 24px rgba(18,28,45,.10);  /* мягкая светлая тень */
+  --shadow: 0 8px 24px rgba(18,28,45,.10);
 
-  /* Акценты */
-  --brand: #2D7EF7;    /* основной акцент (iOS-синий) */
-  --accent: #24C768;   /* вторичный (здоровье/прогресс) */
+  --brand: #2D7EF7;
+  --accent: #24C768;
 
-  /* Совместимость с твоими модификаторами */
   --pro: var(--brand);
   --proplus: #f59e0b;
 
-  /* Переменная для высоты в Telegram WebView (будет выставляться JS) */
   --tg-viewport-height: 100vh;
 
-  /* ✅ Safe-area сверху (выставит GlobalSafeTop) */
+  /* ✅ важно: сверху НЕ добавляем никакие safe-area/спейсеры */
   --lm-safe-top: 0px;
 }
 
@@ -41,7 +35,6 @@
 html, body { height: 100%; }
 *, *::before, *::after { box-sizing: border-box; }
 
-/* Важно: убираем window/body-scroll, чтобы жест “дотянул вверх → свернуть” не уходил в Telegram */
 html {
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
@@ -58,11 +51,11 @@ body {
   text-rendering: optimizeLegibility;
 
   height: 100%;
-  overflow: hidden;           /* ключевой фикс */
-  overscroll-behavior: none;  /* гасим “резинку” на уровне body */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
-/* Светлая «живая» подложка (ауры как на iOS) */
+/* Светлая «живая» подложка */
 .lm-bg {
   position: fixed; inset: 0; z-index: -1;
   background:
@@ -72,27 +65,29 @@ body {
   filter: blur(0px);
 }
 
-/* Контейнер страницы — теперь это основной scroll-container */
+/* Контейнер страницы — основной scroll-container */
 .lm-page {
-  padding: 20px;
+  /* ✅ как было “нормально”: 16px, чтобы совпадало с TopBar (-16px) */
+  padding: 16px;
+
   max-width: 900px;
   margin: 0 auto;
 
   height: var(--tg-viewport-height, 100vh);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain; /* не отдаём “протягивание” наружу */
+  overscroll-behavior: contain;
 }
 
 /* Заголовки */
 h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
 .lm-subtitle { color: var(--subtle); margin: 0 0 12px; }
 
-/* ===== Сетка главного меню (если понадобится) ===== */
+/* ===== Сетка ===== */
 .lm-grid { display: grid; gap: 14px; }
 @media (min-width: 560px) { .lm-grid--2col { grid-template-columns: 1fr 1fr; } }
 
-/* ===== Карточки (светлое стекло) ===== */
+/* ===== Карточки ===== */
 .card {
   display:flex; align-items:center; justify-content:space-between;
   padding:16px 16px;
@@ -126,7 +121,6 @@ h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
 .card__title { font-weight:700; }
 .card__chev { opacity:.45; }
 
-/* Акценты */
 .card--pro .card__icon {
   background: linear-gradient(135deg, rgba(45,126,247,.16), rgba(59,130,246,.12));
 }
@@ -159,7 +153,6 @@ h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
 .list-btn__right { opacity:.7; }
 .list-btn__emoji { width:26px; display:inline-flex; justify-content:center; }
 
-/* тонкая кнопка-ссылка внизу (светлая) */
 .ghost-link {
   display:inline-flex; align-items:center; gap:8px;
   padding:10px 14px; border-radius:10px;
@@ -221,7 +214,7 @@ h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
   display: flex;
   align-items: center;
   line-height: 1.2;
-  font-size: 16px;          /* ключевой размер против iOS zoom */
+  font-size: 16px;
   color: var(--text);
   backdrop-filter: blur(10px);
 }
@@ -234,14 +227,12 @@ h1 { font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 8px; }
   line-height: 1.2; padding: 0;
 }
 
-/* чтобы иконки и текст не сдвигались на ретинах */
 .lm-composer, .lm-composer * {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transform: translateZ(0);
 }
 
-/* ===== Глобальный фикс зума iOS (VK WebView) ===== */
 input, textarea, select,
 .lm-composer__field,
 .lm-composer__field input,
@@ -251,19 +242,16 @@ input, textarea, select,
 
 /* ===================================================== */
 /* ЕДИНАЯ ВЫСОТА CTA-КНОПОК В КАРТОЧКАХ ИНСТРУМЕНТОВ     */
-/* Активируется только внутри .tools-equal               */
 /* ===================================================== */
 
 .tools-equal { display: grid; gap: 14px; }
 
-/* карточка становится колонкой: шапка, контент, CTA внизу */
 .tools-equal .card {
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
 }
 
-/* фикс для иконок, чтобы верх не «гулял» */
 .tools-equal .card .card__icon {
   width: 56px;
   height: 56px;
@@ -273,7 +261,6 @@ input, textarea, select,
   place-items: center;
 }
 
-/* описание ограничиваем 2 строками */
 .tools-equal .card p {
   margin-top: 6px;
   opacity: .85;
@@ -285,7 +272,6 @@ input, textarea, select,
   overflow: hidden;
 }
 
-/* CTA-кнопка — одинаковая высота и прижата к низу карточки */
 .tools-equal .card .list-btn {
   margin-top: auto;
   min-height: 56px;
@@ -296,10 +282,8 @@ input, textarea, select,
   border-radius: 16px;
 }
 
-/* если CTA — это ссылка, убираем подчёркивание */
 .tools-equal .card a.list-btn { text-decoration: none; }
 
-/* ===== Доп. утилиты для светлой темы ===== */
 .pill { display:inline-flex; align-items:center; gap:6px; padding:6px 10px;
   border-radius:999px; border:1px solid var(--card-border);
   background: var(--card-bg); color: var(--subtle);
@@ -312,7 +296,6 @@ input, textarea, select,
 }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-/* ===== Усиленное стекло и золото для геро-блока ===== */
 .hero-card{
   background:
     linear-gradient(135deg, rgba(255,207,92,.22), rgba(255,184,58,.18)),
