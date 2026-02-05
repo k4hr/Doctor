@@ -6,6 +6,7 @@ import Script from 'next/script';
 import TwaBootstrap from '../components/TwaBootstrap';
 import GlobalSafeTop from '../components/GlobalSafeTop';
 import TMAInit from '../components/TMAInit';
+import TelegramNoSwipeInit from '../components/TelegramNoSwipeInit';
 
 /** Всегда СВЕТЛАЯ тема + отключаем масштабирование (iOS zoom fix) */
 export const viewport: Viewport = {
@@ -57,6 +58,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ background: '#F5F7FA', color: '#0B0C10' }}>
         {/* Глобальный фон */}
         <div className="lm-bg" />
+
+        {/* Отключаем вертикальные свайпы сворачивания + выставляем --tg-viewport-height */}
+        <TelegramNoSwipeInit />
 
         {/* Безопасная зона под хедер TWA */}
         <GlobalSafeTop />
