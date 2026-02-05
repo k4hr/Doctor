@@ -1,3 +1,5 @@
+/* path: app/hamburger/profile/doctor/settings/questions/page.tsx */
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -102,6 +104,8 @@ export default function DoctorQuestionsPage() {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
       WebApp?.ready?.();
+      // на всякий: иногда WebView даёт горизонтальный скролл из-за resize
+      WebApp?.expand?.();
     } catch {}
 
     const idata = (WebApp?.initData as string) || getInitDataFromCookie();
@@ -170,7 +174,7 @@ export default function DoctorQuestionsPage() {
 
       <div className="wrap">
         <div className="head">
-          <div>
+          <div className="headText">
             <div className="title">Вопросы</div>
             <div className="sub">{loading ? 'Загрузка…' : titleSub}</div>
           </div>
@@ -218,16 +222,22 @@ export default function DoctorQuestionsPage() {
               }}
             >
               <div className="top">
-                <div className="t">{q.questionTitle || 'Вопрос'}</div>
+                <div className="t" title={q.questionTitle || 'Вопрос'}>
+                  {q.questionTitle || 'Вопрос'}
+                </div>
                 <div className="d">{fmtDateTimeRu(q.lastAnswerCreatedAt || q.questionUpdatedAt)}</div>
               </div>
 
               <div className="row2">
-                <div className="m">{q.questionSpeciality || '—'}</div>
+                <div className="m" title={q.questionSpeciality || '—'}>
+                  {q.questionSpeciality || '—'}
+                </div>
                 <div className="badge">{statusRu(q.questionStatus)}</div>
               </div>
 
-              <div className="b">{q.lastAnswerBody || ''}</div>
+              <div className="b" title={q.lastAnswerBody || ''}>
+                {q.lastAnswerBody || ''}
+              </div>
             </button>
           ))}
         </div>
@@ -238,18 +248,29 @@ export default function DoctorQuestionsPage() {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
+          overflow-x: hidden; /* ✅ убираем горизонтальный скролл на корне */
         }
+
         .wrap {
           max-width: 430px;
           margin: 0 auto;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden; /* ✅ на всякий */
         }
+
         .head {
           margin-top: 6px;
           display: flex;
           align-items: baseline;
           justify-content: space-between;
           gap: 10px;
+          min-width: 0; /* ✅ важно для flex */
         }
+        .headText {
+          min-width: 0; /* ✅ чтобы текст не раздувал строку */
+        }
+
         .title {
           font-size: 22px;
           font-weight: 950;
@@ -261,7 +282,9 @@ export default function DoctorQuestionsPage() {
           font-weight: 900;
           color: rgba(17, 24, 39, 0.6);
         }
+
         .linkBtn {
+          flex: 0 0 auto;
           border: none;
           background: transparent;
           color: #6d28d9;
@@ -270,6 +293,7 @@ export default function DoctorQuestionsPage() {
           text-decoration: underline;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          white-space: nowrap;
         }
         .linkBtn:disabled {
           opacity: 0.6;
@@ -286,7 +310,10 @@ export default function DoctorQuestionsPage() {
           display: grid;
           grid-template-columns: 1fr 1fr;
           overflow: hidden;
+          width: 100%;
+          max-width: 100%;
         }
+
         .sw {
           padding: 12px 10px;
           border: none;
@@ -296,6 +323,7 @@ export default function DoctorQuestionsPage() {
           color: rgba(17, 24, 39, 0.55);
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          min-width: 0;
         }
         .swActive {
           background: #24c768;
@@ -308,6 +336,8 @@ export default function DoctorQuestionsPage() {
           line-height: 1.35;
           color: #ef4444;
           font-weight: 800;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
         .muted {
           margin-top: 10px;
@@ -320,8 +350,13 @@ export default function DoctorQuestionsPage() {
           margin-top: 12px;
           display: grid;
           gap: 10px;
+          width: 100%;
+          max-width: 100%;
         }
+
         .item {
+          width: 100%;
+          max-width: 100%;
           text-align: left;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: #fff;
@@ -330,49 +365,60 @@ export default function DoctorQuestionsPage() {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.04);
+          overflow: hidden; /* ✅ чтобы ничего не вылезало */
         }
         .item:active {
           transform: scale(0.99);
           opacity: 0.96;
         }
+
         .top {
           display: flex;
           justify-content: space-between;
           gap: 10px;
           align-items: baseline;
+          min-width: 0; /* ✅ */
         }
+
         .t {
+          flex: 1 1 auto;
+          min-width: 0; /* ✅ самое важное */
           font-size: 13px;
           font-weight: 950;
           color: #111827;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          min-width: 0;
+          text-overflow: ellipsis; /* ✅ троеточие */
+          white-space: nowrap; /* ✅ 1 строка */
         }
+
         .d {
+          flex: 0 0 auto;
           font-size: 11px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.45);
           white-space: nowrap;
         }
+
         .row2 {
           margin-top: 6px;
           display: flex;
           justify-content: space-between;
           gap: 10px;
           align-items: center;
-          min-width: 0;
+          min-width: 0; /* ✅ */
         }
+
         .m {
+          flex: 1 1 auto;
+          min-width: 0; /* ✅ */
           font-size: 12px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.6);
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          min-width: 0;
+          text-overflow: ellipsis; /* ✅ */
+          white-space: nowrap; /* ✅ */
         }
+
         .badge {
           flex: 0 0 auto;
           font-size: 11px;
@@ -384,16 +430,20 @@ export default function DoctorQuestionsPage() {
           color: rgba(17, 24, 39, 0.75);
           white-space: nowrap;
         }
+
+        /* ✅ превью текста: 2 строки + троеточие */
         .b {
           margin-top: 8px;
           font-size: 13px;
           line-height: 1.45;
           color: rgba(17, 24, 39, 0.78);
-          white-space: pre-wrap;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          white-space: normal;
           overflow-wrap: anywhere;
           word-break: break-word;
-          max-height: 4.4em;
-          overflow: hidden;
         }
       `}</style>
     </main>
