@@ -26,6 +26,14 @@ function norm(s: any) {
   return String(s ?? '').trim();
 }
 
+function pickCrop(raw: any) {
+  if (!raw || typeof raw !== 'object') return null;
+  const x = Number((raw as any).x);
+  const y = Number((raw as any).y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -56,6 +64,7 @@ export async function GET(req: Request) {
         speciality2: true,
         speciality3: true,
         experienceYears: true,
+        profilephotocrop: true, // ✅
         files: {
           where: { kind: DoctorFileKind.PROFILE_PHOTO },
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -76,6 +85,7 @@ export async function GET(req: Request) {
       speciality3: d.speciality3 ? String(d.speciality3) : null,
       experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
       avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
+      avatarCrop: pickCrop(d.profilephotocrop),
     }));
 
     return NextResponse.json({ ok: true, items });
