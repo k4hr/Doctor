@@ -85,7 +85,7 @@ export default function DoctorsBySpecialityPage() {
             key={d.id}
             doctor={d}
             ratingLabel={safeRatingLabel()}
-            showOnlineDot={true}
+            showOnlineDot={false}
             onClick={(doc) => {
               haptic('light');
               router.push(`/hamburger/doctor/${doc.id}`);
