@@ -37,7 +37,7 @@ function tg(): TgWebApp | null {
 function tgHardHideMainButton() {
   try {
     const wa = tg();
-    wa?.MainButton?.offClick?.(); // снимаем вообще все хендлеры
+    wa?.MainButton?.offClick?.();
     wa?.MainButton?.hideProgress?.();
     wa?.MainButton?.hide?.();
   } catch {}
@@ -82,7 +82,8 @@ function focusFirstInvalid(form: HTMLFormElement, show: (msg: string) => void) {
   }
 }
 
-const MAX_PROFILE = 3;
+// ✅ теперь только 1 фото профиля
+const MAX_PROFILE = 1;
 const MAX_DOCS = 10;
 
 function clampFiles(files: FileList | null | undefined, max: number): File[] {
@@ -112,11 +113,6 @@ async function fetchWithTimeout(
   }
 }
 
-/**
- * Telegram может передавать initData:
- *  - через window.Telegram.WebApp.initData
- *  - через query/hash параметр tgWebAppData (если открытие не совсем стандартное)
- */
 function getTelegramInitDataSmart(): { initData: string; source: string } {
   const wa = tg();
   const fromWa = (wa?.initData || '').trim();
@@ -168,7 +164,6 @@ export default function DoctorRegistrationPage() {
     };
   }, []);
 
-  // ✅ На входе: говорим Telegram "мы WebApp", и сразу скрываем MainButton (он глобальный)
   useEffect(() => {
     try {
       const wa = tg();
@@ -199,15 +194,15 @@ export default function DoctorRegistrationPage() {
 
   const validateFiles = () => {
     if (profilePhotos.length === 0) {
-      showToast(`Загрузите фото профиля (1–${MAX_PROFILE}).`);
+      showToast('Загрузите фото профиля (1).');
+      return false;
+    }
+    if (profilePhotos.length > MAX_PROFILE) {
+      showToast('Фото профиля: нужно ровно 1.');
       return false;
     }
     if (docPhotos.length === 0) {
       showToast(`Загрузите документы/диплом (1–${MAX_DOCS}).`);
-      return false;
-    }
-    if (profilePhotos.length > MAX_PROFILE) {
-      showToast(`Фото профиля: максимум ${MAX_PROFILE}.`);
       return false;
     }
     if (docPhotos.length > MAX_DOCS) {
@@ -288,7 +283,11 @@ export default function DoctorRegistrationPage() {
       setStage('Загружаем документы…');
       const fd = new FormData();
       fd.append('initData', initData);
-      profilePhotos.forEach((f) => fd.append('profilePhotos', f, f.name));
+
+      // ✅ теперь отправляем одну фотку как profilePhoto (одиночный файл)
+      fd.append('profilePhoto', profilePhotos[0], profilePhotos[0].name);
+
+      // ✅ документы как и раньше массивом
       docPhotos.forEach((f) => fd.append('docPhotos', f, f.name));
 
       const resUp = await fetchWithTimeout('/api/doctor/upload', {
@@ -408,9 +407,33 @@ export default function DoctorRegistrationPage() {
           <div className="docreg-field">
             <span className="docreg-label">Дата рождения</span>
             <div className="docreg-dob-row">
-              <input name="birthDay" type="number" inputMode="numeric" placeholder="День" className="docreg-input" min={1} max={31} />
-              <input name="birthMonth" type="number" inputMode="numeric" placeholder="Месяц" className="docreg-input" min={1} max={12} />
-              <input name="birthYear" type="number" inputMode="numeric" placeholder="Год" className="docreg-input" min={1900} max={2100} />
+              <input
+                name="birthDay"
+                type="number"
+                inputMode="numeric"
+                placeholder="День"
+                className="docreg-input"
+                min={1}
+                max={31}
+              />
+              <input
+                name="birthMonth"
+                type="number"
+                inputMode="numeric"
+                placeholder="Месяц"
+                className="docreg-input"
+                min={1}
+                max={12}
+              />
+              <input
+                name="birthYear"
+                type="number"
+                inputMode="numeric"
+                placeholder="Год"
+                className="docreg-input"
+                min={1900}
+                max={2100}
+              />
             </div>
           </div>
 
@@ -430,23 +453,35 @@ export default function DoctorRegistrationPage() {
             </span>
 
             <select name="speciality1" required className="docreg-input docreg-select" defaultValue="">
-              <option value="" disabled>Основная специализация</option>
+              <option value="" disabled>
+                Основная специализация
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
             <select name="speciality2" className="docreg-input docreg-select docreg-select-second" defaultValue="">
-              <option value="" disabled>Дополнительная специализация (по желанию)</option>
+              <option value="" disabled>
+                Дополнительная специализация (по желанию)
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
             <select name="speciality3" className="docreg-input docreg-select docreg-select-third" defaultValue="">
-              <option value="" disabled>Ещё одна специализация (по желанию)</option>
+              <option value="" disabled>
+                Ещё одна специализация (по желанию)
+              </option>
               {VRACHI_LIST.map((spec) => (
-                <option key={spec} value={spec}>{spec}</option>
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
               ))}
             </select>
 
@@ -459,7 +494,13 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Образование<span className="req">*</span>
             </span>
-            <textarea name="education" required placeholder="ВУЗ, годы обучения, факультет, квалификация." className="docreg-textarea" rows={3} />
+            <textarea
+              name="education"
+              required
+              placeholder="ВУЗ, годы обучения, факультет, квалификация."
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
@@ -486,7 +527,16 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               Стаж работы, лет<span className="req">*</span>
             </span>
-            <input name="experienceYears" type="number" required min={0} max={70} inputMode="numeric" placeholder="Общий стаж" className="docreg-input" />
+            <input
+              name="experienceYears"
+              type="number"
+              required
+              min={0}
+              max={70}
+              inputMode="numeric"
+              placeholder="Общий стаж"
+              className="docreg-input"
+            />
           </label>
 
           <label className="docreg-field">
@@ -503,7 +553,14 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               E-mail<span className="req">*</span>
             </span>
-            <input name="email" type="email" required placeholder="doctor@example.com" className="docreg-input" autoComplete="email" />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="doctor@example.com"
+              className="docreg-input"
+              autoComplete="email"
+            />
           </label>
         </section>
 
@@ -515,21 +572,39 @@ export default function DoctorRegistrationPage() {
             <span className="docreg-label">
               О себе<span className="req">*</span>
             </span>
-            <textarea name="about" required placeholder="Коротко о себе и подходе к пациентам" className="docreg-textarea" rows={3} />
+            <textarea
+              name="about"
+              required
+              placeholder="Коротко о себе и подходе к пациентам"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Специализация подробно<span className="req">*</span>
             </span>
-            <textarea name="specialityDetails" required placeholder="С какими запросами работаете" className="docreg-textarea" rows={3} />
+            <textarea
+              name="specialityDetails"
+              required
+              placeholder="С какими запросами работаете"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
             <span className="docreg-label">
               Опыт работы<span className="req">*</span>
             </span>
-            <textarea name="experienceDetails" required placeholder="Опишите опыт работы" className="docreg-textarea" rows={3} />
+            <textarea
+              name="experienceDetails"
+              required
+              placeholder="Опишите опыт работы"
+              className="docreg-textarea"
+              rows={3}
+            />
           </label>
 
           <label className="docreg-field">
@@ -564,17 +639,15 @@ export default function DoctorRegistrationPage() {
           <div className="docs-grid">
             <div className="docs-item">
               <div className="docs-title">
-                Фото профиля<span className="req">*</span> <span className="docs-limit">(до {MAX_PROFILE})</span>
+                Фото профиля<span className="req">*</span> <span className="docs-limit">(1)</span>
               </div>
 
               {profileUrls.length > 0 ? (
-                <div className="thumbs">
-                  {profileUrls.map((u, idx) => (
-                    <div className="thumb" key={u}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img className="thumbImg" src={u} alt={`profile-${idx + 1}`} />
-                    </div>
-                  ))}
+                <div className="thumbs thumbs-one">
+                  <div className="thumb">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="thumbImg" src={profileUrls[0]} alt="profile" />
+                  </div>
                 </div>
               ) : (
                 <div className="placeholder">Фото не выбрано</div>
@@ -585,12 +658,14 @@ export default function DoctorRegistrationPage() {
                 className="file"
                 type="file"
                 accept="image/*"
-                multiple
+                multiple={false}
                 onChange={(e) => {
                   const next = clampFiles(e.target.files, MAX_PROFILE);
-                  if (e.target.files && e.target.files.length > MAX_PROFILE) {
-                    showToast(`Можно выбрать максимум ${MAX_PROFILE} фото профиля.`);
+
+                  if (e.target.files && e.target.files.length > 1) {
+                    showToast('Можно выбрать только 1 фото профиля.');
                   }
+
                   setProfilePhotos(next);
                   setProfileInputKey((x) => x + 1);
                 }}
@@ -664,7 +739,6 @@ export default function DoctorRegistrationPage() {
           </div>
         </section>
 
-        {/* ✅ НИЖНЯЯ ПАНЕЛЬ — ТЕПЕРЬ НЕ FIXED, А В КОНЦЕ СТРАНИЦЫ */}
         <div className="docreg-submit-wrap">
           <button
             type="button"
@@ -833,6 +907,11 @@ export default function DoctorRegistrationPage() {
           width: 100%;
         }
 
+        /* ✅ когда одна фотка — делаем 1 колонку и чуть крупнее */
+        .thumbs-one {
+          grid-template-columns: 1fr;
+        }
+
         .thumb {
           width: 100%;
           border-radius: 12px;
@@ -881,7 +960,6 @@ export default function DoctorRegistrationPage() {
         }
         .miniDanger:active { transform: scale(0.99); }
 
-        /* ✅ БЫЛО fixed — СТАЛО обычным блоком внизу */
         .docreg-submit-wrap {
           margin-top: 6px;
           background: #ffffff;
