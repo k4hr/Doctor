@@ -1,9 +1,14 @@
 /* path: app/hamburger/doctor/[id]/page.tsx */
 'use client';
 
+import type { Viewport } from 'next';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopBarBack from '../../../../components/TopBarBack';
+
+export const viewport: Viewport = {
+  themeColor: '#f6f7fb',
+};
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -209,7 +214,6 @@ export default function DoctorPublicProfilePage() {
     setInitData(idata || '');
   }, []);
 
-  // грузим публичные данные врача
   useEffect(() => {
     (async () => {
       try {
@@ -246,7 +250,6 @@ export default function DoctorPublicProfilePage() {
     })();
   }, [doctorId]);
 
-  // грузим отзывы
   useEffect(() => {
     (async () => {
       try {
@@ -308,7 +311,6 @@ export default function DoctorPublicProfilePage() {
 
   const onLeaveReview = () => {
     haptic('light');
-    // формы отзыва у тебя пока нет — просто переключим вкладку
     setTab('reviews');
   };
 
@@ -439,11 +441,7 @@ export default function DoctorPublicProfilePage() {
                     <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
                   </div>
 
-                  {r.text ? (
-                    <div className="reviewText">{r.text}</div>
-                  ) : (
-                    <div className="reviewText muted">Без текста</div>
-                  )}
+                  {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
 
                   {r.isVerified ? <div className="badgeOk">проверен</div> : null}
                 </div>
