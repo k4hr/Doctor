@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import TopBarBack from '../../../../../../components/TopBarBack';
 import { DoctorFileKind } from '@prisma/client';
 import DoctorAdminActions from './DoctorAdminActions';
+import ThumbnailPicker from './ThumbnailPicker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -136,6 +137,14 @@ function statusUi(status: string) {
   }
 }
 
+function pickCrop(raw: any): { x: number; y: number } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const x = Number((raw as any).x);
+  const y = Number((raw as any).y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
 export default async function DoctorAdminCardPage({ params }: { params: { id: string } }) {
   const { id } = params;
 
@@ -198,6 +207,8 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
+  const initialCrop = pickCrop((doctor as any).profilephotocrop);
+
   return (
     <main style={pageStyle}>
       <TopBarBack />
@@ -237,6 +248,9 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
         <div style={{ marginTop: 12 }}>
           <DoctorAdminActions doctorId={doctor.id} currentStatus={doctor.status} />
         </div>
+
+        {/* ✅ Выбор миниатюры */}
+        <ThumbnailPicker doctorId={doctor.id} photoUrl={profileUrls[0] ?? null} initialCrop={initialCrop} />
 
         <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
 
