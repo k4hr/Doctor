@@ -103,9 +103,9 @@ model Doctor {
   isOnline Boolean @default(false) @map("isonline")
 
   // ✅ НОВОЕ: одно фото врача + кроп миниатюры (храним прямо в Doctor)
-  // В БД создай колонки НИЖЕ ИМЕННО ТАК (lowercase), тогда @map не нужен
+  // В БД создай колонки НИЖЕ ИМЕННО ТАК (lowercase)
   profilephotourl  String?
-  profilephotocrop Json?
+  profilephotocrop Json? @db.Json
 
   files DoctorFile[]
 
@@ -137,7 +137,6 @@ model Doctor {
   @@index([city])
   @@index([submittedAt])
   @@index([isOnline])
-  @@index([profilephotourl])
 }
 
 model DoctorFile {
