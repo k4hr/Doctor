@@ -98,9 +98,14 @@ model Doctor {
   achievements      String?
   publications      String?
 
-  // ✅ НОВОЕ: ручной онлайн/оффлайн
+  // ✅ ручной онлайн/оффлайн
   // В БД колонка была создана как "isonline" (lowercase), поэтому маппим:
   isOnline Boolean @default(false) @map("isonline")
+
+  // ✅ НОВОЕ: одно фото врача + кроп миниатюры (храним прямо в Doctor)
+  // В БД создай колонки НИЖЕ ИМЕННО ТАК (lowercase), тогда @map не нужен
+  profilephotourl  String?
+  profilephotocrop Json?
 
   files DoctorFile[]
 
@@ -132,6 +137,7 @@ model Doctor {
   @@index([city])
   @@index([submittedAt])
   @@index([isOnline])
+  @@index([profilephotourl])
 }
 
 model DoctorFile {
