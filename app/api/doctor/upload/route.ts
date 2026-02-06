@@ -16,7 +16,6 @@ type TgUser = {
 };
 
 function envClean(name: string) {
-  // убираем переводы строк + трим
   return String(process.env[name] ?? '').replace(/[\r\n]/g, '').trim();
 }
 
@@ -115,8 +114,6 @@ function makeS3() {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
     forcePathStyle: true,
-
-    // чтобы не добавлял лишние checksum-хедеры на PutObject
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   } as any);
@@ -177,26 +174,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'NO_DOCTOR', hint: 'Сначала сохраните анкету' }, { status: 404 });
     }
 
+    // ✅ поддерживаем оба варианта:
+    // - новый: profilePhoto (одиночный файл)
+    // - старый: profilePhotos (массив)
     const profilePhotos = asFiles(form.getAll('profilePhotos'));
     const docPhotos = asFiles(form.getAll('docPhotos'));
 
-    const legacyProfile = form.get('profilePhoto');
-    const legacyDiploma = form.get('diplomaPhoto');
+    const profileSingle = form.get('profilePhoto'); // ✅ новый фронт шлёт это
+    const legacyDiploma = form.get('diplomaPhoto'); // оставляем на всякий
 
-    const finalProfile = profilePhotos.length ? profilePhotos : legacyProfile instanceof File ? [legacyProfile] : [];
-    const finalDocs = docPhotos.length ? docPhotos : legacyDiploma instanceof File ? [legacyDiploma] : [];
+    const finalProfile =
+      profileSingle instanceof File
+        ? [profileSingle]
+        : profilePhotos.length
+          ? profilePhotos
+          : [];
 
-    const MAX_PROFILE = 3;
+    const finalDocs =
+      docPhotos.length
+        ? docPhotos
+        : legacyDiploma instanceof File
+          ? [legacyDiploma]
+          : [];
+
+    // ✅ теперь строго 1 фото профиля
+    const MAX_PROFILE = 1;
     const MAX_DOCS = 10;
 
     if (finalProfile.length === 0 || finalDocs.length === 0) {
       return NextResponse.json({ ok: false, error: 'FILES_REQUIRED' }, { status: 400 });
     }
     if (finalProfile.length > MAX_PROFILE) {
-      return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'profilePhotos', max: MAX_PROFILE }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: 'TOO_MANY_FILES', field: 'profilePhoto', max: MAX_PROFILE },
+        { status: 400 }
+      );
     }
     if (finalDocs.length > MAX_DOCS) {
-      return NextResponse.json({ ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: 'TOO_MANY_FILES', field: 'docPhotos', max: MAX_DOCS },
+        { status: 400 }
+      );
     }
 
     const maxAvatar = 8 * 1024 * 1024;
@@ -205,10 +223,13 @@ export async function POST(req: Request) {
     for (const f of finalProfile) {
       const mime = (f.type || '').trim();
       if (!isImageMime(mime)) {
-        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhotos', mime }, { status: 400 });
+        return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'profilePhoto', mime }, { status: 400 });
       }
       if (f.size > maxAvatar) {
-        return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhotos', maxBytes: maxAvatar, gotBytes: f.size }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'profilePhoto', maxBytes: maxAvatar, gotBytes: f.size },
+          { status: 400 }
+        );
       }
     }
 
@@ -218,17 +239,21 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'BAD_MIME', field: 'docPhotos', mime }, { status: 400 });
       }
       if (f.size > maxDoc) {
-        return NextResponse.json({ ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc, gotBytes: f.size }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: 'FILE_TOO_LARGE', field: 'docPhotos', maxBytes: maxDoc, gotBytes: f.size },
+          { status: 400 }
+        );
       }
     }
 
     const s3 = makeS3();
 
+    // ✅ загружаем ровно 1 аватар
     const uploadedProfile: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
-    for (let i = 0; i < finalProfile.length; i++) {
-      const f = finalProfile[i];
+    {
+      const f = finalProfile[0];
       const mime = (f.type || '').trim();
-      const key = `doctors/${doctor.id}/avatar-${Date.now()}-${i + 1}-${rand()}.${safeExt(mime)}`;
+      const key = `doctors/${doctor.id}/avatar-${Date.now()}-1-${rand()}.${safeExt(mime)}`;
 
       const body = Buffer.from(await f.arrayBuffer());
 
@@ -245,11 +270,14 @@ export async function POST(req: Request) {
         );
       } catch (e) {
         const details = pickS3Error(e);
-        console.error('R2 upload avatar failed', { i, mime, size: f.size, key, details }, e);
-        return NextResponse.json({ ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhotos', index: i, details }, { status: 502 });
+        console.error('R2 upload avatar failed', { mime, size: f.size, key, details }, e);
+        return NextResponse.json(
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'profilePhoto', index: 0, details },
+          { status: 502 }
+        );
       }
 
-      uploadedProfile.push({ url: publicUrlForKey(key) || key, mime, sizeBytes: f.size, sortOrder: i });
+      uploadedProfile.push({ url: publicUrlForKey(key) || key, mime, sizeBytes: f.size, sortOrder: 0 });
     }
 
     const uploadedDocs: { url: string; mime: string; sizeBytes: number; sortOrder: number }[] = [];
@@ -274,7 +302,10 @@ export async function POST(req: Request) {
       } catch (e) {
         const details = pickS3Error(e);
         console.error('R2 upload doc failed', { i, mime, size: f.size, key, details }, e);
-        return NextResponse.json({ ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i, details }, { status: 502 });
+        return NextResponse.json(
+          { ok: false, error: 'R2_UPLOAD_FAILED', where: 'docPhotos', index: i, details },
+          { status: 502 }
+        );
       }
 
       uploadedDocs.push({ url: publicUrlForKey(key) || key, mime, sizeBytes: f.size, sortOrder: i });
@@ -289,8 +320,22 @@ export async function POST(req: Request) {
 
       await tx.doctorFile.createMany({
         data: [
-          ...uploadedProfile.map((x) => ({ doctorId: doctor.id, kind: DoctorFileKind.PROFILE_PHOTO, url: x.url, mime: x.mime, sizeBytes: x.sizeBytes, sortOrder: x.sortOrder })),
-          ...uploadedDocs.map((x) => ({ doctorId: doctor.id, kind: DoctorFileKind.DIPLOMA_PHOTO, url: x.url, mime: x.mime, sizeBytes: x.sizeBytes, sortOrder: x.sortOrder })),
+          ...uploadedProfile.map((x) => ({
+            doctorId: doctor.id,
+            kind: DoctorFileKind.PROFILE_PHOTO,
+            url: x.url,
+            mime: x.mime,
+            sizeBytes: x.sizeBytes,
+            sortOrder: x.sortOrder,
+          })),
+          ...uploadedDocs.map((x) => ({
+            doctorId: doctor.id,
+            kind: DoctorFileKind.DIPLOMA_PHOTO,
+            url: x.url,
+            mime: x.mime,
+            sizeBytes: x.sizeBytes,
+            sortOrder: x.sortOrder,
+          })),
         ],
       });
 
@@ -303,7 +348,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       doctorId: doctor.id,
-      profilePhotos: uploadedProfile.map((x) => x.url),
+      profilePhotos: uploadedProfile.map((x) => x.url), // ✅ оставил массив для совместимости
       docPhotos: uploadedDocs.map((x) => x.url),
       submittedAt: (doctor.submittedAt ?? now).toISOString(),
       status: 'PENDING',
