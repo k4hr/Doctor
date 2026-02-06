@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import DoctorCard, { type DoctorAvatarCrop, type DoctorCardData } from '@/components/DoctorCard/DoctorCard';
 
 type ApiDoctor = {
   id: string;
@@ -14,6 +15,7 @@ type ApiDoctor = {
   speciality3: string | null;
   experienceYears: number | null;
   avatarUrl: string | null;
+  avatarCrop?: DoctorAvatarCrop | null; // ✅ новое
 };
 
 type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
@@ -51,30 +53,6 @@ function getInitDataFromCookie(): string {
   return getCookie('tg_init_data');
 }
 
-function nameLastFirst(d: ApiDoctor) {
-  const ln = String(d.lastName || '').trim();
-  const fn = String(d.firstName || '').trim();
-  const full = [ln, fn].filter(Boolean).join(' ').trim();
-  return full || 'Врач';
-}
-
-function specLine(d: ApiDoctor) {
-  const parts = [d.speciality1, d.speciality2, d.speciality3].filter(Boolean).map((x) => String(x).trim());
-  return parts.length ? parts.join(', ') : '—';
-}
-
-function expLabel(d: ApiDoctor) {
-  const n = typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
-  return n != null ? `Стаж: ${n} лет` : 'Стаж: —';
-}
-
-function avatarLetter(d: ApiDoctor) {
-  const ln = String(d.lastName || '').trim();
-  const fn = String(d.firstName || '').trim();
-  const ch = (ln || fn || 'D')[0] || 'D';
-  return ch.toUpperCase();
-}
-
 function makePlaceholders(n: number): UiDoctor[] {
   return Array.from({ length: n }).map((_, i) => ({
     id: `placeholder-${i}`,
@@ -86,6 +64,7 @@ function makePlaceholders(n: number): UiDoctor[] {
     speciality3: null,
     experienceYears: null,
     avatarUrl: null,
+    avatarCrop: null,
     __placeholder: true,
   }));
 }
@@ -124,7 +103,6 @@ export default function VrachiOnlineBlock() {
   }
 
   useEffect(() => {
-    // ✅ window только здесь, чтобы не падал build/SSR
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
       WebApp?.ready?.();
@@ -140,14 +118,12 @@ export default function VrachiOnlineBlock() {
     setInitData(finalIdata);
 
     load(finalIdata);
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const uiItems: UiDoctor[] = useMemo(() => {
     const list = Array.isArray(items) ? items.slice(0, UI_LIMIT) : [];
     if (list.length >= UI_LIMIT) return list;
-
     const need = UI_LIMIT - list.length;
     return [...list, ...makePlaceholders(need)];
   }, [items]);
@@ -172,41 +148,31 @@ export default function VrachiOnlineBlock() {
         </header>
 
         <div className="doconline-list">
-          {uiItems.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              className={d.__placeholder ? 'doconline-card doconline-card--ph' : 'doconline-card'}
-              onClick={() => handleDoctorClick(d)}
-              disabled={d.__placeholder}
-            >
-              <div className="doconline-avatar" aria-label="Аватар врача">
-                {d.avatarUrl && !d.__placeholder ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.avatarUrl} alt="doctor" className="doconline-avatar-img" />
-                ) : (
-                  <span>{avatarLetter(d)}</span>
-                )}
-              </div>
+          {uiItems.map((d) => {
+            const card: DoctorCardData = {
+              id: d.id,
+              firstName: d.firstName,
+              lastName: d.lastName,
+              middleName: d.middleName,
+              speciality1: d.speciality1,
+              speciality2: d.speciality2,
+              speciality3: d.speciality3,
+              experienceYears: d.experienceYears,
+              avatarUrl: d.avatarUrl,
+              avatarCrop: d.avatarCrop ?? null,
+            };
 
-              <div className="doconline-main">
-                <div className="doconline-name-row">
-                  <span className="doconline-name" title={nameLastFirst(d)}>
-                    {nameLastFirst(d)}
-                  </span>
-                </div>
-
-                <span className="doconline-spec" title={specLine(d)}>
-                  {specLine(d)}
-                </span>
-
-                <div className="doconline-bottom">
-                  <span className="doconline-exp">{expLabel(d)}</span>
-                  <span className="doconline-rating">⭐ 5.0</span>
-                </div>
-              </div>
-            </button>
-          ))}
+            return (
+              <DoctorCard
+                key={d.id}
+                doctor={card}
+                disabled={!!d.__placeholder}
+                onClick={() => handleDoctorClick(d)}
+                showRating={true}
+                ratingLabel="⭐ 5.0"
+              />
+            );
+          })}
         </div>
 
         <button type="button" className="doconline-all" onClick={handleAllDoctorsClick} disabled={!initData}>
@@ -250,123 +216,6 @@ export default function VrachiOnlineBlock() {
           display: flex;
           flex-direction: column;
           gap: 8px;
-        }
-
-        .doconline-card {
-          padding: 10px 12px;
-          border-radius: 16px;
-          border: 1px solid rgba(34, 197, 94, 0.22);
-          background: rgba(220, 252, 231, 0.75);
-          box-shadow: 0 8px 20px rgba(22, 163, 74, 0.16);
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          text-align: left;
-          min-width: 0;
-          overflow: hidden;
-        }
-
-        .doconline-card:disabled {
-          cursor: default;
-        }
-
-        .doconline-card--ph {
-          opacity: 0.6;
-        }
-
-        .doconline-card:active {
-          transform: translateY(1px);
-          box-shadow: 0 6px 16px rgba(22, 163, 74, 0.24);
-        }
-
-        .doconline-avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 999px;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 18px;
-          color: #16a34a;
-          box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
-          flex-shrink: 0;
-          overflow: hidden;
-        }
-
-        .doconline-avatar-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .doconline-main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          min-width: 0;
-          overflow: hidden;
-        }
-
-        .doconline-name-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .doconline-name {
-          font-size: 14px;
-          font-weight: 700;
-          color: #022c22;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          min-width: 0;
-          max-width: 100%;
-        }
-
-        .doconline-spec {
-          font-size: 12px;
-          color: rgba(15, 23, 42, 0.8);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          min-width: 0;
-          max-width: 100%;
-        }
-
-        .doconline-bottom {
-          margin-top: 4px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 11px;
-          gap: 10px;
-          min-width: 0;
-        }
-
-        .doconline-exp {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.9);
-          color: #15803d;
-          font-weight: 500;
-          white-space: nowrap;
-          flex: 0 0 auto;
-        }
-
-        .doconline-rating {
-          color: #166534;
-          font-weight: 600;
-          white-space: nowrap;
-          flex: 0 0 auto;
         }
 
         .doconline-all {
