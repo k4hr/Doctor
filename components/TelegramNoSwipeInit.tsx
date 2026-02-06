@@ -8,7 +8,14 @@ export default function TelegramNoSwipeInit() {
     const tg = (window as any)?.Telegram?.WebApp;
     if (!tg) return;
 
-    const setVar = (name: string, value: number) => {
+    const isIOS =
+      tg.platform === 'ios' ||
+      /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    // Небольшая поправка под телеграм-оверлей ("Закрыть/…") на iOS
+    const EXTRA_TOP = isIOS ? 12 : 0;
+
+    const setPxVar = (name: string, value: number) => {
       const v = Number.isFinite(value) ? value : 0;
       document.documentElement.style.setProperty(name, `${Math.max(0, Math.round(v))}px`);
     };
@@ -18,21 +25,18 @@ export default function TelegramNoSwipeInit() {
       const h = Number(tg.viewportHeight) || window.innerHeight;
       document.documentElement.style.setProperty('--tg-viewport-height', `${h}px`);
 
-      // 2) Safe-top: берём максимально надёжное из Telegram, иначе фолбэк env() из CSS
-      // Разные версии Telegram/WebApp SDK могут иметь разные поля
-      const topFromSafeArea =
-        Number(tg.safeAreaInset?.top) ||
+      // 2) Safe-top: для контента важнее contentSafeAreaInset
+      const rawTop =
         Number(tg.contentSafeAreaInset?.top) ||
+        Number(tg.safeAreaInset?.top) ||
         Number(tg.safeArea?.top) ||
         0;
 
-      // Если Telegram отдаёт 0, НЕ затираем фолбэк env(safe-area-inset-top) — это важно
-      if (topFromSafeArea > 0) {
-        setVar('--lm-safe-top', topFromSafeArea);
-      } else {
-        // Убираем кастомную переменную, чтобы работал фолбэк из :root (env)
-        document.documentElement.style.removeProperty('--lm-safe-top');
-      }
+      // Если Telegram не даёт inset — всё равно на iOS добавим минимум под оверлей
+      const top = Math.max(0, rawTop) + EXTRA_TOP;
+
+      // Всегда выставляем переменную, чтобы было стабильно именно в Telegram WebView
+      setPxVar('--lm-safe-top', top);
     };
 
     try { tg.disableVerticalSwipes?.(); } catch {}
