@@ -78,8 +78,16 @@ function toPublicUrlMaybe(value: string | null) {
   if (/^https?:\/\//i.test(v)) return v;
 
   const base = (process.env.R2_PUBLIC_BASE_URL || '').trim();
-  if (!base) return v; // оставим как key
+  if (!base) return v;
   return `${base.replace(/\/$/, '')}/${v}`;
+}
+
+function pickCrop(raw: any) {
+  if (!raw || typeof raw !== 'object') return null;
+  const x = Number((raw as any).x);
+  const y = Number((raw as any).y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
 }
 
 export async function GET(req: Request) {
@@ -119,6 +127,8 @@ export async function GET(req: Request) {
         speciality1: true,
         experienceYears: true,
 
+        profilephotocrop: true, // ✅
+
         files: {
           where: { kind: { in: ['PROFILE_PHOTO', 'DIPLOMA_PHOTO'] } },
           orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -147,16 +157,15 @@ export async function GET(req: Request) {
 
       return {
         ...d,
-        // убираем "files" из ответа, чтобы не тащить лишнее
         files: undefined,
 
-        // ✅ новый формат
         profilePhotoUrls: profile,
         diplomaPhotoUrls: docs,
 
-        // ✅ совместимость со старым UI
         profilePhotoUrl: profile[0] || null,
         diplomaPhotoUrl: docs[0] || null,
+
+        avatarCrop: pickCrop(d.profilephotocrop),
       };
     });
 
