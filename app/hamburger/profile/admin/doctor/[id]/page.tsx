@@ -197,13 +197,13 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
 
   const profileUrls = doctor.files
     .filter((f) => f.kind === DoctorFileKind.PROFILE_PHOTO)
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
   const docsUrls = doctor.files
     .filter((f) => f.kind === DoctorFileKind.DIPLOMA_PHOTO)
-    .sort((a, b) => (a.sortOrder - b.sortOrder) || (a.createdAt.getTime() - b.createdAt.getTime()))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
@@ -256,12 +256,24 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
 
         <div style={{ display: 'grid', gap: 10, fontSize: 13, ...wrapText }}>
           <div style={{ fontWeight: 900, fontSize: 14 }}>Личные данные</div>
-          <div><b>Фамилия:</b> {show(doctor.lastName)}</div>
-          <div><b>Имя:</b> {show(doctor.firstName)}</div>
-          <div><b>Отчество:</b> {show(doctor.middleName)}</div>
-          <div><b>Пол:</b> {genderRu(doctor.gender)}</div>
-          <div><b>Дата рождения:</b> {show(doctor.birthDay)}.{show(doctor.birthMonth)}.{show(doctor.birthYear)}</div>
-          <div><b>Город:</b> {show(doctor.city)}</div>
+          <div>
+            <b>Фамилия:</b> {show(doctor.lastName)}
+          </div>
+          <div>
+            <b>Имя:</b> {show(doctor.firstName)}
+          </div>
+          <div>
+            <b>Отчество:</b> {show(doctor.middleName)}
+          </div>
+          <div>
+            <b>Пол:</b> {genderRu(doctor.gender)}
+          </div>
+          <div>
+            <b>Дата рождения:</b> {show(doctor.birthDay)}.{show(doctor.birthMonth)}.{show(doctor.birthYear)}
+          </div>
+          <div>
+            <b>Город:</b> {show(doctor.city)}
+          </div>
 
           <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
 
@@ -271,35 +283,85 @@ export default async function DoctorAdminCardPage({ params }: { params: { id: st
             {doctor.speciality2 ? `, ${doctor.speciality2}` : ''}
             {doctor.speciality3 ? `, ${doctor.speciality3}` : ''}
           </div>
-          <div><b>Образование:</b><br />{show(doctor.education)}</div>
-          <div><b>Степень:</b> {degreeRu(doctor.degree)}</div>
-          <div><b>Место работы:</b> {show(doctor.workplace)}</div>
-          <div><b>Должность:</b> {show(doctor.position)}</div>
-          <div><b>Стаж (лет):</b> {show(doctor.experienceYears)}</div>
-          <div><b>Награды:</b><br />{show(doctor.awards)}</div>
+          <div>
+            <b>Образование:</b>
+            <br />
+            {show(doctor.education)}
+          </div>
+          <div>
+            <b>Степень:</b> {degreeRu(doctor.degree)}
+          </div>
+          <div>
+            <b>Место работы:</b> {show(doctor.workplace)}
+          </div>
+          <div>
+            <b>Должность:</b> {show(doctor.position)}
+          </div>
+          <div>
+            <b>Стаж (лет):</b> {show(doctor.experienceYears)}
+          </div>
+          <div>
+            <b>Награды:</b>
+            <br />
+            {show(doctor.awards)}
+          </div>
 
           <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
 
           <div style={{ fontWeight: 900, fontSize: 14 }}>Контакты</div>
-          <div><b>Email:</b> {show(doctor.email)}</div>
+          <div>
+            <b>Email:</b> {show(doctor.email)}
+          </div>
 
           <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
 
           <div style={{ fontWeight: 900, fontSize: 14 }}>Описание</div>
-          <div><b>О себе:</b><br />{show(doctor.about)}</div>
-          <div><b>Специализация подробно:</b><br />{show(doctor.specialityDetails)}</div>
-          <div><b>Опыт работы:</b><br />{show(doctor.experienceDetails)}</div>
-          <div><b>Курсы:</b><br />{show(doctor.courses)}</div>
-          <div><b>Достижения:</b><br />{show(doctor.achievements)}</div>
-          <div><b>Публикации:</b><br />{show(doctor.publications)}</div>
+          <div>
+            <b>О себе:</b>
+            <br />
+            {show(doctor.about)}
+          </div>
+          <div>
+            <b>Специализация подробно:</b>
+            <br />
+            {show(doctor.specialityDetails)}
+          </div>
+          <div>
+            <b>Опыт работы:</b>
+            <br />
+            {show(doctor.experienceDetails)}
+          </div>
+          <div>
+            <b>Курсы:</b>
+            <br />
+            {show(doctor.courses)}
+          </div>
+          <div>
+            <b>Достижения:</b>
+            <br />
+            {show(doctor.achievements)}
+          </div>
+          <div>
+            <b>Публикации:</b>
+            <br />
+            {show(doctor.publications)}
+          </div>
 
           <hr style={{ margin: '6px 0', border: 'none', borderTop: '1px solid #eef2f7' }} />
 
           <div style={{ fontWeight: 900, fontSize: 14 }}>Системное</div>
-          <div><b>ID анкеты:</b> <span style={wrapText}>{doctor.id}</span></div>
-          <div><b>Дата создания:</b> {fmtDateTimeRuMsk(doctor.createdAt)}</div>
-          <div><b>Дата обновления:</b> {fmtDateTimeRuMsk(doctor.updatedAt)}</div>
-          <div><b>Дата отправки на модерацию:</b> {fmtDateTimeRuMsk(doctor.submittedAt)}</div>
+          <div>
+            <b>ID анкеты:</b> <span style={wrapText}>{doctor.id}</span>
+          </div>
+          <div>
+            <b>Дата создания:</b> {fmtDateTimeRuMsk(doctor.createdAt)}
+          </div>
+          <div>
+            <b>Дата обновления:</b> {fmtDateTimeRuMsk(doctor.updatedAt)}
+          </div>
+          <div>
+            <b>Дата отправки на модерацию:</b> {fmtDateTimeRuMsk(doctor.submittedAt)}
+          </div>
         </div>
 
         <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
