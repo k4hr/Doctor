@@ -92,9 +92,11 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     const body = await req.json().catch(() => null);
     const xRaw = body?.x;
     const yRaw = body?.y;
+    const zoomRaw = body?.zoom;
 
     const xNum = Number(xRaw);
     const yNum = Number(yRaw);
+    const zoomNum = zoomRaw === undefined || zoomRaw === null ? 1 : Number(zoomRaw);
 
     if (!Number.isFinite(xNum) || !Number.isFinite(yNum)) {
       return NextResponse.json(
@@ -103,7 +105,18 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
       );
     }
 
-    const crop = { x: clamp(xNum, 0, 100), y: clamp(yNum, 0, 100) };
+    if (!Number.isFinite(zoomNum)) {
+      return NextResponse.json(
+        { ok: false, error: 'VALIDATION', field: 'zoom', hint: 'zoom должен быть числом (1..3)' },
+        { status: 400 }
+      );
+    }
+
+    const crop = {
+      x: clamp(xNum, 0, 100),
+      y: clamp(yNum, 0, 100),
+      zoom: clamp(zoomNum, 1, 3),
+    };
 
     const updated = await prisma.doctor.update({
       where: { id },
