@@ -20,7 +20,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'ВРАЧИ.ТУТ',
   description: 'Онлайн-консультации с врачами в Telegram Mini App',
-  themeColor: '#F5F7FA',
   other: {
     'color-scheme': 'light',
     'apple-mobile-web-app-status-bar-style': 'default',
@@ -31,17 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru" data-theme="light">
       <head>
-        <Script
-          src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
-        />
+        <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
 
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-        />
         <meta name="color-scheme" content="light" />
-        <meta name="theme-color" content="#F5F7FA" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
