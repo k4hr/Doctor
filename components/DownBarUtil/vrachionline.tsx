@@ -15,14 +15,12 @@ type ApiDoctor = {
   speciality3: string | null;
   experienceYears: number | null;
   avatarUrl: string | null;
-  avatarCrop?: DoctorAvatarCrop | null; // ✅ новое
+  avatarCrop?: DoctorAvatarCrop | null;
 };
 
 type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
 type ApiErr = { ok: false; error: string; hint?: string };
 type ApiResp = ApiOk | ApiErr;
-
-type UiDoctor = ApiDoctor & { __placeholder?: boolean };
 
 const UI_LIMIT = 7;
 
@@ -53,20 +51,11 @@ function getInitDataFromCookie(): string {
   return getCookie('tg_init_data');
 }
 
-function makePlaceholders(n: number): UiDoctor[] {
-  return Array.from({ length: n }).map((_, i) => ({
-    id: `placeholder-${i}`,
-    firstName: 'Имя',
-    lastName: 'Фамилия',
-    middleName: null,
-    speciality1: 'Специальность',
-    speciality2: null,
-    speciality3: null,
-    experienceYears: null,
-    avatarUrl: null,
-    avatarCrop: null,
-    __placeholder: true,
-  }));
+function isRealDoctor(d: ApiDoctor) {
+  // чтобы не показывать мусор/пустые анкеты
+  const fn = String(d.firstName ?? '').trim();
+  const ln = String(d.lastName ?? '').trim();
+  return !!d.id && (fn.length > 0 || ln.length > 0);
 }
 
 /** Блок "Врачи онлайн" для доунбара (реальные данные) */
@@ -94,8 +83,15 @@ export default function VrachiOnlineBlock() {
 
       const ok = j as ApiOk;
       const list = Array.isArray(ok.items) ? ok.items : [];
-      setItems(list);
-      setCount(typeof ok.count === 'number' ? ok.count : list.length);
+
+      // ✅ фильтруем только реальных, и ограничиваем до 7
+      const real = list.filter(isRealDoctor).slice(0, UI_LIMIT);
+
+      setItems(real);
+      // count лучше показывать общий count из API (если он про реальных),
+      // но чтобы не было странностей — гарантируем минимум real.length
+      const apiCount = typeof ok.count === 'number' ? ok.count : real.length;
+      setCount(Math.max(real.length, apiCount));
     } catch {
       setItems([]);
       setCount(0);
@@ -121,15 +117,11 @@ export default function VrachiOnlineBlock() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const uiItems: UiDoctor[] = useMemo(() => {
-    const list = Array.isArray(items) ? items.slice(0, UI_LIMIT) : [];
-    if (list.length >= UI_LIMIT) return list;
-    const need = UI_LIMIT - list.length;
-    return [...list, ...makePlaceholders(need)];
+  const uiItems: ApiDoctor[] = useMemo(() => {
+    return Array.isArray(items) ? items.slice(0, UI_LIMIT) : [];
   }, [items]);
 
-  const handleDoctorClick = (d: UiDoctor) => {
-    if (d.__placeholder) return;
+  const handleDoctorClick = (d: ApiDoctor) => {
     haptic('light');
     router.push(`/hamburger/doctor/${encodeURIComponent(d.id)}`);
   };
@@ -148,31 +140,35 @@ export default function VrachiOnlineBlock() {
         </header>
 
         <div className="doconline-list">
-          {uiItems.map((d) => {
-            const card: DoctorCardData = {
-              id: d.id,
-              firstName: d.firstName,
-              lastName: d.lastName,
-              middleName: d.middleName,
-              speciality1: d.speciality1,
-              speciality2: d.speciality2,
-              speciality3: d.speciality3,
-              experienceYears: d.experienceYears,
-              avatarUrl: d.avatarUrl,
-              avatarCrop: d.avatarCrop ?? null,
-            };
+          {uiItems.length === 0 ? (
+            <div className="doconline-empty">Сейчас нет врачей онлайн</div>
+          ) : (
+            uiItems.map((d) => {
+              const card: DoctorCardData = {
+                id: d.id,
+                firstName: d.firstName,
+                lastName: d.lastName,
+                middleName: d.middleName,
+                speciality1: d.speciality1,
+                speciality2: d.speciality2,
+                speciality3: d.speciality3,
+                experienceYears: d.experienceYears,
+                avatarUrl: d.avatarUrl,
+                avatarCrop: d.avatarCrop ?? null,
+              };
 
-            return (
-              <DoctorCard
-                key={d.id}
-                doctor={card}
-                disabled={!!d.__placeholder}
-                onClick={() => handleDoctorClick(d)}
-                showRating={true}
-                ratingLabel="⭐ 5.0"
-              />
-            );
-          })}
+              return (
+                <DoctorCard
+                  key={d.id}
+                  doctor={card}
+                  disabled={false}
+                  onClick={() => handleDoctorClick(d)}
+                  showRating={true}
+                  ratingLabel="5.0"
+                />
+              );
+            })
+          )}
         </div>
 
         <button type="button" className="doconline-all" onClick={handleAllDoctorsClick} disabled={!initData}>
@@ -216,6 +212,17 @@ export default function VrachiOnlineBlock() {
           display: flex;
           flex-direction: column;
           gap: 8px;
+        }
+
+        .doconline-empty {
+          padding: 12px 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(10, 12, 20, 0.08);
+          background: rgba(255, 255, 255, 0.96);
+          color: rgba(15, 23, 42, 0.65);
+          font-size: 13px;
+          font-weight: 600;
+          box-shadow: 0 8px 18px rgba(18, 28, 45, 0.06);
         }
 
         .doconline-all {
