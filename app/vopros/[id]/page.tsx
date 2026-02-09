@@ -1,7 +1,6 @@
 /* path: app/vopros/[id]/page.tsx */
 import type React from 'react';
 import crypto from 'crypto';
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import TopBarBack from '../../../components/TopBarBack';
@@ -10,7 +9,8 @@ import PhotoLightbox from './PhotoLightbox';
 import AnswerComments from './AnswerComments';
 import AnswerCreate from './AnswerCreate';
 import QuestionHeaderActions from './QuestionHeaderActions';
-import DoctorCard, { type DoctorCardItem } from '../../../components/DoctorCard/DoctorCard';
+import AnswerDoctorCardLink from './AnswerDoctorCardLink';
+import { type DoctorCardItem } from '../../../components/DoctorCard/DoctorCard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -248,7 +248,16 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   const answers = Array.isArray((q as any).answers) ? ((q as any).answers as any[]) : [];
   const alreadyAnsweredByMe = !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
-  const canAnswer = !!tgId && isApprovedDoctor && doctorCanAnswerBySpec && !alreadyAnsweredByMe && answers.length < 10;
+
+  const isClosed = !!q.close;
+
+  const canAnswer =
+    !!tgId &&
+    isApprovedDoctor &&
+    doctorCanAnswerBySpec &&
+    !alreadyAnsweredByMe &&
+    answers.length < 10 &&
+    !isClosed;
 
   // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
@@ -283,15 +292,13 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     gap: 12,
   };
 
-  const isClosed = !!q.close;
-
   return (
     <main style={pageStyle}>
       <TopBarBack />
 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
-      {/* ✅ Новое: actions (Закрыть / ⋯) */}
+      {/* ✅ actions (Закрыть / ⋯) */}
       <QuestionHeaderActions questionId={String(q.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
@@ -349,16 +356,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show(q.body)}
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            justifyContent: 'space-between',
-            gap: 10,
-            flexWrap: 'wrap',
-            minWidth: 0,
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(15,23,42,0.78)', ...wrapText, flex: '1 1 auto', minWidth: 0 }}>
             {show(q.speciality)}
           </div>
@@ -367,16 +365,8 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        {/* ✅ Новое: статус закрытия (для всех) */}
-        <div
-          style={{
-            marginTop: 2,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
+        {/* ✅ статус закрытия */}
+        <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span
             style={{
               fontSize: 12,
@@ -434,10 +424,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <div style={{ marginTop: 14 }}>
         <h2 style={{ margin: '10px 0 10px', fontSize: 16, fontWeight: 950 }}>Ответы врачей</h2>
 
-        {/* ✅ Новое: если вопрос закрыт — отвечать нельзя */}
         <AnswerCreate
           questionId={String(q.id)}
-          canAnswer={!!canAnswer && !isClosed}
+          canAnswer={!!canAnswer}
           reason={
             isClosed
               ? 'Вопрос уже закрыт.'
@@ -476,15 +465,14 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               const d = a.doctor;
 
               const profileUrl =
-                toPublicUrlMaybe(d?.files?.[0]?.url || null) ||
-                toPublicUrlMaybe(d?.profilephotourl || null);
+                toPublicUrlMaybe(d?.files?.[0]?.url || null) || toPublicUrlMaybe(d?.profilephotourl || null);
 
               const doctorCard = doctorCardItemFromDoctor(d, profileUrl);
-
               const ratingLabel = safeRatingLabel(d);
 
               // ✅ Комментировать: автор ИЛИ врач, который оставил этот ответ
-              const canDoctorComment = isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
+              const canDoctorComment =
+                isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
 
               const initialComments = Array.isArray(a?.comments)
@@ -510,20 +498,11 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
-                  {/* ✅ Новое: используем единый DoctorCard */}
+                  {/* ✅ кликабельная карточка врача — через Client wrapper */}
                   <div style={{ padding: 12, paddingBottom: 0 }}>
-                    <DoctorCard
-                      doctor={doctorCard}
-                      ratingLabel={ratingLabel}
-                      onClick={() => {
-                        // DoctorCard сам дернет haptic, а Link тут не нужен
-                        // переход делаем через обычный location (серверный компонент не умеет useRouter)
-                        if (doctorHref && doctorHref !== '#') window.location.href = doctorHref;
-                      }}
-                    />
+                    <AnswerDoctorCardLink doctor={doctorCard} href={doctorHref} ratingLabel={ratingLabel} />
                   </div>
 
-                  {/* тело ответа */}
                   <div style={{ padding: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)', marginBottom: 8 }}>
                       {fmtDateTimeRuMsk(a.createdAt)}
@@ -552,7 +531,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           : 'Вы вошли как пользователь.'}
       </div>
 
-      {/* ✅ маленькая подсказка для автора, если закрыт */}
       {isAuthor && isClosed ? (
         <div
           style={{
