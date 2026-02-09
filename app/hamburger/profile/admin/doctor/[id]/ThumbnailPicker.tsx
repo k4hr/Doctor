@@ -1,6 +1,7 @@
 /* path: app/hamburger/profile/admin/doctor/[id]/ThumbnailPicker.tsx */
 'use client';
 
+import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Crop = { x: number; y: number; zoom?: number };
