@@ -352,7 +352,7 @@ export default function DoctorProfilePage() {
           title={!canOpenCabinet ? 'Доступно после подтверждения' : 'Кабинет'}
         >
           <span className="cabinetIcon" aria-hidden="true">
-            📂
+            Меню
           </span>
         </button>
 
