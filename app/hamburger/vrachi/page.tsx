@@ -1,56 +1,74 @@
 /* path: app/hamburger/vrachi/page.tsx */
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../components/TopBarBack';
 import DownBar from '../../../components/DownBar';
 import { VRACHI_GROUPS } from '../../lib/vrachi';
 
+function haptic(type: 'light' | 'medium' = 'light') {
+  try {
+    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
+}
+
 export default function VrachiPage() {
   const router = useRouter();
 
+  useEffect(() => {
+    try {
+      (window as any)?.Telegram?.WebApp?.ready?.();
+      (window as any)?.Telegram?.WebApp?.expand?.();
+    } catch {}
+  }, []);
+
   const go = (speciality: string) => {
+    haptic('light');
     router.push(`/hamburger/vrachi/${encodeURIComponent(speciality)}`);
   };
 
   return (
-    <main className="vrachi-page">
+    <main className="feed">
       <TopBarBack />
 
-      <section className="vrachi-main">
-        {VRACHI_GROUPS.map((group) => (
-          <div key={group.letter} className="vrachi-group">
-            <div className="vrachi-letter">{group.letter}</div>
+      <section className="feed-main">
+        <section className="vrachi-list" aria-label="Список специализаций">
+          {VRACHI_GROUPS.map((group) => (
+            <div key={group.letter} className="vrachi-group">
+              <div className="vrachi-letter">{group.letter}</div>
 
-            {group.items.map((name) => (
-              <button
-                key={name}
-                type="button"
-                className="vrachi-item"
-                onClick={() => go(name)}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        ))}
+              {group.items.map((name) => (
+                <button key={name} type="button" className="vrachi-item" onClick={() => go(name)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          ))}
+        </section>
 
         <DownBar />
       </section>
 
       <style jsx>{`
-        .vrachi-page {
+        /* ✅ 1в1 как на app/page.tsx */
+        .feed {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
         }
 
-        .vrachi-main {
+        .feed-main {
           margin-top: 12px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 18px;
           padding-bottom: 72px;
+        }
+
+        .vrachi-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
         }
 
         .vrachi-group {
