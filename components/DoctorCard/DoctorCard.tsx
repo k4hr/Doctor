@@ -45,7 +45,7 @@ function doctorAvatarLetter(d: DoctorCardItem) {
   return (n[0] || 'D').toUpperCase();
 }
 
-export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Props) {
+export default function DoctorCard({ doctor, onClick, ratingLabel = '⭐ 5.0' }: Props) {
   const name = useMemo(() => doctorFullName(doctor), [doctor]);
   const spec = useMemo(() => doctorSpecsLine(doctor), [doctor]);
 
@@ -83,7 +83,7 @@ export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Pro
 
           <div className="doconline-bottom">
             <span className="doconline-exp">{expLabel}</span>
-            <span className="doconline-rating">⭐ {ratingLabel}</span>
+            <span className="doconline-rating">{ratingLabel}</span>
           </div>
         </div>
       </button>
