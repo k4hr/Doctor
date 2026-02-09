@@ -87,7 +87,6 @@ export default function CloseQuestionPage() {
 
   const [loading, setLoading] = useState(true);
   const [warn, setWarn] = useState('');
-
   const [info, setInfo] = useState<CloseInfoOk | null>(null);
 
   const [selected, setSelected] = useState<string[]>([]);
@@ -275,7 +274,9 @@ export default function CloseQuestionPage() {
 
             return (
               <div key={doc.doctorId} className={active ? 'pickWrap pickWrapActive' : 'pickWrap'}>
-                <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => toggleDoctor(doc.doctorId)} />
+                <div className="cardClamp">
+                  <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => toggleDoctor(doc.doctorId)} />
+                </div>
                 <div className={active ? 'check checkOn' : 'check'} aria-hidden="true">
                   ✓
                 </div>
@@ -313,7 +314,9 @@ export default function CloseQuestionPage() {
           <div className="closedList">
             {closedCards.map((doc) => (
               <div key={doc.doctorId} className="closedRow">
-                <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => goLeaveReview(doc.doctorId)} />
+                <div className="cardClamp">
+                  <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => goLeaveReview(doc.doctorId)} />
+                </div>
                 <button type="button" className="reviewBtn" onClick={() => goLeaveReview(doc.doctorId)}>
                   Оставить отзыв
                 </button>
@@ -324,10 +327,32 @@ export default function CloseQuestionPage() {
       ) : null}
 
       <style jsx>{`
+        /* Жёстко рубим горизонтальный скролл на странице (и в её потомках) */
+        :global(html),
+        :global(body) {
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+
         .page {
           min-height: 100dvh;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
+
+          /* чтобы любые длинные строки не выталкивали контейнер */
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+
+        /* чтобы padding не раздувал ширину */
+        .page :global(*) {
+          box-sizing: border-box;
+          min-width: 0;
+          max-width: 100%;
         }
 
         .head {
@@ -366,6 +391,10 @@ export default function CloseQuestionPage() {
           border: 1px solid rgba(15, 23, 42, 0.06);
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           margin-top: 10px;
+
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden; /* если внутри карточек что-то “выпирает” */
         }
 
         .cardTitle {
@@ -392,17 +421,33 @@ export default function CloseQuestionPage() {
           margin-top: 12px;
           display: grid;
           gap: 10px;
+
+          width: 100%;
+          max-width: 100%;
         }
 
         .pickWrap {
           position: relative;
           border-radius: 18px;
-          overflow: visible;
+
+          width: 100%;
+          max-width: 100%;
+
+          /* ВАЖНО: “обрезаем” любые выезды DoctorCard вправо */
+          overflow: hidden;
+          background: transparent;
         }
 
         .pickWrapActive {
           outline: 2px solid rgba(34, 197, 94, 0.35);
           border-radius: 18px;
+        }
+
+        /* Доп. зажим, если DoctorCard внутри имеет свои странные размеры */
+        .cardClamp {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .check {
@@ -413,7 +458,7 @@ export default function CloseQuestionPage() {
           height: 26px;
           border-radius: 10px;
           border: 1px solid rgba(15, 23, 42, 0.12);
-          background: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.92);
           display: grid;
           place-items: center;
           font-weight: 950;
@@ -440,6 +485,9 @@ export default function CloseQuestionPage() {
           font-weight: 850;
           display: grid;
           gap: 4px;
+
+          width: 100%;
+          max-width: 100%;
         }
 
         .sumNote {
@@ -477,11 +525,17 @@ export default function CloseQuestionPage() {
           margin-top: 12px;
           display: grid;
           gap: 10px;
+
+          width: 100%;
+          max-width: 100%;
         }
 
         .closedRow {
           display: grid;
           gap: 8px;
+
+          width: 100%;
+          max-width: 100%;
         }
 
         .reviewBtn {
@@ -495,7 +549,10 @@ export default function CloseQuestionPage() {
           font-size: 12px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          white-space: nowrap;
+
+          /* на всякий пожарный: */
+          white-space: normal;
+          overflow-wrap: anywhere;
         }
 
         .reviewBtn:active {
