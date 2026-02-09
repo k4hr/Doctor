@@ -274,9 +274,7 @@ export default function CloseQuestionPage() {
 
             return (
               <div key={doc.doctorId} className={active ? 'pickWrap pickWrapActive' : 'pickWrap'}>
-                <div className="cardClamp">
-                  <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => toggleDoctor(doc.doctorId)} />
-                </div>
+                <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => toggleDoctor(doc.doctorId)} />
                 <div className={active ? 'check checkOn' : 'check'} aria-hidden="true">
                   ✓
                 </div>
@@ -314,9 +312,7 @@ export default function CloseQuestionPage() {
           <div className="closedList">
             {closedCards.map((doc) => (
               <div key={doc.doctorId} className="closedRow">
-                <div className="cardClamp">
-                  <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => goLeaveReview(doc.doctorId)} />
-                </div>
+                <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => goLeaveReview(doc.doctorId)} />
                 <button type="button" className="reviewBtn" onClick={() => goLeaveReview(doc.doctorId)}>
                   Оставить отзыв
                 </button>
@@ -327,37 +323,28 @@ export default function CloseQuestionPage() {
       ) : null}
 
       <style jsx>{`
-        /* Жёстко рубим горизонтальный скролл на странице (и в её потомках) */
+        /* Рубим горизонтальный скролл, но НЕ ломаем раскладку */
         :global(html),
         :global(body) {
-          max-width: 100%;
+          width: 100%;
           overflow-x: hidden;
         }
 
         .page {
           min-height: 100dvh;
           width: 100%;
-          max-width: 100%;
           overflow-x: hidden;
-
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
-
-          /* чтобы любые длинные строки не выталкивали контейнер */
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        /* чтобы padding не раздувал ширину */
-        .page :global(*) {
-          box-sizing: border-box;
-          min-width: 0;
-          max-width: 100%;
         }
 
         .head {
           margin-top: 6px;
           margin-bottom: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 0;
         }
 
         .title {
@@ -367,7 +354,6 @@ export default function CloseQuestionPage() {
         }
 
         .sub {
-          margin-top: 4px;
           font-size: 12px;
           font-weight: 800;
           color: rgba(17, 24, 39, 0.55);
@@ -384,6 +370,8 @@ export default function CloseQuestionPage() {
           font-weight: 850;
         }
 
+        /* ВАЖНО: принудительно делаем карточку вертикальной,
+           чтобы никакие глобальные .card {display:flex} не ломали всё в строку */
         .card {
           background: #fff;
           border-radius: 18px;
@@ -394,7 +382,14 @@ export default function CloseQuestionPage() {
 
           width: 100%;
           max-width: 100%;
-          overflow: hidden; /* если внутри карточек что-то “выпирает” */
+
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 0;
+
+          overflow: hidden;
+          min-width: 0;
         }
 
         .cardTitle {
@@ -417,37 +412,28 @@ export default function CloseQuestionPage() {
           color: rgba(17, 24, 39, 0.55);
         }
 
+        /* Список строго вертикальный */
         .list {
           margin-top: 12px;
           display: grid;
+          grid-template-columns: 1fr;
           gap: 10px;
-
           width: 100%;
-          max-width: 100%;
+          min-width: 0;
         }
 
+        /* Вот тут мы “фиксируем” ширину карточки врача и рубим выезды */
         .pickWrap {
           position: relative;
           border-radius: 18px;
-
           width: 100%;
-          max-width: 100%;
-
-          /* ВАЖНО: “обрезаем” любые выезды DoctorCard вправо */
-          overflow: hidden;
-          background: transparent;
+          min-width: 0;
+          overflow: hidden; /* режет то, что вылазит за край */
         }
 
         .pickWrapActive {
           outline: 2px solid rgba(34, 197, 94, 0.35);
           border-radius: 18px;
-        }
-
-        /* Доп. зажим, если DoctorCard внутри имеет свои странные размеры */
-        .cardClamp {
-          width: 100%;
-          max-width: 100%;
-          overflow: hidden;
         }
 
         .check {
@@ -485,9 +471,8 @@ export default function CloseQuestionPage() {
           font-weight: 850;
           display: grid;
           gap: 4px;
-
           width: 100%;
-          max-width: 100%;
+          min-width: 0;
         }
 
         .sumNote {
@@ -524,18 +509,17 @@ export default function CloseQuestionPage() {
         .closedList {
           margin-top: 12px;
           display: grid;
+          grid-template-columns: 1fr;
           gap: 10px;
-
           width: 100%;
-          max-width: 100%;
+          min-width: 0;
         }
 
         .closedRow {
           display: grid;
           gap: 8px;
-
           width: 100%;
-          max-width: 100%;
+          min-width: 0;
         }
 
         .reviewBtn {
@@ -549,8 +533,6 @@ export default function CloseQuestionPage() {
           font-size: 12px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-
-          /* на всякий пожарный: */
           white-space: normal;
           overflow-wrap: anywhere;
         }
