@@ -9,6 +9,8 @@ import { DoctorFileKind, DoctorStatus } from '@prisma/client';
 import PhotoLightbox from './PhotoLightbox';
 import AnswerComments from './AnswerComments';
 import AnswerCreate from './AnswerCreate';
+import QuestionHeaderActions from './QuestionHeaderActions';
+import DoctorCard, { type DoctorCardItem } from '../../../components/DoctorCard/DoctorCard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -141,7 +143,7 @@ function authorLabelFromQuestion(q: any): string {
   return 'Вопрос от Пользователь';
 }
 
-/** ✅ В шапке ответа показываем только Фамилия Имя */
+/** ✅ Только Фамилия + Имя (для комментариев) */
 function doctorLastFirst(d: any) {
   const ln = String(d?.lastName || '').trim();
   const fn = String(d?.firstName || '').trim();
@@ -149,14 +151,19 @@ function doctorLastFirst(d: any) {
   return full || '—';
 }
 
-function doctorSpecsLine(d: any) {
-  const parts = [d?.speciality1, d?.speciality2, d?.speciality3].filter(Boolean).map((x) => String(x).trim());
-  return parts.length ? parts.join(', ') : '—';
-}
-
-function doctorAvatarLetter(d: any) {
-  const n = String(d?.lastName || d?.firstName || 'D').trim();
-  return (n[0] || 'D').toUpperCase();
+function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardItem {
+  return {
+    id: String(d?.id || ''),
+    firstName: String(d?.firstName || '').trim() || '—',
+    lastName: String(d?.lastName || '').trim() || '—',
+    middleName: d?.middleName ? String(d.middleName) : null,
+    city: d?.city ? String(d.city) : null,
+    speciality1: String(d?.speciality1 || '').trim() || '—',
+    speciality2: d?.speciality2 ? String(d.speciality2).trim() : null,
+    speciality3: d?.speciality3 ? String(d.speciality3).trim() : null,
+    experienceYears: typeof d?.experienceYears === 'number' ? d.experienceYears : null,
+    avatarUrl: avatarUrl ?? null,
+  };
 }
 
 function safeRatingLabel(_d: any) {
@@ -177,6 +184,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     where: { id },
     include: {
       files: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+      close: true,
       answers: {
         where: { isDeleted: false },
         orderBy: [{ createdAt: 'asc' }],
@@ -229,7 +237,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     : null;
 
   const isApprovedDoctor = !!viewerDoctor && viewerDoctor.status === DoctorStatus.APPROVED;
-  const isAuthor = !!tgId && q.authorTelegramId === tgId;
+  const isAuthor = !!tgId && String(q.authorTelegramId) === String(tgId);
 
   const qSpec = norm(q.speciality);
   const doctorSpecs = new Set(
@@ -239,9 +247,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   const doctorCanAnswerBySpec = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
 
   const answers = Array.isArray((q as any).answers) ? ((q as any).answers as any[]) : [];
-
   const alreadyAnsweredByMe = !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
-
   const canAnswer = !!tgId && isApprovedDoctor && doctorCanAnswerBySpec && !alreadyAnsweredByMe && answers.length < 10;
 
   // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
@@ -277,11 +283,16 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     gap: 12,
   };
 
+  const isClosed = !!q.close;
+
   return (
     <main style={pageStyle}>
       <TopBarBack />
 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
+
+      {/* ✅ Новое: actions (Закрыть / ⋯) */}
+      <QuestionHeaderActions questionId={String(q.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
@@ -338,13 +349,54 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show(q.body)}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 10,
+            flexWrap: 'wrap',
+            minWidth: 0,
+          }}
+        >
           <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(15,23,42,0.78)', ...wrapText, flex: '1 1 auto', minWidth: 0 }}>
             {show(q.speciality)}
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(15,23,42,0.55)', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
             {fmtDateTimeRuMsk(q.createdAt)}
           </div>
+        </div>
+
+        {/* ✅ Новое: статус закрытия (для всех) */}
+        <div
+          style={{
+            marginTop: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 900,
+              padding: '6px 10px',
+              borderRadius: 999,
+              border: '1px solid rgba(15,23,42,0.10)',
+              background: isClosed ? 'rgba(109, 40, 217, 0.10)' : 'rgba(15,23,42,0.04)',
+              color: isClosed ? '#6d28d9' : 'rgba(15,23,42,0.70)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {isClosed ? 'Закрыт' : 'Открыт'}
+          </span>
+
+          {isClosed ? (
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.60)' }}>
+              Закрыт: {fmtDateTimeRuMsk((q.close as any)?.createdAt)}
+            </span>
+          ) : null}
         </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
@@ -382,11 +434,14 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <div style={{ marginTop: 14 }}>
         <h2 style={{ margin: '10px 0 10px', fontSize: 16, fontWeight: 950 }}>Ответы врачей</h2>
 
+        {/* ✅ Новое: если вопрос закрыт — отвечать нельзя */}
         <AnswerCreate
           questionId={String(q.id)}
-          canAnswer={!!canAnswer}
+          canAnswer={!!canAnswer && !isClosed}
           reason={
-            !tgId
+            isClosed
+              ? 'Вопрос уже закрыт.'
+              : !tgId
               ? 'Открой из Telegram.'
               : !isApprovedDoctor
               ? 'Нужно быть одобренным врачом.'
@@ -419,23 +474,17 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           <div style={{ display: 'grid', gap: 12 }}>
             {answers.map((a) => {
               const d = a.doctor;
-              const profileUrl = toPublicUrlMaybe(d?.files?.[0]?.url || null);
 
-              const ln = String(d?.lastName || '').trim();
-              const fn = String(d?.firstName || '').trim();
-              const mn = String(d?.middleName || '').trim();
-              const fullName = [ln, fn, mn].filter(Boolean).join(' ').trim() || '—';
+              const profileUrl =
+                toPublicUrlMaybe(d?.files?.[0]?.url || null) ||
+                toPublicUrlMaybe(d?.profilephotourl || null);
 
-              const specs = doctorSpecsLine(d);
-
-              const exp = Number(d?.experienceYears);
-              const expLabel = Number.isFinite(exp) ? `Стаж: ${exp} лет` : 'Стаж: —';
+              const doctorCard = doctorCardItemFromDoctor(d, profileUrl);
 
               const ratingLabel = safeRatingLabel(d);
 
-              // ✅ Комментировать можно только: автор вопроса ИЛИ врач, который оставил этот ответ
-              const canDoctorComment =
-                isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
+              // ✅ Комментировать: автор ИЛИ врач, который оставил этот ответ
+              const canDoctorComment = isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
 
               const initialComments = Array.isArray(a?.comments)
@@ -461,113 +510,21 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
-                  {/* ✅ ШАПКА (КЛИКАБЕЛЬНАЯ): ведёт в профиль врача */}
-                  <Link
-                    href={doctorHref}
-                    style={{
-                      display: 'block',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 16,
-                        border: '1px solid rgba(34, 197, 94, 0.22)',
-                        background: 'rgba(220, 252, 231, 0.75)',
-                        boxShadow: '0 8px 20px rgba(22, 163, 74, 0.16)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        cursor: 'pointer',
-                        margin: 12,
+                  {/* ✅ Новое: используем единый DoctorCard */}
+                  <div style={{ padding: 12, paddingBottom: 0 }}>
+                    <DoctorCard
+                      doctor={doctorCard}
+                      ratingLabel={ratingLabel}
+                      onClick={() => {
+                        // DoctorCard сам дернет haptic, а Link тут не нужен
+                        // переход делаем через обычный location (серверный компонент не умеет useRouter)
+                        if (doctorHref && doctorHref !== '#') window.location.href = doctorHref;
                       }}
-                    >
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 999,
-                          background: '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: 18,
-                          color: '#16a34a',
-                          boxShadow: '0 4px 10px rgba(22, 163, 74, 0.30)',
-                          flexShrink: 0,
-                          overflow: 'hidden',
-                        }}
-                        aria-label="Фото врача"
-                      >
-                        {profileUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={profileUrl}
-                            alt="doctor"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          />
-                        ) : (
-                          <span>{doctorAvatarLetter(d)}</span>
-                        )}
-                      </div>
-
-                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <span
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: '#022c22',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {fullName}
-                          </span>
-
-                          {/* ❌ НЕТ онлайн-точки */}
-                          <span style={{ width: 10, height: 10, opacity: 0 }} />
-                        </div>
-
-                        <span
-                          style={{
-                            fontSize: 12,
-                            color: 'rgba(15, 23, 42, 0.80)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {specs}
-                        </span>
-
-                        <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10 }}>
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              background: 'rgba(255,255,255,0.90)',
-                              color: '#15803d',
-                              fontWeight: 500,
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {expLabel}
-                          </span>
-
-                          <span style={{ color: '#166534', fontWeight: 600, whiteSpace: 'nowrap' }}>⭐ {ratingLabel}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                    />
+                  </div>
 
                   {/* тело ответа */}
-                  <div style={{ padding: 12, paddingTop: 0 }}>
+                  <div style={{ padding: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)', marginBottom: 8 }}>
                       {fmtDateTimeRuMsk(a.createdAt)}
                     </div>
@@ -594,6 +551,26 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           ? 'Вы вошли как врач.'
           : 'Вы вошли как пользователь.'}
       </div>
+
+      {/* ✅ маленькая подсказка для автора, если закрыт */}
+      {isAuthor && isClosed ? (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            borderRadius: 16,
+            border: '1px solid rgba(109,40,217,0.18)',
+            background: 'rgba(109,40,217,0.08)',
+            color: 'rgba(15,23,42,0.78)',
+            fontSize: 12,
+            fontWeight: 800,
+            lineHeight: 1.35,
+            ...wrapText,
+          }}
+        >
+          Вопрос закрыт — ответы больше не принимаются. Отзывы можно оставить через страницу закрытия.
+        </div>
+      ) : null}
     </main>
   );
 }
