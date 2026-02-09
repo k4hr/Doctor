@@ -58,6 +58,11 @@ enum DoctorPayoutStatus {
   CANCELED
 }
 
+enum QuestionCloseStatus {
+  CREATED
+  PAID
+}
+
 model Doctor {
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
@@ -99,11 +104,9 @@ model Doctor {
   publications      String?
 
   // ✅ ручной онлайн/оффлайн
-  // В БД колонка была создана как "isonline" (lowercase), поэтому маппим:
   isOnline Boolean @default(false) @map("isonline")
 
-  // ✅ НОВОЕ: одно фото врача + кроп миниатюры (храним прямо в Doctor)
-  // В БД создай колонки НИЖЕ ИМЕННО ТАК (lowercase)
+  // ✅ фото профиля
   profilephotourl  String?
   profilephotocrop Json? @db.Json
 
@@ -111,18 +114,15 @@ model Doctor {
 
   assignedQuestions Question[] @relation("AssignedDoctor")
 
-  // ⚠️ Оставил как есть (у тебя уже было). Позже можно убрать/переименовать.
   answeredQuestions Question[] @relation("AnsweredDoctor")
 
-  // ✅ Новое: врач может оставить много ответов (по форумному)
   answers Answer[]
 
-  // ✅ Новое: врач может писать комментарии под ответами
   answerComments AnswerComment[]
 
   // ✅ Рейтинг (агрегаты по отзывам)
-  ratingSum   Int @default(0) // сумма всех оценок 1..5
-  ratingCount Int @default(0) // количество отзывов
+  ratingSum   Int @default(0)
+  ratingCount Int @default(0)
 
   // ✅ Отзывы о враче
   reviews DoctorReview[]
@@ -168,7 +168,6 @@ model Question {
   authorFirstName  String?
   authorLastName   String?
 
-  // ✅ В БД колонка называется authorisanonymous (lowercase)
   authorIsAnonymous Boolean @default(true) @map("authorisanonymous")
 
   speciality String
@@ -178,29 +177,56 @@ model Question {
 
   keywords String[] @default([])
 
+  // ✅ ПЛАТНОСТЬ ВОПРОСА
+  isFree   Boolean @default(true)
+  priceRub Int     @default(0)
+
   status QuestionStatus @default(OPEN)
 
   assignedDoctorId String?
   assignedDoctor   Doctor? @relation("AssignedDoctor", fields: [assignedDoctorId], references: [id], onDelete: SetNull)
 
-  // ⚠️ Старое поле. При мульти-ответах становится спорным.
-  // Можно оставить как "принятый/первый/лучший" врач, или удалить позже.
   answeredByDoctorId String?
   answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
 
   files QuestionFile[]
 
-  // ✅ Новое: ответы врачей (до 10 — ограничишь в API)
   answers Answer[]
 
-  // ✅ Отзывы могут быть привязаны к вопросу (опционально)
   reviews DoctorReview[]
+
+  close QuestionClose?
 
   @@index([speciality])
   @@index([status])
   @@index([createdAt])
   @@index([assignedDoctorId])
   @@index([answeredByDoctorId])
+  @@index([isFree])
+}
+
+model QuestionClose {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  questionId String @unique
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  authorTelegramId String
+
+  status QuestionCloseStatus @default(CREATED)
+
+  // выбранные врачи (до 3)
+  selectedDoctorIds String[] @default([])
+
+  // сколько было распределено (0 для бесплатных)
+  totalRub Int @default(0)
+
+  // сколько получит каждый (для UI)
+  perDoctorRub Int @default(0)
+
+  @@index([questionId])
+  @@index([authorTelegramId])
 }
 
 model QuestionFile {
@@ -235,18 +261,16 @@ model Answer {
 
   body String
 
-  // если потом захочешь скрывать/модерировать
   isDeleted Boolean @default(false)
 
   comments AnswerComment[]
 
-  // ✅ Отзывы могут быть привязаны к конкретному ответу (опционально)
   reviews DoctorReview[]
 
   @@index([questionId])
   @@index([doctorId])
   @@index([questionId, createdAt])
-  @@unique([questionId, doctorId]) // ✅ один врач = один ответ на вопрос (обычно логично)
+  @@unique([questionId, doctorId])
 }
 
 model AnswerComment {
@@ -259,7 +283,6 @@ model AnswerComment {
 
   authorType AnswerCommentAuthorType
 
-  // Комментарий может писать либо врач (doctorId), либо пользователь (telegramId)
   authorDoctorId   String?
   authorDoctor     Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
 
@@ -283,23 +306,18 @@ model DoctorReview {
   doctorId String
   doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
-  // Кто оставил отзыв (обычный пользователь)
   authorTelegramId String
 
-  // 1..5 (в API валидируешь)
   rating Int
 
-  // Текст отзыва (опционально)
   text String?
 
-  // Можно привязать отзыв к конкретному вопросу/ответу (после "принял ответ")
   questionId String?
   question   Question? @relation(fields: [questionId], references: [id], onDelete: SetNull)
 
   answerId String?
   answer   Answer? @relation(fields: [answerId], references: [id], onDelete: SetNull)
 
-  // На будущее (модерация/оплата/подтверждение)
   isVerified Boolean @default(false)
 
   @@index([doctorId])
@@ -309,7 +327,6 @@ model DoctorReview {
   @@index([answerId])
 }
 
-// ✅ 1:1 кошелек врача
 model DoctorWallet {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -318,14 +335,12 @@ model DoctorWallet {
   doctorId String @unique
   doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
-  // Храним в рублях (Int). Если захочешь копейки — сделаем в копейках.
-  balanceRub Int @default(0) // доступно к выводу
-  pendingRub Int @default(0) // в обработке на вывод
+  balanceRub Int @default(0)
+  pendingRub Int @default(0)
 
   @@index([doctorId])
 }
 
-// ✅ транзакции по кошельку
 model DoctorTransaction {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -341,7 +356,6 @@ model DoctorTransaction {
   title     String?
   meta      Json?
 
-  // ✅ FIX: чтобы связь payout <-> transaction была 1:1, payoutId должен быть unique
   payoutId String? @unique
   payout   DoctorPayoutRequest? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
@@ -351,7 +365,6 @@ model DoctorTransaction {
   @@index([doctorId, status, createdAt])
 }
 
-// ✅ заявки на вывод
 model DoctorPayoutRequest {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -363,7 +376,6 @@ model DoctorPayoutRequest {
   amountRub Int
   status    DoctorPayoutStatus @default(PENDING)
 
-  // реквизиты/метод можно хранить в JSON (позже прикрутим карту/счёт)
   details Json?
 
   transaction DoctorTransaction?
