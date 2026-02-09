@@ -178,11 +178,9 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           display: flex;
           flex-direction: column;
 
-          /* ✅ фикс высоты как ты хочешь */
           height: 90px;
           overflow: hidden;
 
-          /* ✅ и при этом низ всегда “приклеен” вниз */
           justify-content: space-between;
         }
 
@@ -213,13 +211,10 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           gap: 10px;
           min-width: 0;
 
-          /* ✅ ключевой фикс “пустоты”:
-             не даём верхнему блоку растягиваться по высоте */
           flex: 0 0 auto;
           min-height: 0;
         }
 
-        /* ✅ нижний блок тоже не растягиваем */
         .qcBottom {
           flex: 0 0 auto;
           display: grid;
@@ -229,7 +224,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
           min-height: 0;
 
-          /* чуть плотнее визуально */
           margin-top: 2px;
         }
 
@@ -241,10 +235,11 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-height: 0;
         }
 
+        /* ✅ ТОЛЬКО ШРИФТ (под DoctorCard) */
         .qcAuthorTop {
-          font-size: 11px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.58);
+          font-size: 12px;
+          font-weight: 600;
+          color: rgba(15, 23, 42, 0.8);
           line-height: 1.05;
 
           white-space: nowrap;
@@ -253,16 +248,16 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
+        /* ✅ ТОЛЬКО ШРИФТ (под DoctorCard name) */
         .qcTitle {
           margin: 0;
-          font-size: 15px;
-          font-weight: 900;
-          color: #0b0c10;
-          letter-spacing: -0.01em;
+          font-size: 14px;
+          font-weight: 700;
+          color: #022c22;
+          letter-spacing: 0;
 
-          /* ✅ делаем 2 строки реально “ровно”, чтобы после … не было воздуха */
           line-height: 16px;
-          height: 32px; /* 2 строки * 16px */
+          height: 32px;
           max-height: 32px;
 
           display: -webkit-box;
@@ -279,11 +274,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           gap: 4px;
         }
 
+        /* ✅ ТОЛЬКО ШРИФТ (пилюли как внизу у DoctorCard) */
         .qcPill {
           flex: 0 0 auto;
 
-          font-size: 9px;
-          font-weight: 900;
+          font-size: 11px;
+          font-weight: 600;
           padding: 4px 9px;
 
           border-radius: 999px;
@@ -322,10 +318,11 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #991b1b;
         }
 
+        /* ✅ ТОЛЬКО ШРИФТ (как doconline-spec) */
         .qcDoctorText {
           font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.72);
+          font-weight: 600;
+          color: rgba(15, 23, 42, 0.8);
           line-height: 1.05;
 
           white-space: nowrap;
@@ -334,13 +331,14 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
+        /* ✅ ТОЛЬКО ШРИФТ (как doconline-bottom) */
         .qcTime {
           justify-self: end;
           white-space: nowrap;
 
-          font-size: 9px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.52);
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(15, 23, 42, 0.62);
           line-height: 1.05;
         }
       `}</style>
