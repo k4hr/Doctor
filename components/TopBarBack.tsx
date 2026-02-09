@@ -1,27 +1,40 @@
 /* path: components/TopBarBack.tsx */
 'use client';
 
+import { useRouter } from 'next/navigation';
 import BackBtn from './BackBtn';
 import Hamburger from './Hamburger';
 
+function haptic(type: 'light' | 'medium' = 'light') {
+  try {
+    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
+}
+
 export default function TopBarBack() {
+  const router = useRouter();
+
+  const goHome = () => {
+    haptic('light');
+    router.push('/');
+  };
+
   return (
     <>
       <div className="app-topbar app-topbar--back">
         <div className="app-topbar-row app-topbar-row--back">
-          {/* Слева — "Назад" */}
           <div className="topbar-left">
             <BackBtn fallback="/" label="Назад" />
           </div>
 
-          {/* По центру — ВРАЧИ.ТУТ */}
-          <div className="app-logo app-logo--center">
-            <span className="app-logo-main">ВРАЧИ</span>
-            <span className="app-logo-dot">.</span>
-            <span className="app-logo-accent">ТУТ</span>
-          </div>
+          <button type="button" className="app-logo-btn app-logo-btn--center" onClick={goHome} aria-label="На главную">
+            <span className="app-logo">
+              <span className="app-logo-main">ВРАЧИ</span>
+              <span className="app-logo-dot">.</span>
+              <span className="app-logo-accent">ТУТ</span>
+            </span>
+          </button>
 
-          {/* Справа — гамбургер */}
           <div className="topbar-right">
             <Hamburger />
           </div>
@@ -29,10 +42,10 @@ export default function TopBarBack() {
       </div>
 
       <style jsx>{`
+        /* ✅ ДОЛЖНО БЫТЬ 1в1 как TopBar по sticky/отступам */
         .app-topbar {
           position: sticky;
-          /* ✅ sticky должен быть "вверху", без +52px (это часто ломает клики/слои в WebView) */
-          top: env(safe-area-inset-top, 0px);
+          top: 0;
           z-index: 1000;
 
           margin: 0 -16px 8px;
@@ -40,20 +53,14 @@ export default function TopBarBack() {
 
           background: #ffffff;
           box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-
-          /* ✅ КЛЮЧЕВОЕ: сам контейнер НЕ ловит клики */
-          pointer-events: none;
         }
 
         .app-topbar-row {
           display: flex;
           align-items: center;
-
-          /* ✅ а вот содержимое ловит клики */
-          pointer-events: auto;
+          gap: 12px;
         }
 
-        /* Три колонки: левый текст, центр-логотип, правый бургер */
         .app-topbar-row--back {
           justify-content: space-between;
         }
@@ -63,9 +70,6 @@ export default function TopBarBack() {
           min-width: 64px;
           display: flex;
           align-items: center;
-
-          /* ✅ кликабельные зоны */
-          pointer-events: auto;
         }
 
         .topbar-left {
@@ -76,6 +80,18 @@ export default function TopBarBack() {
           justify-content: flex-end;
         }
 
+        .app-logo-btn {
+          border: 0;
+          background: transparent;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          flex: 1;
+          display: flex;
+          justify-content: center;
+        }
+
         .app-logo {
           display: inline-flex;
           align-items: baseline;
@@ -84,12 +100,6 @@ export default function TopBarBack() {
           font-weight: 900;
           font-size: 26px;
           letter-spacing: -0.02em;
-          pointer-events: none; /* логотип не должен мешать кликам */
-        }
-
-        .app-logo--center {
-          flex: 1;
-          justify-content: center;
         }
 
         .app-logo-main,
@@ -99,6 +109,11 @@ export default function TopBarBack() {
 
         .app-logo-accent {
           color: #24c768;
+        }
+
+        .app-logo-btn:active {
+          transform: scale(0.995);
+          opacity: 0.92;
         }
       `}</style>
     </>
