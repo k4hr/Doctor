@@ -1,18 +1,34 @@
 /* path: components/TopBar.tsx */
 'use client';
 
+import { useRouter } from 'next/navigation';
 import Hamburger from './Hamburger';
 
+function haptic(type: 'light' | 'medium' = 'light') {
+  try {
+    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+  } catch {}
+}
+
 export default function TopBar() {
+  const router = useRouter();
+
+  const goHome = () => {
+    haptic('light');
+    router.push('/');
+  };
+
   return (
     <>
       <div className="app-topbar">
         <div className="app-topbar-row">
-          <div className="app-logo">
-            <span className="app-logo-main">ВРАЧИ</span>
-            <span className="app-logo-dot">.</span>
-            <span className="app-logo-accent">ТУТ</span>
-          </div>
+          <button type="button" className="app-logo-btn" onClick={goHome} aria-label="На главную">
+            <span className="app-logo">
+              <span className="app-logo-main">ВРАЧИ</span>
+              <span className="app-logo-dot">.</span>
+              <span className="app-logo-accent">ТУТ</span>
+            </span>
+          </button>
 
           <Hamburger />
         </div>
@@ -21,7 +37,7 @@ export default function TopBar() {
       <style jsx>{`
         .app-topbar {
           position: sticky;
-          top: 0; /* ✅ без +52px, иначе бар съезжает вниз */
+          top: 0;
           z-index: 1000;
 
           margin: 0 -16px 8px;
@@ -38,12 +54,20 @@ export default function TopBar() {
           gap: 12px;
         }
 
+        .app-logo-btn {
+          border: 0;
+          background: transparent;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+
         .app-logo {
           display: inline-flex;
           align-items: baseline;
           gap: 4px;
-          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI',
-            sans-serif;
+          font-family: Montserrat, Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
           font-weight: 900;
           font-size: 26px;
           letter-spacing: -0.02em;
@@ -56,6 +80,11 @@ export default function TopBar() {
 
         .app-logo-accent {
           color: #24c768;
+        }
+
+        .app-logo-btn:active {
+          transform: scale(0.995);
+          opacity: 0.92;
         }
       `}</style>
     </>
