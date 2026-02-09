@@ -258,7 +258,7 @@ export default function DoctorProfilePage() {
         const d = (jDoc as DoctorMeOk).doctor;
         setDoctor(d);
 
-        // ✅ ВЫРАВНИВАЕМ С SETTINGS/BALANCE: кабинет только для APPROVED
+        // ✅ кабинет только для APPROVED
         const isApproved = String(d?.status || '').toUpperCase() === 'APPROVED';
         setCanOpenCabinet(isApproved);
 
@@ -322,7 +322,10 @@ export default function DoctorProfilePage() {
   const specs = useMemo(() => specsLine(doctor), [doctor]);
 
   const expYears = doctor?.experienceYears ?? null;
-  const consults = doctor?.stats?.consultationsCount ?? 0;
+
+  // ✅ "ответов" вместо "консультаций"
+  const answers = doctor?.stats?.consultationsCount ?? 0;
+
   const reviewsStat = doctor?.stats?.reviewsCount ?? 0;
 
   const ratingLabel = useMemo(() => fmtRating(ratingAvg), [ratingAvg]);
@@ -330,13 +333,6 @@ export default function DoctorProfilePage() {
     const v = typeof ratingAvg === 'number' && Number.isFinite(ratingAvg) ? ratingAvg : 0;
     return Math.max(0, Math.min(5, v));
   }, [ratingAvg]);
-
-  const onLeaveReview = () => {
-    haptic('light');
-    if (doctor?.id) {
-      router.push(`/hamburger/doctor/${doctor.id}`);
-    }
-  };
 
   return (
     <main className="page">
@@ -380,10 +376,6 @@ export default function DoctorProfilePage() {
           <DocumentBadge size="sm" />
           {isProPreview ? <ProBadge size="sm" /> : null}
         </div>
-
-        <button type="button" className="leaveReviewBtn" onClick={onLeaveReview}>
-          Оставить отзыв
-        </button>
       </section>
 
       <section className="stats">
@@ -395,8 +387,8 @@ export default function DoctorProfilePage() {
         <div className="divider" />
 
         <div className="stat">
-          <div className="statVal">{formatInt(consults)}</div>
-          <div className="statLab">консультаций</div>
+          <div className="statVal">{formatInt(answers)}</div>
+          <div className="statLab">ответов</div>
         </div>
 
         <div className="divider" />
@@ -461,10 +453,6 @@ export default function DoctorProfilePage() {
                 </span>
               </div>
             </div>
-
-            <button type="button" className="leaveReviewBtnWide" onClick={onLeaveReview}>
-              Оставить отзыв
-            </button>
 
             {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
             {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
@@ -609,22 +597,6 @@ export default function DoctorProfilePage() {
           gap: 8px;
         }
 
-        .leaveReviewBtn {
-          margin-top: 10px;
-          border: none;
-          background: transparent;
-          color: #6d28d9;
-          font-weight: 950;
-          font-size: 13px;
-          text-decoration: underline;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .leaveReviewBtn:active {
-          opacity: 0.7;
-          transform: scale(0.99);
-        }
-
         .stats {
           margin-top: 10px;
           background: #fff;
@@ -754,27 +726,6 @@ export default function DoctorProfilePage() {
           font-size: 13px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.65);
-        }
-
-        .leaveReviewBtnWide {
-          width: 100%;
-          border: none;
-          border-radius: 14px;
-          padding: 12px 12px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          background: #24c768;
-          color: #fff;
-          font-size: 14px;
-          font-weight: 950;
-          text-align: center;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
-          margin-bottom: 10px;
-        }
-
-        .leaveReviewBtnWide:active {
-          transform: scale(0.99);
-          opacity: 0.95;
         }
 
         .warnSmall {
