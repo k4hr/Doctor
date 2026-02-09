@@ -19,7 +19,7 @@ export type DoctorCardItem = {
 type Props = {
   doctor: DoctorCardItem;
   onClick?: (doctor: DoctorCardItem) => void;
-  ratingLabel?: string; // строка "5.0" и т.п.
+  ratingLabel?: string; // "5.0" и т.п. (БЕЗ ⭐)
 };
 
 function haptic(type: 'light' | 'medium' = 'light') {
@@ -29,10 +29,10 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 function doctorFullName(d: DoctorCardItem) {
+  // ✅ только Фамилия + Имя (без отчества)
   const ln = String(d?.lastName || '').trim();
   const fn = String(d?.firstName || '').trim();
-  const mn = String(d?.middleName || '').trim();
-  return [ln, fn, mn].filter(Boolean).join(' ').trim() || '—';
+  return [ln, fn].filter(Boolean).join(' ').trim() || '—';
 }
 
 function doctorSpecsLine(d: DoctorCardItem) {
@@ -45,7 +45,14 @@ function doctorAvatarLetter(d: DoctorCardItem) {
   return (n[0] || 'D').toUpperCase();
 }
 
-export default function DoctorCard({ doctor, onClick, ratingLabel = '⭐ 5.0' }: Props) {
+function normalizeRatingLabel(v: any) {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  // если кто-то случайно передаст "⭐ 5.0" — уберём звездочки/пробелы слева
+  return s.replace(/^⭐\s*/g, '').trim();
+}
+
+export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Props) {
   const name = useMemo(() => doctorFullName(doctor), [doctor]);
   const spec = useMemo(() => doctorSpecsLine(doctor), [doctor]);
 
@@ -54,6 +61,8 @@ export default function DoctorCard({ doctor, onClick, ratingLabel = '⭐ 5.0' }:
       ? doctor.experienceYears
       : null;
   const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
+
+  const ratingText = normalizeRatingLabel(ratingLabel);
 
   return (
     <>
@@ -83,7 +92,9 @@ export default function DoctorCard({ doctor, onClick, ratingLabel = '⭐ 5.0' }:
 
           <div className="doconline-bottom">
             <span className="doconline-exp">{expLabel}</span>
-            <span className="doconline-rating">{ratingLabel}</span>
+
+            {/* ✅ звезда всегда тут, чтобы нигде не задваивалось */}
+            {ratingText ? <span className="doconline-rating">⭐ {ratingText}</span> : null}
           </div>
         </div>
       </button>
