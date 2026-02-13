@@ -1,7 +1,7 @@
 /* path: app/hamburger/review/new/page.tsx */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import TopBarBack from '../../../../components/TopBarBack';
 
@@ -120,7 +120,7 @@ function StarsPicker({ value, onChange }: { value: number; onChange: (n: number)
   );
 }
 
-export default function NewReviewPage() {
+function NewReviewInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -192,12 +192,10 @@ export default function NewReviewPage() {
 
   const submit = async () => {
     if (saving) return;
-
     if (!doctorId || !questionId) {
       tgAlert('Не хватает doctorId/questionId');
       return;
     }
-
     const r = Math.max(1, Math.min(5, Number(rating) || 0));
     if (r < 1 || r > 5) {
       tgAlert('Оценка должна быть от 1 до 5');
@@ -279,7 +277,7 @@ export default function NewReviewPage() {
         ) : null}
 
         <div className="row">
-          <div className="rowLabel">Анонимный отзыв</div>
+          <div className="rowLabel">Анонимно</div>
           <button
             type="button"
             className={isAnonymous ? 'toggle toggleOn' : 'toggle'}
@@ -292,7 +290,7 @@ export default function NewReviewPage() {
             <span className="toggleKnob" />
           </button>
         </div>
-        <div className="hint">{isAnonymous ? 'Отзыв будет анонимным' : 'Отзыв будет не анонимным'}</div>
+        <div className="hint">{isAnonymous ? 'Отзыв будет анонимным' : 'Отзыв будет с твоим именем (если оно есть)'}</div>
 
         <div className="sep" />
 
@@ -488,7 +486,7 @@ export default function NewReviewPage() {
           width: 100%;
           margin-top: 10px;
           border-radius: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.10);
+          border: 1px solid rgba(15, 23, 42, 0.1);
           background: rgba(249, 250, 251, 0.9);
           padding: 10px 12px;
           font-size: 13px;
@@ -524,5 +522,51 @@ export default function NewReviewPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+export default function NewReviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="page">
+          <TopBarBack />
+          <div className="card">
+            <div className="cardTitle">Оставить отзыв</div>
+            <div className="muted" style={{ marginTop: 10 }}>
+              Загрузка…
+            </div>
+          </div>
+
+          <style jsx>{`
+            .page {
+              min-height: 100dvh;
+              padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+              background: #f6f7fb;
+            }
+            .card {
+              background: #fff;
+              border-radius: 18px;
+              padding: 14px;
+              border: 1px solid rgba(15, 23, 42, 0.06);
+              box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
+              margin-top: 10px;
+            }
+            .cardTitle {
+              font-size: 16px;
+              font-weight: 950;
+              color: #111827;
+            }
+            .muted {
+              font-size: 13px;
+              font-weight: 800;
+              color: rgba(17, 24, 39, 0.55);
+            }
+          `}</style>
+        </main>
+      }
+    >
+      <NewReviewInner />
+    </Suspense>
   );
 }
