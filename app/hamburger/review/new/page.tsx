@@ -142,6 +142,7 @@ function NewReviewInner() {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
       WebApp?.ready?.();
+      WebApp?.expand?.();
     } catch {}
 
     const idata = (WebApp?.initData as string) || getInitDataFromCookie();
@@ -269,6 +270,7 @@ function NewReviewInner() {
                 <div className="ph">D</div>
               )}
             </div>
+
             <div className="docText">
               <div className="docName">{title}</div>
               {specs ? <div className="docSpecs">{specs}</div> : null}
@@ -315,8 +317,24 @@ function NewReviewInner() {
       </div>
 
       <style jsx>{`
+        :global(html),
+        :global(body) {
+          width: 100%;
+          overflow-x: hidden;
+        }
+
+        /* На всякий случай прибиваем контейнер-обёртку, если она центрирует/сжимает */
+        :global(.lm-page) {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+
         .page {
           min-height: 100dvh;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
         }
@@ -328,6 +346,16 @@ function NewReviewInner() {
           border: 1px solid rgba(15, 23, 42, 0.06);
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           margin-top: 10px;
+
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+
+          overflow: hidden;
         }
 
         .cardTitle {
@@ -363,6 +391,10 @@ function NewReviewInner() {
           border-radius: 14px;
           background: rgba(249, 250, 251, 0.9);
           border: 1px solid rgba(15, 23, 42, 0.08);
+
+          width: 100%;
+          min-width: 0;
+          overflow: hidden;
         }
 
         .avatar {
@@ -391,6 +423,7 @@ function NewReviewInner() {
 
         .docText {
           min-width: 0;
+          flex: 1 1 auto;
           display: flex;
           flex-direction: column;
           gap: 2px;
@@ -434,6 +467,7 @@ function NewReviewInner() {
           position: relative;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          flex: 0 0 auto;
         }
         .toggleOn {
           background: rgba(36, 199, 104, 0.18);
@@ -494,6 +528,7 @@ function NewReviewInner() {
           color: rgba(17, 24, 39, 0.85);
           outline: none;
           resize: vertical;
+          min-width: 0;
         }
 
         .btn {
@@ -525,47 +560,65 @@ function NewReviewInner() {
   );
 }
 
+function Fallback() {
+  return (
+    <main className="page">
+      <TopBarBack />
+      <div className="card">
+        <div className="cardTitle">Оставить отзыв</div>
+        <div className="muted" style={{ marginTop: 10 }}>
+          Загрузка…
+        </div>
+      </div>
+
+      <style jsx>{`
+        :global(html),
+        :global(body) {
+          width: 100%;
+          overflow-x: hidden;
+        }
+        :global(.lm-page) {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+        .page {
+          min-height: 100dvh;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          background: #f6f7fb;
+        }
+        .card {
+          background: #fff;
+          border-radius: 18px;
+          padding: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
+          margin-top: 10px;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+        }
+        .cardTitle {
+          font-size: 16px;
+          font-weight: 950;
+          color: #111827;
+        }
+        .muted {
+          font-size: 13px;
+          font-weight: 800;
+          color: rgba(17, 24, 39, 0.55);
+        }
+      `}</style>
+    </main>
+  );
+}
+
 export default function NewReviewPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="page">
-          <TopBarBack />
-          <div className="card">
-            <div className="cardTitle">Оставить отзыв</div>
-            <div className="muted" style={{ marginTop: 10 }}>
-              Загрузка…
-            </div>
-          </div>
-
-          <style jsx>{`
-            .page {
-              min-height: 100dvh;
-              padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-              background: #f6f7fb;
-            }
-            .card {
-              background: #fff;
-              border-radius: 18px;
-              padding: 14px;
-              border: 1px solid rgba(15, 23, 42, 0.06);
-              box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
-              margin-top: 10px;
-            }
-            .cardTitle {
-              font-size: 16px;
-              font-weight: 950;
-              color: #111827;
-            }
-            .muted {
-              font-size: 13px;
-              font-weight: 800;
-              color: rgba(17, 24, 39, 0.55);
-            }
-          `}</style>
-        </main>
-      }
-    >
+    <Suspense fallback={<Fallback />}>
       <NewReviewInner />
     </Suspense>
   );
