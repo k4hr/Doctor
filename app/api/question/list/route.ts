@@ -1,5 +1,7 @@
+/* path: app/api/question/list/route.ts */
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { QuestionStatus } from '@prisma/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,12 +18,17 @@ function snippet(s: string, max = 170) {
   return t.slice(0, max - 1).trimEnd() + '…';
 }
 
-function mapStatusToUi(status: any): 'ANSWERING' | 'WAITING' {
-  return String(status) === 'IN_PROGRESS' ? 'ANSWERING' : 'WAITING';
+function mapPriceToUi(q: any): 'FREE' | 'PAID' {
+  const isFree = q?.isFree === true;
+  const price = Number(q?.priceRub ?? q?.price ?? 0);
+  return !isFree && Number.isFinite(price) && price > 0 ? 'PAID' : 'FREE';
 }
 
-function mapPriceToUi(_q: any): 'FREE' | 'PAID' {
-  return 'FREE';
+function buildPriceText(q: any): string | undefined {
+  const isFree = q?.isFree === true;
+  const price = Number(q?.priceRub ?? q?.price ?? 0);
+  if (isFree || !Number.isFinite(price) || price <= 0) return undefined;
+  return `${Math.round(price)} ₽`;
 }
 
 function buildAuthorLabel(q: any) {
@@ -37,6 +44,17 @@ function buildAuthorLabel(q: any) {
   if (full) return `Вопрос от ${full}`;
 
   return 'Вопрос от Пользователь';
+}
+
+function mapStatusToUi(statusDb: any, answersCount: number): 'WAITING' | 'ANSWERING' | 'CLOSED' {
+  // ✅ CLOSED
+  if (String(statusDb) === String(QuestionStatus.DONE) || String(statusDb) === 'DONE') return 'CLOSED';
+
+  // ✅ если есть ответы — считаем что уже “ANSWERING”
+  if (answersCount > 0) return 'ANSWERING';
+
+  // ✅ иначе ждёт
+  return 'WAITING';
 }
 
 export async function POST(req: Request) {
@@ -58,23 +76,46 @@ export async function POST(req: Request) {
         speciality: true,
         status: true,
 
+        // ✅ автор
         authorIsAnonymous: true,
         authorUsername: true,
         authorFirstName: true,
         authorLastName: true,
+
+        // ✅ цена (если у тебя эти поля есть — оставь; если нет, просто удали их + mapPriceToUi/buildPriceText)
+        isFree: true,
+        priceRub: true,
+
+        // ✅ СКОЛЬКО ОТВЕТОВ (только не удалённые)
+        _count: {
+          select: {
+            answers: {
+              where: { isDeleted: false },
+            },
+          },
+        },
       },
     });
 
-    const items = rows.map((q) => ({
-      id: String(q.id),
-      title: String(q.title),
-      bodySnippet: snippet(String(q.body), 170),
-      createdAt: q.createdAt.toISOString(),
-      doctorLabel: String(q.speciality || '—'),
-      authorLabel: buildAuthorLabel(q),
-      status: mapStatusToUi(q.status),
-      priceBadge: mapPriceToUi(q),
-    }));
+    const items = rows.map((q: any) => {
+      const answersCount = Number(q?._count?.answers ?? 0);
+
+      return {
+        id: String(q.id),
+        title: String(q.title),
+        bodySnippet: snippet(String(q.body), 170),
+        createdAt: q.createdAt.toISOString(),
+        doctorLabel: String(q.speciality || '—'),
+        authorLabel: buildAuthorLabel(q),
+
+        // ✅ ВАЖНО: теперь карточка реально получит и статус, и answersCount
+        answersCount,
+        status: mapStatusToUi(q.status, answersCount),
+
+        priceBadge: mapPriceToUi(q),
+        priceText: buildPriceText(q),
+      };
+    });
 
     const nextCursor = rows.length ? String(rows[rows.length - 1].id) : null;
 
