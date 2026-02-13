@@ -64,7 +64,12 @@ export async function GET(req: Request) {
         speciality2: true,
         speciality3: true,
         experienceYears: true,
-        profilephotocrop: true, // ✅
+        profilephotocrop: true,
+
+        // ✅ ВОТ ОНО
+        ratingSum: true,
+        ratingCount: true,
+
         files: {
           where: { kind: DoctorFileKind.PROFILE_PHOTO },
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -86,6 +91,10 @@ export async function GET(req: Request) {
       experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
       avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
       avatarCrop: pickCrop(d.profilephotocrop),
+
+      // ✅ прокидываем агрегаты
+      ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : Number(d.ratingSum ?? 0),
+      ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : Number(d.ratingCount ?? 0),
     }));
 
     return NextResponse.json({ ok: true, items });
