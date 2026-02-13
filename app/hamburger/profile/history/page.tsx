@@ -1,4 +1,4 @@
-/* path: app/hamburger/history/page.tsx */
+/* path: app/hamburger/profile/history/page.tsx */
 'use client';
 
 import TopBarBack from '../../../../components/TopBarBack';
