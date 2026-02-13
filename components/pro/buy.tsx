@@ -33,6 +33,27 @@ const FEATURES: { good?: boolean; text: string }[] = [
   { good: true, text: 'Золотая карточка врача и золотая плашка в профиле' },
 ];
 
+function monthWordUpper(n: number) {
+  const m = Math.abs(Math.trunc(n));
+  const mod10 = m % 10;
+  const mod100 = m % 100;
+
+  // 11-14 -> МЕСЯЦЕВ
+  if (mod100 >= 11 && mod100 <= 14) return 'МЕСЯЦЕВ';
+  if (mod10 === 1) return 'МЕСЯЦ';
+  if (mod10 >= 2 && mod10 <= 4) return 'МЕСЯЦА';
+  return 'МЕСЯЦЕВ';
+}
+
+function termUpper(months: number) {
+  return `${months} ${monthWordUpper(months)}`;
+}
+
+function formatRub(n: number) {
+  const x = Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  return `${x} ₽`;
+}
+
 export default function ProBuyCard() {
   const [plan, setPlan] = useState<Plan>('M1');
   const [loading, setLoading] = useState(false);
@@ -88,46 +109,51 @@ export default function ProBuyCard() {
             {FEATURES.map((f, i) => (
               <li key={i} className="pro-feature">
                 {f.good ? <span className="feat-icon yes">✔</span> : <span className="feat-icon no">✖</span>}
-                <span>{f.text}</span>
+                <span className="feat-text">{f.text}</span>
               </li>
             ))}
           </ul>
 
-          <div className="pro-plans">
+          <div className="pro-plans" role="list" aria-label="Тарифы PRO">
             {PLANS.map((p) => {
               const active = p.id === plan;
+
+              const tag =
+                p.id === 'M1' ? (
+                  <span className="tag tagPopular">популярно</span>
+                ) : p.id === 'Y1' ? (
+                  <span className="tag tagProfit">выгодно</span>
+                ) : null;
+
+              const perMonth = p.months > 1 ? Math.round(p.priceRub / p.months) : null;
+
               return (
                 <button
                   key={p.id}
                   type="button"
-                  className={`pro-plan ${active ? 'is-active' : ''}`}
+                  className={`plan ${active ? 'is-active' : ''}`}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     haptic('light');
                     setPlan(p.id);
                   }}
+                  aria-pressed={active}
                 >
-                  <div className="pro-plan-top">
-                    <span className="pro-plan-label">{p.label}</span>
-                    {p.id === 'Y1' ? <span className="pro-plan-tag">выгодно</span> : null}
-                  </div>
-                  <div className="pro-plan-price">{p.priceRub} ₽</div>
+                  {tag ? <div className="tagRow">{tag}</div> : <div className="tagRow" />}
+
+                  <div className="planTerm">{termUpper(p.months)}</div>
+                  <div className="planPrice">{formatRub(p.priceRub)}</div>
+
+                  {perMonth !== null ? <div className="planPer">{formatRub(perMonth)} / 1 МЕСЯЦ</div> : <div className="planPer is-empty" />}
                 </button>
               );
             })}
           </div>
 
-          <div className="pro-bottom">
-            <div className="pro-price">
-              <span className="pro-price-big">{current.priceRub} ₽</span>
-              <span className="pro-price-small"> / {current.label}</span>
-            </div>
-
-            <button type="button" className="pro-buy" onClick={onBuy} disabled={loading}>
-              {loading ? 'Создаём…' : 'Купить PRO'}
-            </button>
-          </div>
+          <button type="button" className="pro-buy" onClick={onBuy} disabled={loading}>
+            {loading ? 'Создаём…' : 'Купить PRO'}
+          </button>
 
           <div className="pro-footnote">
             Подписка активируется сразу после покупки. Если PRO уже активен — продлим срок.
@@ -141,40 +167,41 @@ export default function ProBuyCard() {
         }
 
         .pro-title {
-          font-size: 22px;
-          font-weight: 900;
+          font-size: 20px;
+          font-weight: 950;
           text-align: center;
-          margin-bottom: 14px;
+          margin: 0 0 12px;
           color: #111827;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.4px;
         }
 
         .pro-card {
           border-radius: 22px;
-          padding: 18px 16px 16px;
+          padding: 16px 14px 14px;
           border: 1px solid rgba(217, 119, 6, 0.5);
-          background: radial-gradient(circle at top left, #fffbeb 0, #fef3c7 45%, #ffffff 90%);
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+          background: radial-gradient(circle at top left, #fffbeb 0, #fef3c7 45%, #ffffff 92%);
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
         }
 
         .pro-badge {
-          font-size: 18px;
-          font-weight: 900;
+          font-size: 16px;
+          font-weight: 950;
           text-align: center;
-          padding: 8px 0;
+          padding: 10px 0;
           border-radius: 18px;
           margin-bottom: 10px;
           border: 1px solid rgba(217, 119, 6, 0.8);
           background: rgba(254, 243, 199, 0.96);
           color: #b45309;
+          letter-spacing: 0.3px;
         }
 
         .pro-subtitle {
-          font-size: 14px;
+          font-size: 13px;
           text-align: center;
-          margin: 0 0 14px;
+          margin: 0 0 12px;
           color: rgba(55, 65, 81, 0.9);
-          font-weight: 600;
+          font-weight: 700;
         }
 
         .pro-features {
@@ -188,16 +215,19 @@ export default function ProBuyCard() {
 
         .pro-feature {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 10px;
-          font-size: 14px;
+          font-size: 13px;
           color: #374151;
+          line-height: 1.35;
         }
 
         .feat-icon {
           font-size: 16px;
           width: 20px;
           text-align: center;
+          flex: 0 0 20px;
+          margin-top: 1px;
         }
 
         .feat-icon.yes {
@@ -208,97 +238,112 @@ export default function ProBuyCard() {
           color: #dc2626;
         }
 
+        .feat-text {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+
+        /* ===== планы: как на скрине — вертикально, на всю ширину ===== */
         .pro-plans {
-          margin-top: 16px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+          margin-top: 14px;
+          display: flex;
+          flex-direction: column;
           gap: 10px;
         }
 
-        .pro-plan {
-          border-radius: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.75);
-          padding: 10px 10px 9px;
-          text-align: left;
+        .plan {
+          width: 100%;
+          border-radius: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: rgba(255, 255, 255, 0.78);
+          padding: 10px 12px 10px;
+          text-align: center;
           cursor: pointer;
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+          -webkit-tap-highlight-color: transparent;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+          position: relative;
+          overflow: hidden;
         }
 
-        .pro-plan.is-active {
-          border-color: rgba(217, 119, 6, 0.8);
-          box-shadow: 0 8px 18px rgba(217, 119, 6, 0.18);
-          background: rgba(255, 255, 255, 0.9);
+        .plan:active {
+          transform: scale(0.99);
+          opacity: 0.96;
         }
 
-        .pro-plan-top {
+        .plan.is-active {
+          border-color: rgba(217, 119, 6, 0.95);
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 10px 22px rgba(217, 119, 6, 0.18);
+        }
+
+        .tagRow {
+          height: 18px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 8px;
+          justify-content: flex-start;
           margin-bottom: 4px;
         }
 
-        .pro-plan-label {
-          font-size: 13px;
-          font-weight: 800;
-          color: #111827;
-        }
-
-        .pro-plan-tag {
+        .tag {
           font-size: 11px;
-          font-weight: 800;
-          padding: 2px 8px;
+          font-weight: 950;
+          padding: 3px 9px;
           border-radius: 999px;
-          border: 1px solid rgba(217, 119, 6, 0.75);
-          color: #b45309;
-          background: rgba(254, 243, 199, 0.9);
           white-space: nowrap;
+          letter-spacing: 0.2px;
         }
 
-        .pro-plan-price {
-          font-size: 14px;
-          font-weight: 900;
+        .tagPopular {
+          border: 1px solid rgba(34, 197, 94, 0.35);
+          background: rgba(34, 197, 94, 0.12);
+          color: #166534;
+        }
+
+        .tagProfit {
+          border: 1px solid rgba(217, 119, 6, 0.55);
+          background: rgba(254, 243, 199, 0.9);
+          color: #b45309;
+        }
+
+        .planTerm {
+          font-size: 16px;
+          font-weight: 950;
           color: #111827;
+          letter-spacing: 0.4px;
         }
 
-        .pro-bottom {
-          margin-top: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .pro-price {
-          display: flex;
-          align-items: baseline;
-          gap: 6px;
-        }
-
-        .pro-price-big {
-          font-size: 20px;
-          font-weight: 900;
+        .planPrice {
+          margin-top: 2px;
+          font-size: 18px;
+          font-weight: 950;
           color: #111827;
+          letter-spacing: -0.02em;
         }
 
-        .pro-price-small {
-          font-size: 13px;
-          font-weight: 700;
-          color: rgba(55, 65, 81, 0.85);
+        .planPer {
+          margin-top: 3px;
+          font-size: 12px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.65);
         }
 
+        .planPer.is-empty {
+          visibility: hidden;
+        }
+
+        /* ===== купить ===== */
         .pro-buy {
+          margin-top: 12px;
+          width: 100%;
           border: none;
-          border-radius: 16px;
-          padding: 12px 14px;
-          font-size: 15px;
-          font-weight: 900;
+          border-radius: 18px;
+          padding: 14px 14px;
+          font-size: 16px;
+          font-weight: 950;
           color: #111827;
           cursor: pointer;
           background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
-          box-shadow: 0 10px 18px rgba(217, 119, 6, 0.25);
-          min-width: 140px;
+          box-shadow: 0 12px 20px rgba(217, 119, 6, 0.26);
         }
 
         .pro-buy:disabled {
@@ -309,9 +354,10 @@ export default function ProBuyCard() {
         .pro-footnote {
           margin-top: 10px;
           font-size: 12px;
-          font-weight: 600;
-          color: rgba(55, 65, 81, 0.8);
+          font-weight: 700;
+          color: rgba(55, 65, 81, 0.78);
           text-align: center;
+          line-height: 1.35;
         }
       `}</style>
     </>
