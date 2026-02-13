@@ -79,7 +79,6 @@ function priceLabel(q: MyQuestionItem) {
   if (isFree) return { text: 'Бесплатно', tone: 'free' as const };
   if (price && Number.isFinite(price) && price > 0) return { text: `${Math.round(price)} ₽`, tone: 'paid' as const };
 
-  // если API не отдаёт цену — просто прячем плашку
   return null;
 }
 
@@ -196,7 +195,7 @@ export default function HamburgerQuestionsPage() {
               <button key={q.id} type="button" className="qc" onClick={() => goQuestion(q.id)}>
                 <div className="top">
                   <div className="title" title={String(q.title || '')}>
-                    {clip(q.title, 70)}
+                    {clip(q.title, 56)}
                   </div>
 
                   <div className="pills">
@@ -236,40 +235,46 @@ export default function HamburgerQuestionsPage() {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
         }
+
+        /* Заголовки как на скрине */
         .t {
           margin: 6px 0 0;
-          font-size: 22px;
+          font-size: 34px;
           font-weight: 950;
+          letter-spacing: -0.02em;
           color: #111827;
         }
         .s {
-          margin: 6px 0 12px;
-          font-size: 13px;
-          color: rgba(17, 24, 39, 0.7);
+          margin: 8px 0 14px;
+          font-size: 16px;
+          font-weight: 600;
+          color: rgba(17, 24, 39, 0.58);
         }
 
+        /* Сегмент-переключатель как на скрине */
         .seg {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          margin: 8px 0 12px;
+          gap: 12px;
+          margin: 6px 0 14px;
         }
         .segBtn {
-          border-radius: 14px;
-          padding: 10px 12px;
+          border-radius: 18px;
+          padding: 12px 14px;
           border: 1px solid rgba(15, 23, 42, 0.14);
-          background: rgba(249, 250, 251, 1);
-          color: rgba(17, 24, 39, 0.82);
-          font-weight: 950;
-          font-size: 12px;
+          background: rgba(255, 255, 255, 0.92);
+          color: rgba(17, 24, 39, 0.72);
+          font-weight: 900;
+          font-size: 18px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           touch-action: manipulation;
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.05);
         }
         .segBtn--on {
-          border-color: rgba(36, 199, 104, 0.42);
-          background: rgba(36, 199, 104, 0.1);
-          color: #166534;
+          border-color: rgba(36, 199, 104, 0.45);
+          background: rgba(36, 199, 104, 0.12);
+          color: rgba(22, 163, 74, 1);
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.14);
         }
         .segBtn:active {
@@ -300,10 +305,10 @@ export default function HamburgerQuestionsPage() {
         .list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 14px;
         }
 
-        /* Карточка как на скрине (без "Вопрос от ...") */
+        /* Карточка — максимально близко к скрину */
         .qc {
           width: 100%;
           text-align: left;
@@ -313,9 +318,9 @@ export default function HamburgerQuestionsPage() {
 
           border: 1px solid rgba(10, 12, 20, 0.08);
           background: rgba(255, 255, 255, 0.96);
-          border-radius: 18px;
+          border-radius: 22px;
 
-          padding: 12px 12px 10px;
+          padding: 16px;
 
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.07);
           backdrop-filter: blur(12px);
@@ -323,7 +328,7 @@ export default function HamburgerQuestionsPage() {
 
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 14px;
 
           overflow: hidden;
         }
@@ -336,17 +341,18 @@ export default function HamburgerQuestionsPage() {
           display: grid;
           grid-template-columns: 1fr auto;
           align-items: start;
-          gap: 10px;
+          gap: 12px;
           min-width: 0;
         }
 
+        /* ✅ ВОТ ТУТ: размер и цвет заголовка как на скрине */
         .title {
           margin: 0;
-          font-size: 18px;
+          font-size: 26px;
           font-weight: 950;
-          color: #064e3b; /* тёмно-зелёный как на скрине */
-          letter-spacing: -0.01em;
-          line-height: 1.12;
+          color: #0b4b3a; /* вытащено с твоего скрина (тёмно-зелёный) */
+          letter-spacing: -0.02em;
+          line-height: 1.06;
 
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -359,16 +365,16 @@ export default function HamburgerQuestionsPage() {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 8px;
+          gap: 10px;
           flex: 0 0 auto;
         }
 
         .pill {
-          font-size: 12px;
+          font-size: 16px;
           font-weight: 900;
-          padding: 7px 12px;
+          padding: 10px 16px;
           border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(15, 23, 42, 0.12);
           white-space: nowrap;
           line-height: 1;
         }
@@ -376,7 +382,7 @@ export default function HamburgerQuestionsPage() {
         .pill--free {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.1);
-          color: rgba(15, 23, 42, 0.72);
+          color: rgba(15, 23, 42, 0.66);
         }
         .pill--paid {
           background: rgba(245, 158, 11, 0.12);
@@ -386,8 +392,8 @@ export default function HamburgerQuestionsPage() {
 
         .pill--green {
           background: rgba(34, 197, 94, 0.12);
-          border-color: rgba(34, 197, 94, 0.28);
-          color: #16a34a;
+          border-color: rgba(34, 197, 94, 0.26);
+          color: #2a9a53; /* ближе к зелёному текста на скрине */
         }
         .pill--blue {
           background: rgba(59, 130, 246, 0.12);
@@ -397,21 +403,21 @@ export default function HamburgerQuestionsPage() {
         .pill--gray {
           background: rgba(15, 23, 42, 0.04);
           border-color: rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.72);
+          color: rgba(15, 23, 42, 0.66);
         }
 
         .bottom {
           display: grid;
           grid-template-columns: 1fr auto;
           align-items: end;
-          gap: 10px;
+          gap: 12px;
           min-width: 0;
         }
 
         .spec {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 800;
-          color: rgba(15, 23, 42, 0.72);
+          color: rgba(15, 23, 42, 0.62);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -419,9 +425,9 @@ export default function HamburgerQuestionsPage() {
         }
 
         .time {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: 900;
-          color: rgba(15, 23, 42, 0.55);
+          color: rgba(15, 23, 42, 0.5);
           white-space: nowrap;
         }
       `}</style>
