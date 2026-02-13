@@ -1,7 +1,7 @@
 /* path: app/hamburger/consultations/page.tsx */
 'use client';
 
-import TopBarBack from '../../../components/TopBarBack';
+import TopBarBack from '../../../../components/TopBarBack';
 
 export default function HamburgerConsultationsPage() {
   return (
