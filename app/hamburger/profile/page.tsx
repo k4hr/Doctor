@@ -49,7 +49,6 @@ type DoctorMeResponse = DoctorMeOk | DoctorMeErr;
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
-    // было "Max-AgetMax-Age" — исправил на нормальный Max-Age
     document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
   } catch {}
 }
@@ -238,17 +237,17 @@ export default function ProfilePage() {
       {warn && <p className="warn">{warn}</p>}
 
       <section className="profile-card">
-        <button type="button" className="profile-btn" onClick={() => go('/hamburger/questions')}>
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/profile/questions')}>
           <span className="profile-btn-title">Вопросы</span>
           <span className="profile-btn-sub">Актуальные и архив</span>
         </button>
 
-        <button type="button" className="profile-btn" onClick={() => go('/hamburger/consultations')}>
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/profile/consultations')}>
           <span className="profile-btn-title">Консультации</span>
           <span className="profile-btn-sub">Ваши консультации</span>
         </button>
 
-        <button type="button" className="profile-btn" onClick={() => go('/hamburger/history')}>
+        <button type="button" className="profile-btn" onClick={() => go('/hamburger/profile/history')}>
           <span className="profile-btn-title">История операций</span>
           <span className="profile-btn-sub">Платежи и списания</span>
         </button>
