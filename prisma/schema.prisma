@@ -308,6 +308,9 @@ model DoctorReview {
 
   authorTelegramId String
 
+  // ✅ анонимность отзыва
+  isAnonymous Boolean @default(true) @map("isanonymous")
+
   rating Int
 
   text String?
@@ -325,6 +328,10 @@ model DoctorReview {
   @@index([authorTelegramId])
   @@index([questionId])
   @@index([answerId])
+
+  // ✅ защита от дублей
+  @@unique([doctorId, authorTelegramId, questionId])
+  @@unique([doctorId, authorTelegramId, answerId])
 }
 
 model DoctorWallet {
