@@ -89,8 +89,12 @@ export default function CloseQuestionPage() {
   const [warn, setWarn] = useState('');
   const [info, setInfo] = useState<CloseInfoOk | null>(null);
 
+  // выбор врачей ДО закрытия
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // выбор врача ДЛЯ ОТЗЫВА (после закрытия)
+  const [reviewDoctorId, setReviewDoctorId] = useState<string>('');
 
   useEffect(() => {
     try {
@@ -119,10 +123,14 @@ export default function CloseQuestionPage() {
         const ok = j as CloseInfoOk;
         setInfo(ok);
 
+        // если уже закрыт — фиксируем выбранных врачей и дефолтно выбираем первого для отзыва
         if (ok.closed?.selectedDoctorIds?.length) {
-          setSelected(ok.closed.selectedDoctorIds.slice(0, 3));
+          const arr = ok.closed.selectedDoctorIds.slice(0, 3);
+          setSelected(arr);
+          setReviewDoctorId(arr[0] || '');
         } else {
           setSelected([]);
+          setReviewDoctorId('');
         }
 
         if (!ok.isAuthor) setWarn('Закрыть вопрос может только автор.');
@@ -141,7 +149,10 @@ export default function CloseQuestionPage() {
     return uniqByDoctor(items);
   }, [info?.doctors]);
 
-  const canInteract = !!info && info.isAuthor && !saving;
+  const isClosed = !!info?.closed;
+
+  // интерактив ДО закрытия — только пока НЕ закрыт
+  const canInteractBeforeClose = !!info && info.isAuthor && !saving && !isClosed;
 
   const isFree = !!info?.isFree;
   const totalRub = Math.max(0, Number(info?.priceRub || 0));
@@ -162,7 +173,7 @@ export default function CloseQuestionPage() {
   }, [info, isFree, totalRub, perDoctor, chosenCount]);
 
   const toggleDoctor = (doctorId: string) => {
-    if (!canInteract) return;
+    if (!canInteractBeforeClose) return;
     haptic('light');
 
     setSelected((prev) => {
@@ -177,13 +188,9 @@ export default function CloseQuestionPage() {
     });
   };
 
-  const goLeaveReview = (doctorId: string) => {
-    haptic('light');
-    router.push(`/hamburger/doctor/${encodeURIComponent(doctorId)}?questionId=${encodeURIComponent(id)}`);
-  };
-
   const onClose = () => {
     if (!info || !info.isAuthor) return;
+    if (isClosed) return;
 
     if (doctors.length === 0) {
       tgAlert('Нельзя закрыть вопрос: пока нет ответов врачей.');
@@ -225,12 +232,19 @@ export default function CloseQuestionPage() {
           return;
         }
 
+        // перезагружаем close-info чтобы получить info.closed
         const rr = await fetch(`/api/question/close-info?id=${encodeURIComponent(id)}`, {
           method: 'GET',
           cache: 'no-store',
         });
         const jj = (await rr.json().catch(() => null)) as CloseInfoResp | null;
-        if (rr.ok && jj && (jj as any).ok === true) setInfo(jj as CloseInfoOk);
+        if (rr.ok && jj && (jj as any).ok === true) {
+          const fresh = jj as CloseInfoOk;
+          setInfo(fresh);
+          const arr = fresh.closed?.selectedDoctorIds?.slice(0, 3) || [];
+          setSelected(arr);
+          setReviewDoctorId(arr[0] || '');
+        }
 
         haptic('medium');
       } catch (e) {
@@ -248,6 +262,24 @@ export default function CloseQuestionPage() {
     return doctors.filter((d) => set.has(d.doctorId));
   }, [doctors, closedSelected]);
 
+  const pickReviewDoctor = (doctorId: string) => {
+    if (!isClosed) return;
+    haptic('light');
+    setReviewDoctorId(doctorId);
+  };
+
+  const goToReviewForm = () => {
+    if (!isClosed) return;
+    if (!reviewDoctorId) {
+      tgAlert('Выбери врача для отзыва.');
+      return;
+    }
+    haptic('light');
+    router.push(
+      `/hamburger/review/new?doctorId=${encodeURIComponent(reviewDoctorId)}&questionId=${encodeURIComponent(id)}`
+    );
+  };
+
   return (
     <main className="page">
       <TopBarBack />
@@ -261,9 +293,13 @@ export default function CloseQuestionPage() {
 
       {warn ? <div className="warn">{warn}</div> : null}
 
+      {/* БЛОК 1: выбор врачей (до закрытия) */}
       <div className="card">
         <div className="cardTitle">Выбери врачей, которым засчитать ответ</div>
-        <div className="cardHint">Можно выбрать максимум 3. После закрытия ты сможешь оставить им отзывы.</div>
+        <div className="cardHint">
+          Можно выбрать максимум 3. После закрытия ты сможешь оставить им отзывы.
+          {isClosed ? ' (вопрос уже закрыт — выбор зафиксирован)' : ''}
+        </div>
 
         {loading ? <div className="muted">Загрузка списка врачей…</div> : null}
         {!loading && info && doctors.length === 0 ? <div className="muted">Пока никто не ответил.</div> : null}
@@ -273,7 +309,11 @@ export default function CloseQuestionPage() {
             const active = selected.includes(doc.doctorId);
 
             return (
-              <div key={doc.doctorId} className={active ? 'pickWrap pickWrapActive' : 'pickWrap'}>
+              <div
+                key={doc.doctorId}
+                className={active ? 'pickWrap pickWrapActive' : 'pickWrap'}
+                style={{ pointerEvents: canInteractBeforeClose ? 'auto' : 'none' }}
+              >
                 <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => toggleDoctor(doc.doctorId)} />
                 <div className={active ? 'check checkOn' : 'check'} aria-hidden="true">
                   ✓
@@ -295,35 +335,53 @@ export default function CloseQuestionPage() {
           </div>
         ) : null}
 
-        <button type="button" className="closeBtn" onClick={onClose} disabled={!canInteract || !info || saving}>
-          {saving ? 'Закрываем…' : 'Закрыть вопрос'}
+        <button type="button" className="closeBtn" onClick={onClose} disabled={!canInteractBeforeClose || !info || saving}>
+          {saving ? 'Закрываем…' : isClosed ? 'Вопрос уже закрыт' : 'Закрыть вопрос'}
         </button>
       </div>
 
-      {info?.closed ? (
+      {/* БЛОК 2: вопрос закрыт — выбор врача для отзыва + кнопка */}
+      {isClosed ? (
         <div className="card">
           <div className="cardTitle">Вопрос закрыт</div>
           <div className="cardHint">
-            {info.isFree
-              ? 'Теперь можно оставить отзывы выбранным врачам.'
-              : `Распределено: ${fmtRub(info.closed.totalRub)} · На каждого: ${fmtRub(info.closed.perDoctorRub)}`}
+            {info?.isFree
+              ? 'Выбери врача и оставь отзыв.'
+              : `Распределено: ${fmtRub(info!.closed!.totalRub)} · На каждого: ${fmtRub(info!.closed!.perDoctorRub)}`}
           </div>
 
-          <div className="closedList">
-            {closedCards.map((doc) => (
-              <div key={doc.doctorId} className="closedRow">
-                <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => goLeaveReview(doc.doctorId)} />
-                <button type="button" className="reviewBtn" onClick={() => goLeaveReview(doc.doctorId)}>
-                  Оставить отзыв
-                </button>
-              </div>
-            ))}
+          <div className="muted" style={{ marginTop: 10 }}>
+            Выберите врача для отзыва:
           </div>
+
+          <div className="list" style={{ marginTop: 10 }}>
+            {closedCards.map((doc) => {
+              const active = reviewDoctorId === doc.doctorId;
+              return (
+                <div
+                  key={doc.doctorId}
+                  className={active ? 'pickWrap pickWrapActive' : 'pickWrap'}
+                  onClick={() => pickReviewDoctor(doc.doctorId)}
+                  role="button"
+                  aria-label="Выбрать врача для отзыва"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <DoctorCard doctor={doc} ratingLabel="5.0" onClick={() => pickReviewDoctor(doc.doctorId)} />
+                  <div className={active ? 'check checkOn' : 'check'} aria-hidden="true">
+                    ✓
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button type="button" className="reviewGoBtn" onClick={goToReviewForm} disabled={!reviewDoctorId}>
+            Оставить отзыв
+          </button>
         </div>
       ) : null}
 
       <style jsx>{`
-        /* Рубим горизонтальный скролл, но НЕ ломаем раскладку */
         :global(html),
         :global(body) {
           width: 100%;
@@ -370,8 +428,6 @@ export default function CloseQuestionPage() {
           font-weight: 850;
         }
 
-        /* ВАЖНО: принудительно делаем карточку вертикальной,
-           чтобы никакие глобальные .card {display:flex} не ломали всё в строку */
         .card {
           background: #fff;
           border-radius: 18px;
@@ -386,7 +442,6 @@ export default function CloseQuestionPage() {
           display: flex;
           flex-direction: column;
           align-items: stretch;
-          gap: 0;
 
           overflow: hidden;
           min-width: 0;
@@ -412,7 +467,6 @@ export default function CloseQuestionPage() {
           color: rgba(17, 24, 39, 0.55);
         }
 
-        /* Список строго вертикальный */
         .list {
           margin-top: 12px;
           display: grid;
@@ -422,13 +476,12 @@ export default function CloseQuestionPage() {
           min-width: 0;
         }
 
-        /* Вот тут мы “фиксируем” ширину карточки врача и рубим выезды */
         .pickWrap {
           position: relative;
           border-radius: 18px;
           width: 100%;
           min-width: 0;
-          overflow: hidden; /* режет то, что вылазит за край */
+          overflow: hidden;
         }
 
         .pickWrapActive {
@@ -506,40 +559,29 @@ export default function CloseQuestionPage() {
           opacity: 0.95;
         }
 
-        .closedList {
+        .reviewGoBtn {
           margin-top: 12px;
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 10px;
-          width: 100%;
-          min-width: 0;
-        }
-
-        .closedRow {
-          display: grid;
-          gap: 8px;
-          width: 100%;
-          min-width: 0;
-        }
-
-        .reviewBtn {
           width: 100%;
           border: none;
-          border-radius: 12px;
-          padding: 12px 10px;
-          background: rgba(109, 40, 217, 0.12);
-          color: #6d28d9;
-          font-weight: 950;
-          font-size: 12px;
+          border-radius: 14px;
+          padding: 12px 12px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          white-space: normal;
-          overflow-wrap: anywhere;
+          background: rgba(109, 40, 217, 0.12);
+          color: #6d28d9;
+          font-size: 14px;
+          font-weight: 950;
+          box-shadow: 0 10px 20px rgba(109, 40, 217, 0.12);
         }
 
-        .reviewBtn:active {
+        .reviewGoBtn:disabled {
+          opacity: 0.55;
+          cursor: default;
+        }
+
+        .reviewGoBtn:active:not(:disabled) {
           transform: scale(0.99);
-          opacity: 0.92;
+          opacity: 0.95;
         }
       `}</style>
     </main>
