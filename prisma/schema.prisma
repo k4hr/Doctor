@@ -63,15 +63,15 @@ enum QuestionCloseStatus {
   PAID
 }
 
-/* ===========================
-   ✅ ВРАЧ.PRO (подписка)
-   =========================== */
+// ===========================
+// ✅ ВРАЧ.PRO (подписка)
+// ===========================
 
 enum DoctorProPlan {
-  M1   // 1 месяц
-  M3   // 3 месяца
-  M6   // 6 месяцев
-  Y1   // 12 месяцев
+  M1 // 1 месяц
+  M3 // 3 месяца
+  M6 // 6 месяцев
+  Y1 // 12 месяцев
 }
 
 enum DoctorProStatus {
@@ -100,8 +100,8 @@ model DoctorProSubscription {
   priceRub Int @default(199)
 
   // ✅ платеж/провайдер (на будущее)
-  provider String? // "yookassa" | "cloudpayments" | "telegram" ...
-  paymentId String? @unique
+  provider  String?  // "yookassa" | "cloudpayments" | "telegram" ...
+  paymentId String?  @unique
 
   // ✅ служебное
   canceledAt DateTime?
@@ -165,7 +165,7 @@ model Doctor {
   assignedQuestions Question[] @relation("AssignedDoctor")
   answeredQuestions Question[] @relation("AnsweredDoctor")
 
-  answers Answer[]
+  answers        Answer[]
   answerComments AnswerComment[]
 
   // ✅ Рейтинг (агрегаты по отзывам)
@@ -231,7 +231,7 @@ model Question {
   keywords String[] @default([])
 
   // ✅ Редактирование (1 раз): счетчик + дата последнего редактирования
-  editCount Int      @default(0)
+  editCount Int       @default(0)
   editedAt  DateTime?
 
   // ✅ ПЛАТНОСТЬ ВОПРОСА
@@ -246,10 +246,10 @@ model Question {
   answeredByDoctorId String?
   answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
 
-  files QuestionFile[]
+  files   QuestionFile[]
   answers Answer[]
   reviews DoctorReview[]
-  close QuestionClose?
+  close   QuestionClose?
 
   @@index([speciality])
   @@index([status])
@@ -263,7 +263,7 @@ model QuestionClose {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  questionId String @unique
+  questionId String   @unique
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   authorTelegramId String
@@ -318,7 +318,7 @@ model Answer {
   isDeleted Boolean @default(false)
 
   comments AnswerComment[]
-  reviews DoctorReview[]
+  reviews  DoctorReview[]
 
   @@index([questionId])
   @@index([doctorId])
@@ -336,8 +336,8 @@ model AnswerComment {
 
   authorType AnswerCommentAuthorType
 
-  authorDoctorId   String?
-  authorDoctor     Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
+  authorDoctorId String?
+  authorDoctor   Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
 
   authorTelegramId String?
 
