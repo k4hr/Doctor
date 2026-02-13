@@ -173,7 +173,7 @@ function Stars({ value }: { value: number }) {
 }
 
 export default function DoctorPublicProfilePage() {
-  const router = useRouter();
+  const router = useRouter(); // оставил, вдруг используешь дальше на странице
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
 
@@ -280,7 +280,7 @@ export default function DoctorPublicProfilePage() {
         const ok = j as ReviewsOk;
         setReviewsItems(ok.items || []);
         setRatingAvg(typeof ok.rating?.value === 'number' ? ok.rating.value : 0);
-        setRatingCount(typeof ok.rating?.count === 'number' ? ok.rating.count : (ok.items?.length || 0));
+        setRatingCount(typeof ok.rating?.count === 'number' ? ok.rating.count : ok.items?.length || 0);
         setReviewsWarn('');
       } catch (e) {
         console.error(e);
@@ -306,11 +306,6 @@ export default function DoctorPublicProfilePage() {
     return Math.max(0, Math.min(5, v));
   }, [ratingAvg]);
 
-  const onLeaveReview = () => {
-    haptic('light');
-    setTab('reviews');
-  };
-
   return (
     <main className="page">
       <TopBarBack />
@@ -335,10 +330,6 @@ export default function DoctorPublicProfilePage() {
         <div className="ratingText">
           Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
         </div>
-
-        <button type="button" className="leaveReviewBtn" onClick={onLeaveReview}>
-          Оставить отзыв
-        </button>
       </section>
 
       <section className="stats">
@@ -418,10 +409,6 @@ export default function DoctorPublicProfilePage() {
                 </span>
               </div>
             </div>
-
-            <button type="button" className="leaveReviewBtnWide" onClick={onLeaveReview}>
-              Оставить отзыв
-            </button>
 
             {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
             {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
@@ -528,23 +515,6 @@ export default function DoctorPublicProfilePage() {
         .ratingCount {
           font-weight: 900;
           color: rgba(17, 24, 39, 0.45);
-        }
-
-        .leaveReviewBtn {
-          margin-top: 10px;
-          border: none;
-          background: transparent;
-          color: #6d28d9;
-          font-weight: 950;
-          font-size: 13px;
-          text-decoration: underline;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        .leaveReviewBtn:active {
-          opacity: 0.7;
-          transform: scale(0.99);
         }
 
         .stats {
@@ -691,27 +661,6 @@ export default function DoctorPublicProfilePage() {
           font-size: 13px;
           font-weight: 900;
           color: rgba(17, 24, 39, 0.65);
-        }
-
-        .leaveReviewBtnWide {
-          width: 100%;
-          border: none;
-          border-radius: 14px;
-          padding: 12px 12px;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          background: #24c768;
-          color: #fff;
-          font-size: 14px;
-          font-weight: 950;
-          text-align: center;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
-          margin-bottom: 10px;
-        }
-
-        .leaveReviewBtnWide:active {
-          transform: scale(0.99);
-          opacity: 0.95;
         }
 
         .reviewsList {
