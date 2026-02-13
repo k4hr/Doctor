@@ -16,6 +16,10 @@ type ApiDoctor = {
   experienceYears: number | null;
   avatarUrl: string | null;
   avatarCrop?: DoctorAvatarCrop | null;
+
+  // ✅ рейтинг из API
+  ratingSum: number;
+  ratingCount: number;
 };
 
 type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
@@ -30,7 +34,6 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-/* cookie helpers (чтобы API пускало через initData) */
 function setCookie(name: string, value: string, days = 3) {
   try {
     const maxAge = days * 24 * 60 * 60;
@@ -52,13 +55,11 @@ function getInitDataFromCookie(): string {
 }
 
 function isRealDoctor(d: ApiDoctor) {
-  // чтобы не показывать мусор/пустые анкеты
   const fn = String(d.firstName ?? '').trim();
   const ln = String(d.lastName ?? '').trim();
   return !!d.id && (fn.length > 0 || ln.length > 0);
 }
 
-/** Блок "Врачи онлайн" для доунбара (реальные данные) */
 export default function VrachiOnlineBlock() {
   const router = useRouter();
 
@@ -83,13 +84,10 @@ export default function VrachiOnlineBlock() {
 
       const ok = j as ApiOk;
       const list = Array.isArray(ok.items) ? ok.items : [];
-
-      // ✅ фильтруем только реальных, и ограничиваем до 7
       const real = list.filter(isRealDoctor).slice(0, UI_LIMIT);
 
       setItems(real);
-      // count лучше показывать общий count из API (если он про реальных),
-      // но чтобы не было странностей — гарантируем минимум real.length
+
       const apiCount = typeof ok.count === 'number' ? ok.count : real.length;
       setCount(Math.max(real.length, apiCount));
     } catch {
@@ -155,6 +153,10 @@ export default function VrachiOnlineBlock() {
                 experienceYears: d.experienceYears,
                 avatarUrl: d.avatarUrl,
                 avatarCrop: d.avatarCrop ?? null,
+
+                // ✅ прокидываем агрегаты в карточку
+                ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : 0,
+                ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : 0,
               };
 
               return (
@@ -164,7 +166,7 @@ export default function VrachiOnlineBlock() {
                   disabled={false}
                   onClick={() => handleDoctorClick(d)}
                   showRating={true}
-                  ratingLabel="5.0"
+                  // ❌ НЕ ПЕРЕДАЁМ ratingLabel="5.0"
                 />
               );
             })
