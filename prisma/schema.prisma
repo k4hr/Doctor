@@ -63,6 +63,56 @@ enum QuestionCloseStatus {
   PAID
 }
 
+/* ===========================
+   ✅ ВРАЧ.PRO (подписка)
+   =========================== */
+
+enum DoctorProPlan {
+  M1   // 1 месяц
+  M3   // 3 месяца
+  M6   // 6 месяцев
+  Y1   // 12 месяцев
+}
+
+enum DoctorProStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+  REFUNDED
+}
+
+model DoctorProSubscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  status DoctorProStatus @default(ACTIVE)
+  plan   DoctorProPlan
+
+  // ✅ период действия
+  startsAt DateTime @default(now())
+  endsAt   DateTime
+
+  // ✅ цена на момент покупки (фиксируем)
+  priceRub Int @default(199)
+
+  // ✅ платеж/провайдер (на будущее)
+  provider String? // "yookassa" | "cloudpayments" | "telegram" ...
+  paymentId String? @unique
+
+  // ✅ служебное
+  canceledAt DateTime?
+  meta       Json? @db.Json
+
+  @@index([doctorId])
+  @@index([doctorId, status])
+  @@index([status])
+  @@index([endsAt])
+}
+
 model Doctor {
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
@@ -113,11 +163,9 @@ model Doctor {
   files DoctorFile[]
 
   assignedQuestions Question[] @relation("AssignedDoctor")
-
   answeredQuestions Question[] @relation("AnsweredDoctor")
 
   answers Answer[]
-
   answerComments AnswerComment[]
 
   // ✅ Рейтинг (агрегаты по отзывам)
@@ -132,11 +180,16 @@ model Doctor {
   transactions DoctorTransaction[]
   payouts      DoctorPayoutRequest[]
 
+  // ✅ ВРАЧ.PRO: активная подписка "срезом" для быстрого UI/фильтров
+  proUntil DateTime? // если null или < now() => не PRO
+  proSubs  DoctorProSubscription[]
+
   @@index([status])
   @@index([speciality1])
   @@index([city])
   @@index([submittedAt])
   @@index([isOnline])
+  @@index([proUntil])
 }
 
 model DoctorFile {
@@ -194,11 +247,8 @@ model Question {
   answeredByDoctor   Doctor? @relation("AnsweredDoctor", fields: [answeredByDoctorId], references: [id], onDelete: SetNull)
 
   files QuestionFile[]
-
   answers Answer[]
-
   reviews DoctorReview[]
-
   close QuestionClose?
 
   @@index([speciality])
@@ -268,7 +318,6 @@ model Answer {
   isDeleted Boolean @default(false)
 
   comments AnswerComment[]
-
   reviews DoctorReview[]
 
   @@index([questionId])
@@ -316,8 +365,7 @@ model DoctorReview {
   isAnonymous Boolean @default(true) @map("isanonymous")
 
   rating Int
-
-  text String?
+  text   String?
 
   questionId String?
   question   Question? @relation(fields: [questionId], references: [id], onDelete: SetNull)
