@@ -14,11 +14,21 @@ export type DoctorCardItem = {
   speciality3: string | null;
   experienceYears: number | null;
   avatarUrl: string | null;
+
+  // ✅ РЕАЛЬНЫЙ РЕЙТИНГ (может прийти разными способами)
+  // 1) прямо из Doctor (агрегаты)
+  ratingSum?: number | null;
+  ratingCount?: number | null;
+
+  // 2) если API уже отдаёт готовое значение
+  ratingValue?: number | null;
 };
 
 type Props = {
   doctor: DoctorCardItem;
   onClick?: (doctor: DoctorCardItem) => void;
+
+  // можно оставить для ручной подмены (но по умолчанию берём из doctor.*)
   ratingLabel?: string; // "5.0" и т.п. (БЕЗ ⭐)
 };
 
@@ -29,7 +39,6 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 function doctorFullName(d: DoctorCardItem) {
-  // ✅ только Фамилия + Имя (без отчества)
   const ln = String(d?.lastName || '').trim();
   const fn = String(d?.firstName || '').trim();
   return [ln, fn].filter(Boolean).join(' ').trim() || '—';
@@ -48,11 +57,36 @@ function doctorAvatarLetter(d: DoctorCardItem) {
 function normalizeRatingLabel(v: any) {
   const s = String(v ?? '').trim();
   if (!s) return '';
-  // если кто-то случайно передаст "⭐ 5.0" — уберём звездочки/пробелы слева
   return s.replace(/^⭐\s*/g, '').trim();
 }
 
-export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Props) {
+function round1(x: number) {
+  return Math.round(x * 10) / 10;
+}
+
+function fmtRatingLabel(v: number) {
+  const x = Number.isFinite(v) ? round1(v) : 0;
+  // для карточек обычно красивее "4.8", но если хочешь "4,8" — замени точку на запятую
+  return x.toFixed(1);
+}
+
+function calcRatingFromDoctor(d: DoctorCardItem): number | null {
+  // 1) если уже есть готовое значение
+  const rv = typeof d.ratingValue === 'number' ? d.ratingValue : Number(d.ratingValue);
+  if (Number.isFinite(rv) && rv > 0) return Math.max(0, Math.min(5, rv));
+
+  // 2) если есть агрегаты
+  const sum = typeof d.ratingSum === 'number' ? d.ratingSum : Number(d.ratingSum);
+  const cnt = typeof d.ratingCount === 'number' ? d.ratingCount : Number(d.ratingCount);
+  if (Number.isFinite(sum) && Number.isFinite(cnt) && cnt > 0) {
+    const avg = sum / cnt;
+    return Math.max(0, Math.min(5, avg));
+  }
+
+  return null;
+}
+
+export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
   const name = useMemo(() => doctorFullName(doctor), [doctor]);
   const spec = useMemo(() => doctorSpecsLine(doctor), [doctor]);
 
@@ -62,7 +96,17 @@ export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Pro
       : null;
   const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
 
-  const ratingText = normalizeRatingLabel(ratingLabel);
+  // ✅ приоритет:
+  // 1) ratingLabel если передали
+  // 2) иначе считаем из doctor.ratingValue / ratingSum+ratingCount
+  const ratingText = useMemo(() => {
+    const manual = normalizeRatingLabel(ratingLabel);
+    if (manual) return manual;
+
+    const computed = calcRatingFromDoctor(doctor);
+    if (computed === null) return '';
+    return fmtRatingLabel(computed);
+  }, [doctor, ratingLabel]);
 
   return (
     <>
@@ -93,7 +137,6 @@ export default function DoctorCard({ doctor, onClick, ratingLabel = '5.0' }: Pro
           <div className="doconline-bottom">
             <span className="doconline-exp">{expLabel}</span>
 
-            {/* ✅ звезда всегда тут, чтобы нигде не задваивалось */}
             {ratingText ? <span className="doconline-rating">⭐ {ratingText}</span> : null}
           </div>
         </div>
