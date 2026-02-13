@@ -9,6 +9,9 @@ import TopBarBack from '../../../../components/TopBarBack';
 import DocumentBadge from '../../../../components/bage/document';
 import ProBadge from '../../../../components/bage/pro';
 
+// ✅ down bar (doctor)
+import DownBarDoctor from '../../../../components/DownBarDoctor';
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -198,7 +201,7 @@ export default function DoctorProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
-  // ✅ только для визуальной проверки бейджа PRO (потом заменишь на doctor.isPro)
+  // ✅ только для визуальной проверки бейджа PRO (потом заменишь на /api/pro/status)
   const isProPreview = true;
 
   const onOpenCabinet = () => {
@@ -322,10 +325,7 @@ export default function DoctorProfilePage() {
   const specs = useMemo(() => specsLine(doctor), [doctor]);
 
   const expYears = doctor?.experienceYears ?? null;
-
-  // ✅ "ответов" вместо "консультаций"
   const answers = doctor?.stats?.consultationsCount ?? 0;
-
   const reviewsStat = doctor?.stats?.reviewsCount ?? 0;
 
   const ratingLabel = useMemo(() => fmtRating(ratingAvg), [ratingAvg]);
@@ -338,151 +338,169 @@ export default function DoctorProfilePage() {
     <main className="page">
       <TopBarBack />
 
-      <section className="hero">
-        <button
-          type="button"
-          className="cabinetBtn"
-          onClick={onOpenCabinet}
-          aria-label="Личный кабинет врача"
-          disabled={!canOpenCabinet}
-          title={!canOpenCabinet ? 'Доступно после подтверждения' : 'Кабинет'}
-        >
-          <span className="cabinetIcon" aria-hidden="true">
-            ⚙️
-          </span>
-        </button>
+      <div className="wrap">
+        <section className="hero">
+          <button
+            type="button"
+            className="cabinetBtn"
+            onClick={onOpenCabinet}
+            aria-label="Личный кабинет врача"
+            disabled={!canOpenCabinet}
+            title={!canOpenCabinet ? 'Доступно после подтверждения' : 'Кабинет'}
+          >
+            <span className="cabinetIcon" aria-hidden="true">
+              ⚙️
+            </span>
+          </button>
 
-        <div className="avatarWrap" aria-label="Фото врача">
-          {doctor?.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="avatarImg" src={doctor.avatarUrl} alt="" />
-          ) : (
-            <div className="avatarPh">{avatarLetter(doctor)}</div>
-          )}
-        </div>
+          <div className="avatarWrap" aria-label="Фото врача">
+            {doctor?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="avatarImg" src={doctor.avatarUrl} alt="" />
+            ) : (
+              <div className="avatarPh">{avatarLetter(doctor)}</div>
+            )}
+          </div>
 
-        <div className="name">{name}</div>
-        <div className="specs">{specs}</div>
+          <div className="name">{name}</div>
+          <div className="specs">{specs}</div>
 
-        <div className="ratingRow" aria-label="Рейтинг">
-          <Stars value={starsValue} />
-        </div>
+          <div className="ratingRow" aria-label="Рейтинг">
+            <Stars value={starsValue} />
+          </div>
 
-        <div className="ratingText">
-          Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
-        </div>
+          <div className="ratingText">
+            Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
+          </div>
 
-        <div className="badgesRow" aria-label="Бейджи">
-          <DocumentBadge size="sm" />
-          {isProPreview ? <ProBadge size="sm" /> : null}
-        </div>
-      </section>
+          <div className="badgesRow" aria-label="Бейджи">
+            <DocumentBadge size="sm" />
+            {isProPreview ? <ProBadge size="sm" /> : null}
+          </div>
+        </section>
 
-      <section className="stats">
-        <div className="stat">
-          <div className="statVal">{expYears !== null ? formatInt(expYears) : '—'}</div>
-          <div className="statLab">лет стажа</div>
-        </div>
+        <section className="stats">
+          <div className="stat">
+            <div className="statVal">{expYears !== null ? formatInt(expYears) : '—'}</div>
+            <div className="statLab">лет стажа</div>
+          </div>
 
-        <div className="divider" />
+          <div className="divider" />
 
-        <div className="stat">
-          <div className="statVal">{formatInt(answers)}</div>
-          <div className="statLab">ответов</div>
-        </div>
+          <div className="stat">
+            <div className="statVal">{formatInt(answers)}</div>
+            <div className="statLab">ответов</div>
+          </div>
 
-        <div className="divider" />
+          <div className="divider" />
 
-        <div className="stat">
-          <div className="statVal">{formatInt(reviewsStat || ratingCount)}</div>
-          <div className="statLab">отзывов</div>
-        </div>
-      </section>
+          <div className="stat">
+            <div className="statVal">{formatInt(reviewsStat || ratingCount)}</div>
+            <div className="statLab">отзывов</div>
+          </div>
+        </section>
 
-      {warn ? <p className="warn">{warn}</p> : null}
+        {warn ? <p className="warn">{warn}</p> : null}
 
-      <section className="tabs">
-        <button type="button" className={tab === 'about' ? 'tab tabActive' : 'tab'} onClick={() => setTab('about')}>
-          О враче
-        </button>
+        <section className="tabs">
+          <button type="button" className={tab === 'about' ? 'tab tabActive' : 'tab'} onClick={() => setTab('about')}>
+            О враче
+          </button>
 
-        <button type="button" className={tab === 'reviews' ? 'tab tabActive' : 'tab'} onClick={() => setTab('reviews')}>
-          Отзывы
-        </button>
-      </section>
+          <button
+            type="button"
+            className={tab === 'reviews' ? 'tab tabActive' : 'tab'}
+            onClick={() => setTab('reviews')}
+          >
+            Отзывы
+          </button>
+        </section>
 
-      <section className="content">
-        {tab === 'about' ? (
-          <>
-            <div className="block">
-              <div className="blockTitle">Описание</div>
-              <div className="blockText">{show(doctor?.about)}</div>
-            </div>
-
-            <div className="block">
-              <div className="blockTitle">О враче</div>
-              <div className="blockText">
-                <b>Образование:</b> {show(doctor?.education)}
-                <br />
-                <b>Место работы:</b> {show(doctor?.workplace)}
-                <br />
-                <b>Должность:</b> {show(doctor?.position)}
+        <section className="content">
+          {tab === 'about' ? (
+            <>
+              <div className="block">
+                <div className="blockTitle">Описание</div>
+                <div className="blockText">{show(doctor?.about)}</div>
               </div>
-            </div>
 
-            <div className="block">
-              <div className="blockTitle">Занимаюсь следующими вопросами</div>
-              <div className="blockText">{show(doctor?.specialityDetails)}</div>
-            </div>
-
-            <div className="block">
-              <div className="blockTitle">Опыт</div>
-              <div className="blockText">{show(doctor?.experienceDetails)}</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="reviewsHeader">
-              <div className="reviewsTitle">Отзывы</div>
-              <div className="reviewsMeta">
-                <span className="metaStars">
-                  <Stars value={starsValue} />
-                </span>
-                <span className="metaText">
-                  {ratingLabel} · {formatInt(ratingCount)} отзывов
-                </span>
-              </div>
-            </div>
-
-            {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
-            {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
-            {!reviewsLoading && !reviewsItems.length ? <p className="muted">Пока отзывов нет.</p> : null}
-
-            <div className="reviewsList">
-              {reviewsItems.map((r) => (
-                <div key={r.id} className="reviewCard">
-                  <div className="reviewTop">
-                    <span className="reviewStars">
-                      <Stars value={Math.max(0, Math.min(5, Number(r.rating) || 0))} />
-                    </span>
-                    <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
-                  </div>
-
-                  {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
-
-                  {r.isVerified ? <div className="badgeOk">проверен</div> : null}
+              <div className="block">
+                <div className="blockTitle">О враче</div>
+                <div className="blockText">
+                  <b>Образование:</b> {show(doctor?.education)}
+                  <br />
+                  <b>Место работы:</b> {show(doctor?.workplace)}
+                  <br />
+                  <b>Должность:</b> {show(doctor?.position)}
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+              </div>
+
+              <div className="block">
+                <div className="blockTitle">Занимаюсь следующими вопросами</div>
+                <div className="blockText">{show(doctor?.specialityDetails)}</div>
+              </div>
+
+              <div className="block">
+                <div className="blockTitle">Опыт</div>
+                <div className="blockText">{show(doctor?.experienceDetails)}</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="reviewsHeader">
+                <div className="reviewsTitle">Отзывы</div>
+                <div className="reviewsMeta">
+                  <span className="metaStars">
+                    <Stars value={starsValue} />
+                  </span>
+                  <span className="metaText">
+                    {ratingLabel} · {formatInt(ratingCount)} отзывов
+                  </span>
+                </div>
+              </div>
+
+              {reviewsWarn ? <p className="warnSmall">{reviewsWarn}</p> : null}
+              {reviewsLoading ? <p className="muted">Загрузка…</p> : null}
+              {!reviewsLoading && !reviewsItems.length ? <p className="muted">Пока отзывов нет.</p> : null}
+
+              <div className="reviewsList">
+                {reviewsItems.map((r) => (
+                  <div key={r.id} className="reviewCard">
+                    <div className="reviewTop">
+                      <span className="reviewStars">
+                        <Stars value={Math.max(0, Math.min(5, Number(r.rating) || 0))} />
+                      </span>
+                      <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
+                    </div>
+
+                    {r.text ? (
+                      <div className="reviewText">{r.text}</div>
+                    ) : (
+                      <div className="reviewText muted">Без текста</div>
+                    )}
+
+                    {r.isVerified ? <div className="badgeOk">проверен</div> : null}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        {/* ✅ Внутри wrap — одинаковая ширина/центровка */}
+        <DownBarDoctor />
+      </div>
 
       <style jsx>{`
         .page {
           min-height: 100dvh;
           padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
+        }
+
+        .wrap {
+          max-width: 430px;
+          margin: 0 auto;
         }
 
         .hero {
