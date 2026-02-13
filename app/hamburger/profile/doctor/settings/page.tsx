@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../../../components/TopBarBack';
 
+// ✅ down bar (doctor)
+import DownBarDoctor from '../../../../../components/DownBarDoctor';
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -283,7 +286,11 @@ export default function DoctorSettingsHomePage() {
             </div>
           </button>
 
-          <button type="button" className="menuItem" onClick={() => go('/hamburger/profile/doctor/settings/consultation')}>
+          <button
+            type="button"
+            className="menuItem"
+            onClick={() => go('/hamburger/profile/doctor/settings/consultation')}
+          >
             <div className="menuText">
               <div className="menuTitle">Консультации</div>
               <div className="menuSub">Ваши консультации</div>
@@ -304,6 +311,9 @@ export default function DoctorSettingsHomePage() {
             </div>
           </button>
         </section>
+
+        {/* ✅ ВАЖНО: DownBarDoctor ВНУТРИ wrap, чтобы ширина совпадала */}
+        <DownBarDoctor />
       </div>
 
       <style jsx>{`
