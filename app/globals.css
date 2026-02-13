@@ -52,6 +52,8 @@ body {
   text-rendering: optimizeLegibility;
 
   height: 100%;
+
+  /* важно: скролл у нас в .lm-page, поэтому body закрыт */
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -76,13 +78,24 @@ body {
   /* ✅ добавляем safe-top ТОЛЬКО сверху */
   padding-top: calc(var(--lm-safe-top, 0px) + 16px);
 
-  max-width: 900px;
-  margin: 0 auto;
+  /* ✅ КЛЮЧЕВОЕ: на мобилке НЕ центрируем, иначе 100vw/негативные маргины режутся */
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 
   height: var(--tg-viewport-height, 100vh);
   overflow-y: auto;
+  overflow-x: hidden; /* ✅ режем только горизонталь внутри скролл-контейнера */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+/* ✅ А вот на широких экранах можно возвращать "красивую" центровку */
+@media (min-width: 920px) {
+  .lm-page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
 }
 
 /* Заголовки */
