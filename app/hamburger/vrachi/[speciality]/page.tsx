@@ -19,10 +19,6 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-function safeRatingLabel() {
-  return '5.0';
-}
-
 export default function DoctorsBySpecialityPage() {
   const router = useRouter();
   const params = useParams<{ speciality: string }>();
@@ -84,7 +80,7 @@ export default function DoctorsBySpecialityPage() {
           <DoctorCard
             key={d.id}
             doctor={d}
-            ratingLabel={safeRatingLabel()}
+            showRating={true}
             showOnlineDot={false}
             onClick={(doc) => {
               haptic('light');
