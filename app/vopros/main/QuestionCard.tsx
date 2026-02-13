@@ -69,26 +69,28 @@ function timeAgoRu(input: string | Date) {
   return `${days} дней назад`;
 }
 
+function answersSuffix(cnt: number) {
+  const n = Math.max(0, Math.trunc(cnt));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+
+  // 1 ответ, 2-4 ответа, 5-20 ответов, 21 ответ, 22-24 ответа, ...
+  if (mod10 === 1 && mod100 !== 11) return '';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'а';
+  return 'ов';
+}
+
 function statusLabel(q: QuestionCardData) {
-  const st = String(q.status || 'WAITING').toUpperCase();
-  const n = Number.isFinite(q.answersCount as number) ? Number(q.answersCount) : 0;
+  const st = String(q.status || 'WAITING').toUpperCase() as QuestionStatusUI;
+  const cnt = Number.isFinite(q.answersCount as number) ? Math.max(0, Number(q.answersCount)) : 0;
 
-  if (st === 'CLOSED') return { text: 'Вопрос закрыт', tone: 'red' as const };
+  // ✅ ЗАКРЫТ — ЗЕЛЁНЫЙ
+  if (st === 'CLOSED') return { text: 'Вопрос закрыт', tone: 'green' as const };
 
-  if (st === 'ANSWERING') {
-    const cnt = Math.max(0, n);
-    if (cnt <= 0) return { text: 'Ждёт ответа', tone: 'gray' as const };
+  // ✅ ЕСТЬ ОТВЕТЫ — ГОЛУБОЙ (счётчик)
+  if (cnt > 0) return { text: `${cnt} ответ${answersSuffix(cnt)}`, tone: 'blue' as const };
 
-    const suf =
-      cnt % 10 === 1 && cnt % 100 !== 11
-        ? ''
-        : cnt % 10 >= 2 && cnt % 10 <= 4 && (cnt % 100 < 10 || cnt % 100 >= 20)
-        ? 'а'
-        : 'ов';
-
-    return { text: `${cnt} ответ${suf}`, tone: 'green' as const };
-  }
-
+  // ✅ НЕТ ОТВЕТОВ — СЕРЫЙ
   return { text: 'Ждёт ответа', tone: 'gray' as const };
 }
 
@@ -140,8 +142,10 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
               className={`qcPill ${
                 ui.statusTone === 'green'
                   ? 'qcPill--green'
-                  : ui.statusTone === 'red'
-                  ? 'qcPill--red'
+                  : ui.statusTone === 'blue'
+                  ? 'qcPill--blue'
+                  : ui.statusTone === 'gray'
+                  ? 'qcPill--gray'
                   : 'qcPill--gray'
               }`}
             >
@@ -235,7 +239,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-height: 0;
         }
 
-        /* ✅ ТОЛЬКО ШРИФТ (под DoctorCard) */
         .qcAuthorTop {
           font-size: 12px;
           font-weight: 600;
@@ -248,7 +251,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        /* ✅ ТОЛЬКО ШРИФТ (под DoctorCard name) */
         .qcTitle {
           margin: 0;
           font-size: 14px;
@@ -274,7 +276,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           gap: 4px;
         }
 
-        /* ✅ ТОЛЬКО ШРИФТ (пилюли как внизу у DoctorCard) */
         .qcPill {
           flex: 0 0 auto;
 
@@ -300,10 +301,18 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #92400e;
         }
 
+        /* ✅ ЗЕЛЁНЫЙ — как в ovrachax (green) */
         .qcPill--green {
-          background: rgba(36, 199, 104, 0.1);
-          border-color: rgba(36, 199, 104, 0.3);
-          color: #166534;
+          background: rgba(34, 197, 94, 0.12);
+          border-color: rgba(34, 197, 94, 0.3);
+          color: rgba(22, 163, 74, 1);
+        }
+
+        /* ✅ ГОЛУБОЙ — как в ovrachax (blue) */
+        .qcPill--blue {
+          background: rgba(59, 130, 246, 0.12);
+          border-color: rgba(59, 130, 246, 0.3);
+          color: rgba(37, 99, 235, 1);
         }
 
         .qcPill--gray {
@@ -312,13 +321,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: rgba(15, 23, 42, 0.7);
         }
 
-        .qcPill--red {
-          background: rgba(239, 68, 68, 0.1);
-          border-color: rgba(239, 68, 68, 0.26);
-          color: #991b1b;
-        }
-
-        /* ✅ ТОЛЬКО ШРИФТ (как doconline-spec) */
         .qcDoctorText {
           font-size: 12px;
           font-weight: 600;
@@ -331,7 +333,6 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           min-width: 0;
         }
 
-        /* ✅ ТОЛЬКО ШРИФТ (как doconline-bottom) */
         .qcTime {
           justify-self: end;
           white-space: nowrap;
