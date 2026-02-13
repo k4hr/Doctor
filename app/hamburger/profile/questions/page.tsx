@@ -1,4 +1,4 @@
-/* path: app/hamburger/questions/page.tsx */
+/* path: app/hamburger/profile/questions/page.tsx */
 'use client';
 
 import TopBarBack from '../../../../components/TopBarBack';
