@@ -1,7 +1,7 @@
 /* path: app/vopros/[id]/QuestionHeaderActions.tsx */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 function haptic(type: 'light' | 'medium' = 'light') {
@@ -36,7 +36,45 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const actionLabel = useMemo(() => (isAuthor ? 'Редактировать' : 'Жалоба'), [isAuthor]);
+  const [canEdit, setCanEdit] = useState(false);
+  const [editLoaded, setEditLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      if (!isAuthor) {
+        setEditLoaded(true);
+        setCanEdit(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/question/edit-info?id=${encodeURIComponent(questionId)}`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        const j = await res.json().catch(() => ({} as any));
+        if (!alive) return;
+
+        setCanEdit(!!j?.ok && !!j?.canEdit);
+        setEditLoaded(true);
+      } catch {
+        if (!alive) return;
+        setCanEdit(false);
+        setEditLoaded(true);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [isAuthor, questionId]);
+
+  const actionLabel = useMemo(() => {
+    if (isAuthor) return canEdit ? 'Редактировать' : 'Редактирование недоступно';
+    return 'Жалоба';
+  }, [isAuthor, canEdit]);
 
   const onToggle = () => {
     haptic('light');
@@ -59,6 +97,10 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
     setOpen(false);
 
     if (isAuthor) {
+      if (!canEdit) {
+        tgAlert('Редактирование недоступно (уже использовано/есть ответы/вопрос закрыт).');
+        return;
+      }
       router.push(`/vopros/${encodeURIComponent(questionId)}/edit`);
       return;
     }
@@ -82,7 +124,13 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
           <>
             <button type="button" className="qhOverlay" onClick={() => setOpen(false)} aria-label="Закрыть меню" />
             <div className="qhMenu" role="menu" aria-label="Действия">
-              <button type="button" className="qhMenuItem" onClick={onAction} role="menuitem">
+              <button
+                type="button"
+                className={'qhMenuItem ' + (isAuthor && editLoaded && !canEdit ? 'qhMenuItem--disabled' : '')}
+                onClick={onAction}
+                role="menuitem"
+                disabled={isAuthor && editLoaded && !canEdit}
+              >
                 {actionLabel}
               </button>
             </div>
@@ -159,7 +207,7 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
           right: 0;
           top: calc(100% + 8px);
           z-index: 1000;
-          min-width: 160px;
+          min-width: 200px;
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: rgba(255, 255, 255, 0.98);
@@ -182,6 +230,11 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
 
         .qhMenuItem:active {
           background: rgba(15, 23, 42, 0.05);
+        }
+
+        .qhMenuItem--disabled {
+          color: rgba(15, 23, 42, 0.35);
+          cursor: default;
         }
       `}</style>
     </div>
