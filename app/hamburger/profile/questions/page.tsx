@@ -11,6 +11,11 @@ type MyQuestionItem = {
   speciality: string;
   createdAt: string; // ISO
   isClosed: boolean;
+
+  // опционально (если потом добавишь в /api/question/my)
+  isFree?: boolean | null;
+  priceRub?: number | null;
+  answersCount?: number | null;
 };
 
 type ApiOk = { ok: true; items: MyQuestionItem[] };
@@ -31,25 +36,60 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-function fmtDateRu(dIso: string) {
-  try {
-    const d = new Date(dIso);
-    if (!Number.isFinite(d.getTime())) return '—';
-    return new Intl.DateTimeFormat('ru-RU', {
-      timeZone: 'Europe/Moscow',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(d);
-  } catch {
-    return '—';
-  }
-}
-
 function clip(s: any, n: number) {
   const t = String(s ?? '').trim();
   if (t.length <= n) return t;
   return t.slice(0, n - 1).trimEnd() + '…';
+}
+
+function timeAgoRu(input: string) {
+  const d = new Date(input);
+  const ts = d.getTime();
+  if (!Number.isFinite(ts)) return '—';
+
+  const diff = Date.now() - ts;
+  const sec = Math.max(0, Math.floor(diff / 1000));
+  if (sec < 60) return 'только что';
+
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} мин назад`;
+
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} ч назад`;
+
+  const days = Math.floor(hr / 24);
+  if (days === 1) return '1 день назад';
+  if (days >= 2 && days <= 4) return `${days} дня назад`;
+  return `${days} дней назад`;
+}
+
+function answersSuffix(cnt: number) {
+  const n = Math.max(0, Math.trunc(cnt));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return '';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'а';
+  return 'ов';
+}
+
+function priceLabel(q: MyQuestionItem) {
+  const isFree = q.isFree === true;
+  const price = typeof q.priceRub === 'number' ? q.priceRub : null;
+
+  if (isFree) return { text: 'Бесплатно', tone: 'free' as const };
+  if (price && Number.isFinite(price) && price > 0) return { text: `${Math.round(price)} ₽`, tone: 'paid' as const };
+
+  // если API не отдаёт цену — просто прячем плашку
+  return null;
+}
+
+function statusLabel(q: MyQuestionItem) {
+  if (q.isClosed) return { text: 'Вопрос закрыт', tone: 'green' as const };
+
+  const cnt = typeof q.answersCount === 'number' && Number.isFinite(q.answersCount) ? Math.max(0, q.answersCount) : 0;
+  if (cnt > 0) return { text: `${cnt} ответ${answersSuffix(cnt)}`, tone: 'blue' as const };
+
+  return { text: 'Ждёт ответа', tone: 'gray' as const };
 }
 
 export default function HamburgerQuestionsPage() {
@@ -105,8 +145,8 @@ export default function HamburgerQuestionsPage() {
     <main className="p">
       <TopBarBack />
 
-      <h1 className="t">Вопросы</h1>
-      <p className="s">Актуальные и архив</p>
+      <h1 className="t">Мои вопросы</h1>
+      <p className="s">Здесь находятся актуальные вопросы и архив</p>
 
       <div className="seg" role="tablist" aria-label="Переключатель списка вопросов">
         <button
@@ -148,27 +188,46 @@ export default function HamburgerQuestionsPage() {
         </div>
       ) : (
         <div className="list" aria-label="Список вопросов">
-          {filtered.map((q) => (
-            <button key={q.id} type="button" className="q" onClick={() => goQuestion(q.id)}>
-              <div className="qTop">
-                <span className={'badge ' + (q.isClosed ? 'badge--closed' : 'badge--open')}>
-                  {q.isClosed ? 'Закрыт' : 'Открыт'}
-                </span>
-                <span className="date">{fmtDateRu(q.createdAt)}</span>
-              </div>
+          {filtered.map((q) => {
+            const pr = priceLabel(q);
+            const st = statusLabel(q);
 
-              <div className="title" title={String(q.title || '')}>
-                {clip(q.title, 86)}
-              </div>
+            return (
+              <button key={q.id} type="button" className="qc" onClick={() => goQuestion(q.id)}>
+                <div className="top">
+                  <div className="title" title={String(q.title || '')}>
+                    {clip(q.title, 70)}
+                  </div>
 
-              <div className="meta">
-                <span className="spec" title={String(q.speciality || '')}>
-                  {q.speciality || '—'}
-                </span>
-                <span className="arrow">›</span>
-              </div>
-            </button>
-          ))}
+                  <div className="pills">
+                    {pr ? (
+                      <span className={'pill ' + (pr.tone === 'paid' ? 'pill--paid' : 'pill--free')}>{pr.text}</span>
+                    ) : null}
+
+                    <span
+                      className={
+                        'pill ' +
+                        (st.tone === 'green'
+                          ? 'pill--green'
+                          : st.tone === 'blue'
+                          ? 'pill--blue'
+                          : 'pill--gray')
+                      }
+                    >
+                      {st.text}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bottom">
+                  <div className="spec" title={String(q.speciality || '')}>
+                    {q.speciality || '—'}
+                  </div>
+                  <div className="time">{timeAgoRu(q.createdAt)}</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -241,84 +300,129 @@ export default function HamburgerQuestionsPage() {
         .list {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 12px;
         }
-        .q {
+
+        /* Карточка как на скрине (без "Вопрос от ...") */
+        .qc {
           width: 100%;
           text-align: left;
-          border-radius: 18px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.92);
-          padding: 12px;
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           touch-action: manipulation;
-          display: grid;
-          gap: 8px;
+
+          border: 1px solid rgba(10, 12, 20, 0.08);
+          background: rgba(255, 255, 255, 0.96);
+          border-radius: 18px;
+
+          padding: 12px 12px 10px;
+
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.07);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+
+          overflow: hidden;
         }
-        .q:active {
-          transform: scale(0.99);
-          opacity: 0.96;
+        .qc:active {
+          transform: translateY(1px);
+          box-shadow: 0 6px 18px rgba(18, 28, 45, 0.11);
         }
 
-        .qTop {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+        .top {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: start;
           gap: 10px;
-        }
-        .badge {
-          font-size: 11px;
-          font-weight: 950;
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          white-space: nowrap;
-        }
-        .badge--open {
-          background: rgba(59, 130, 246, 0.1);
-          color: #1e40af;
-        }
-        .badge--closed {
-          background: rgba(109, 40, 217, 0.1);
-          color: #6d28d9;
-        }
-        .date {
-          font-size: 11px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.55);
-          white-space: nowrap;
+          min-width: 0;
         }
 
         .title {
-          font-size: 14px;
-          font-weight: 950;
-          color: #111827;
-          line-height: 1.25;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .meta {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        .spec {
-          font-size: 12px;
-          font-weight: 850;
-          color: rgba(15, 23, 42, 0.72);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .arrow {
+          margin: 0;
           font-size: 18px;
           font-weight: 950;
-          color: rgba(15, 23, 42, 0.35);
+          color: #064e3b; /* тёмно-зелёный как на скрине */
+          letter-spacing: -0.01em;
+          line-height: 1.12;
+
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          min-width: 0;
+        }
+
+        .pills {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+          flex: 0 0 auto;
+        }
+
+        .pill {
+          font-size: 12px;
+          font-weight: 900;
+          padding: 7px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          white-space: nowrap;
           line-height: 1;
+        }
+
+        .pill--free {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.1);
+          color: rgba(15, 23, 42, 0.72);
+        }
+        .pill--paid {
+          background: rgba(245, 158, 11, 0.12);
+          border-color: rgba(245, 158, 11, 0.28);
+          color: #92400e;
+        }
+
+        .pill--green {
+          background: rgba(34, 197, 94, 0.12);
+          border-color: rgba(34, 197, 94, 0.28);
+          color: #16a34a;
+        }
+        .pill--blue {
+          background: rgba(59, 130, 246, 0.12);
+          border-color: rgba(59, 130, 246, 0.28);
+          color: #2563eb;
+        }
+        .pill--gray {
+          background: rgba(15, 23, 42, 0.04);
+          border-color: rgba(15, 23, 42, 0.12);
+          color: rgba(15, 23, 42, 0.72);
+        }
+
+        .bottom {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          align-items: end;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .spec {
+          font-size: 14px;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.72);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+
+        .time {
+          font-size: 14px;
+          font-weight: 900;
+          color: rgba(15, 23, 42, 0.55);
+          white-space: nowrap;
         }
       `}</style>
     </main>
