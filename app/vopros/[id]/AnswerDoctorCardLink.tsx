@@ -13,16 +13,14 @@ function haptic(type: 'light' | 'medium' = 'light') {
 type Props = {
   doctor: DoctorCardItem;
   href: string;
-  ratingLabel?: string;
 };
 
-export default function AnswerDoctorCardLink({ doctor, href, ratingLabel = '5.0' }: Props) {
+export default function AnswerDoctorCardLink({ doctor, href }: Props) {
   const router = useRouter();
 
   return (
     <DoctorCard
       doctor={doctor}
-      ratingLabel={ratingLabel}
       onClick={() => {
         haptic('light');
         if (!href || href === '#') return;
