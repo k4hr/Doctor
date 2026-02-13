@@ -177,6 +177,10 @@ model Question {
 
   keywords String[] @default([])
 
+  // ✅ Редактирование (1 раз): счетчик + дата последнего редактирования
+  editCount Int      @default(0)
+  editedAt  DateTime?
+
   // ✅ ПЛАТНОСТЬ ВОПРОСА
   isFree   Boolean @default(true)
   priceRub Int     @default(0)
