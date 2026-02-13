@@ -163,11 +163,16 @@ function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardI
     speciality3: d?.speciality3 ? String(d.speciality3).trim() : null,
     experienceYears: typeof d?.experienceYears === 'number' ? d.experienceYears : null,
     avatarUrl: avatarUrl ?? null,
-  };
-}
 
-function safeRatingLabel(_d: any) {
-  return '5.0';
+    // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬНО, иначе DoctorCard не сможет посчитать рейтинг
+    ratingSum: typeof d?.ratingSum === 'number' ? d.ratingSum : d?.ratingSum != null ? Number(d.ratingSum) : null,
+    ratingCount:
+      typeof d?.ratingCount === 'number' ? d.ratingCount : d?.ratingCount != null ? Number(d.ratingCount) : null,
+
+    // если когда-нибудь начнёшь отдавать готовый avg — тоже поддержим
+    ratingValue:
+      typeof d?.ratingValue === 'number' ? d.ratingValue : d?.ratingValue != null ? Number(d.ratingValue) : null,
+  };
 }
 
 function norm(s: any) {
@@ -219,6 +224,62 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     );
   }
 
+  // ✅ ВАЖНО: Prisma include выше тащит doctor целиком, но без агрегатов ratingSum/ratingCount,
+  // если они не выбраны. Поэтому ниже мы ДОЗАПРАШИВАЕМ ответы корректно через отдельный findUnique?
+  //
+  // Проще и надежнее: вместо include:doctor выше, делаем include с select.
+  // Но раз ты просишь минимум изменений — делаем второй запрос на answers с нужными полями врача.
+
+  const q2 = await prisma.question.findUnique({
+    where: { id },
+    include: {
+      files: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+      close: true,
+      answers: {
+        where: { isDeleted: false },
+        orderBy: [{ createdAt: 'asc' }],
+        include: {
+          doctor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              middleName: true,
+              city: true,
+              speciality1: true,
+              speciality2: true,
+              speciality3: true,
+              experienceYears: true,
+              profilephotourl: true,
+              profilephotocrop: true,
+
+              // ✅ рейтинг агрегаты
+              ratingSum: true,
+              ratingCount: true,
+
+              // файлы (аватар)
+              files: {
+                where: { kind: DoctorFileKind.PROFILE_PHOTO },
+                orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                take: 1,
+                select: { url: true },
+              },
+            },
+          },
+          comments: {
+            where: { isDeleted: false },
+            orderBy: [{ createdAt: 'asc' }],
+            include: {
+              authorDoctor: { select: { id: true, lastName: true, firstName: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const qFinal = q2 || q;
+
   const botToken = envClean('TELEGRAM_BOT_TOKEN');
   const initData = cookies().get('tg_init_data')?.value || '';
   const tgId = botToken && initData ? verifyAndExtractTelegramId(initData, botToken) : null;
@@ -237,19 +298,19 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     : null;
 
   const isApprovedDoctor = !!viewerDoctor && viewerDoctor.status === DoctorStatus.APPROVED;
-  const isAuthor = !!tgId && String(q.authorTelegramId) === String(tgId);
+  const isAuthor = !!tgId && String(qFinal.authorTelegramId) === String(tgId);
 
-  const qSpec = norm(q.speciality);
+  const qSpec = norm(qFinal.speciality);
   const doctorSpecs = new Set(
     [viewerDoctor?.speciality1, viewerDoctor?.speciality2, viewerDoctor?.speciality3].map(norm).filter(Boolean)
   );
 
   const doctorCanAnswerBySpec = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
 
-  const answers = Array.isArray((q as any).answers) ? ((q as any).answers as any[]) : [];
+  const answers = Array.isArray((qFinal as any).answers) ? ((qFinal as any).answers as any[]) : [];
   const alreadyAnsweredByMe = !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
 
-  const isClosed = !!q.close;
+  const isClosed = !!qFinal.close;
 
   const canAnswer =
     !!tgId &&
@@ -262,20 +323,20 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
   const doctorCanSeeByAssignment =
-    isApprovedDoctor && viewerDoctor?.id && q.assignedDoctorId
-      ? String(q.assignedDoctorId) === String(viewerDoctor.id)
+    isApprovedDoctor && viewerDoctor?.id && (qFinal as any).assignedDoctorId
+      ? String((qFinal as any).assignedDoctorId) === String(viewerDoctor.id)
       : false;
 
   const canSeePhotos = isAuthor || doctorCanSeeByCategory || doctorCanSeeByAssignment;
 
-  const photoUrls = q.files
+  const photoUrls = qFinal.files
     .filter((f) => String(f.kind) === 'PHOTO')
     .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
     .map((f) => toPublicUrlMaybe(f.url))
     .filter(Boolean) as string[];
 
-  const priceLabel = priceBadgeLabel(q as any);
-  const authorText = authorLabelFromQuestion(q as any);
+  const priceLabel = priceBadgeLabel(qFinal as any);
+  const authorText = authorLabelFromQuestion(qFinal as any);
 
   const cardStyle: React.CSSProperties = {
     width: '100%',
@@ -298,8 +359,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
       <h1 style={{ marginTop: 8, marginBottom: 10 }}>Вопрос</h1>
 
-      {/* ✅ actions (Закрыть / ⋯) */}
-      <QuestionHeaderActions questionId={String(q.id)} isAuthor={!!isAuthor} />
+      <QuestionHeaderActions questionId={String(qFinal.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
@@ -349,23 +409,56 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
             ...wrapText,
           }}
         >
-          {show(q.title)}
+          {show((qFinal as any).title)}
         </div>
 
-        <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(11,12,16,0.82)', whiteSpace: 'pre-wrap', ...wrapText }}>
-          {show(q.body)}
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: 'rgba(11,12,16,0.82)',
+            whiteSpace: 'pre-wrap',
+            ...wrapText,
+          }}
+        >
+          {show((qFinal as any).body)}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(15,23,42,0.78)', ...wrapText, flex: '1 1 auto', minWidth: 0 }}>
-            {show(q.speciality)}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 10,
+            flexWrap: 'wrap',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: 'rgba(15,23,42,0.78)',
+              ...wrapText,
+              flex: '1 1 auto',
+              minWidth: 0,
+            }}
+          >
+            {show((qFinal as any).speciality)}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(15,23,42,0.55)', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
-            {fmtDateTimeRuMsk(q.createdAt)}
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'rgba(15,23,42,0.55)',
+              whiteSpace: 'nowrap',
+              flex: '0 0 auto',
+            }}
+          >
+            {fmtDateTimeRuMsk((qFinal as any).createdAt)}
           </div>
         </div>
 
-        {/* ✅ статус закрытия */}
         <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span
             style={{
@@ -384,7 +477,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
           {isClosed ? (
             <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.60)' }}>
-              Закрыт: {fmtDateTimeRuMsk((q.close as any)?.createdAt)}
+              Закрыт: {fmtDateTimeRuMsk((qFinal as any)?.close?.createdAt)}
             </span>
           ) : null}
         </div>
@@ -420,12 +513,11 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {/* ✅ Ответы врачей */}
       <div style={{ marginTop: 14 }}>
         <h2 style={{ margin: '10px 0 10px', fontSize: 16, fontWeight: 950 }}>Ответы врачей</h2>
 
         <AnswerCreate
-          questionId={String(q.id)}
+          questionId={String(qFinal.id)}
           canAnswer={!!canAnswer}
           reason={
             isClosed
@@ -468,9 +560,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                 toPublicUrlMaybe(d?.files?.[0]?.url || null) || toPublicUrlMaybe(d?.profilephotourl || null);
 
               const doctorCard = doctorCardItemFromDoctor(d, profileUrl);
-              const ratingLabel = safeRatingLabel(d);
 
-              // ✅ Комментировать: автор ИЛИ врач, который оставил этот ответ
               const canDoctorComment =
                 isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
@@ -498,9 +588,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
                   }}
                 >
-                  {/* ✅ кликабельная карточка врача — через Client wrapper */}
                   <div style={{ padding: 12, paddingBottom: 0 }}>
-                    <AnswerDoctorCardLink doctor={doctorCard} href={doctorHref} ratingLabel={ratingLabel} />
+                    {/* ✅ ratingLabel НЕ передаём: DoctorCard сам возьмёт из doctorCard.ratingSum/count */}
+                    <AnswerDoctorCardLink doctor={doctorCard} href={doctorHref} />
                   </div>
 
                   <div style={{ padding: 12 }}>
@@ -508,7 +598,15 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                       {fmtDateTimeRuMsk(a.createdAt)}
                     </div>
 
-                    <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(11,12,16,0.86)', whiteSpace: 'pre-wrap', ...wrapText }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        lineHeight: 1.55,
+                        color: 'rgba(11,12,16,0.86)',
+                        whiteSpace: 'pre-wrap',
+                        ...wrapText,
+                      }}
+                    >
                       {show(a.body)}
                     </div>
 
