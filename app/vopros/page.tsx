@@ -111,6 +111,7 @@ function buildAuthorLabel(authorIsAnonymous: boolean, user: TgUser | null): stri
 }
 
 const MAX_PHOTOS = 10;
+const MAX_TITLE_LEN = 30;
 
 function clampFiles(files: FileList | null | undefined, max: number): File[] {
   if (!files || files.length === 0) return [];
@@ -178,6 +179,7 @@ export default function VoprosPage() {
   const validate = () => {
     if (!speciality) return 'Выберите раздел медицины.';
     if (title.trim().length < 6) return 'Заголовок слишком короткий (минимум 6 символов).';
+    if (title.trim().length > MAX_TITLE_LEN) return `Заголовок слишком длинный (максимум ${MAX_TITLE_LEN} символов).`;
     if (body.trim().length < 50) return 'Опишите вопрос подробнее (минимум 50 символов).';
     if (photos.length > MAX_PHOTOS) return `Можно загрузить максимум ${MAX_PHOTOS} фото.`;
     return '';
@@ -403,9 +405,11 @@ export default function VoprosPage() {
               placeholder="Краткий заголовок вопроса"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              maxLength={140}
+              maxLength={MAX_TITLE_LEN}
             />
-            <p className="field-hint">Например: «Что делать, если морозит и чувствуется слабость?»</p>
+            <p className="field-hint">
+              Максимум {MAX_TITLE_LEN} символов. Сейчас: {title.trim().length}
+            </p>
           </label>
 
           <label className="field">
