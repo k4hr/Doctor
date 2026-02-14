@@ -27,6 +27,31 @@ function tgAlert(msg: string) {
   alert(msg);
 }
 
+/* cookie helpers */
+function setCookie(name: string, value: string, days = 3) {
+  try {
+    const maxAge = days * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  } catch {}
+}
+function getCookie(name: string): string {
+  try {
+    const rows = document.cookie ? document.cookie.split('; ') : [];
+    for (const row of rows) {
+      const [k, ...rest] = row.split('=');
+      if (decodeURIComponent(k) === name) return decodeURIComponent(rest.join('='));
+    }
+  } catch {}
+  return '';
+}
+function getInitDataFromCookie(): string {
+  return getCookie('tg_init_data');
+}
+function getInitDataNow(): string {
+  const idata = String(tg()?.initData || '').trim();
+  return idata || getInitDataFromCookie();
+}
+
 type CreateOk = { ok: true; consultationId: string; priceRub: number };
 type CreateErr = { ok: false; error: string; hint?: string };
 type CreateResp = CreateOk | CreateErr;
@@ -39,7 +64,7 @@ type SubmitOk = { ok: true };
 type SubmitErr = { ok: false; error: string; hint?: string };
 type SubmitResp = SubmitOk | SubmitErr;
 
-export default function ConsultationsStartPage() {
+export default function ConsultationsClient() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -57,6 +82,12 @@ export default function ConsultationsStartPage() {
     try {
       tg()?.ready?.();
       tg()?.expand?.();
+    } catch {}
+
+    // Сохраняем initData в cookie, чтобы потом не зависеть от момента
+    try {
+      const idata = String(tg()?.initData || '').trim();
+      if (idata) setCookie('tg_init_data', idata, 3);
     } catch {}
   }, []);
 
@@ -110,12 +141,24 @@ export default function ConsultationsStartPage() {
       return;
     }
 
+    const initData = getInitDataNow();
+    if (!initData) {
+      setWarn('Нет initData из Telegram. Открой мини-апп из Telegram и попробуй ещё раз.');
+      return;
+    }
+
     setLoading(true);
     try {
-      // 1) create draft
+      const authHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Telegram-Init-Data': initData,
+        'X-Init-Data': initData,
+      };
+
+      // 1) create draft (тут у тебя и был 403)
       const r1 = await fetch('/api/consultation/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ doctorId, problemText: txt }),
       });
 
@@ -131,12 +174,6 @@ export default function ConsultationsStartPage() {
 
       // 2) upload photos (optional)
       if (files.length) {
-        const initData = String(tg()?.initData || '').trim();
-        if (!initData) {
-          setWarn('Нет initData из Telegram для загрузки фото.');
-          return;
-        }
-
         const fd = new FormData();
         fd.set('initData', initData);
         fd.set('consultationId', cid);
@@ -151,10 +188,10 @@ export default function ConsultationsStartPage() {
         }
       }
 
-      // 3) submit
+      // 3) submit (тоже лучше авторизовать тем же initData)
       const r3 = await fetch('/api/consultation/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ consultationId: cid }),
       });
 
@@ -166,7 +203,7 @@ export default function ConsultationsStartPage() {
       }
 
       tgAlert('Заявка отправлена врачу.');
-      router.replace('/hamburger/profile'); // дальше решишь куда вести пациента
+      router.replace('/hamburger/profile');
     } catch (e: any) {
       setWarn(String(e?.message || 'Сеть/сервер недоступны'));
     } finally {
