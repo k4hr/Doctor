@@ -7,6 +7,13 @@ import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+type TgUser = {
+  id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
 function envClean(name: string) {
   return String(process.env[name] ?? '').replace(/[\r\n]/g, '').trim();
 }
@@ -22,40 +29,55 @@ function timingSafeEqualHex(a: string, b: string) {
   }
 }
 
-function verifyAndExtractTelegramId(initData: string, botToken: string): string | null {
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    if (!hash) return null;
+function verifyTelegramWebAppInitData(initData: string, botToken: string, maxAgeSec = 60 * 60 * 24) {
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) return { ok: false as const, error: 'NO_HASH' as const };
 
-    params.delete('hash');
+  const authDateStr = params.get('auth_date');
+  if (!authDateStr) return { ok: false as const, error: 'NO_AUTH_DATE' as const };
 
-    const dcs = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
+  const authDate = Number(authDateStr);
+  if (!Number.isFinite(authDate)) return { ok: false as const, error: 'BAD_AUTH_DATE' as const };
 
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
-    const computedHash = crypto.createHmac('sha256', secretKey).update(dcs).digest('hex');
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (authDate > nowSec + 60) return { ok: false as const, error: 'AUTH_DATE_IN_FUTURE' as const };
+  if (nowSec - authDate > maxAgeSec) return { ok: false as const, error: 'INITDATA_EXPIRED' as const };
 
-    if (!timingSafeEqualHex(computedHash, hash)) return null;
+  params.delete('hash');
 
-    const userStr = params.get('user');
-    if (!userStr) return null;
-    const user = JSON.parse(userStr);
-    if (!user?.id) return null;
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n');
 
-    return String(user.id);
-  } catch {
-    return null;
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  if (!timingSafeEqualHex(computedHash, hash)) {
+    return { ok: false as const, error: 'BAD_HASH' as const };
   }
-}
 
-function getTgIdFromCookies(): string | null {
-  const botToken = envClean('TELEGRAM_BOT_TOKEN');
-  const initData = cookies().get('tg_init_data')?.value || '';
-  if (!botToken || !initData) return null;
-  return verifyAndExtractTelegramId(initData, botToken);
+  const userStr = params.get('user');
+  if (!userStr) return { ok: false as const, error: 'NO_USER' as const };
+
+  let userJson: any;
+  try {
+    userJson = JSON.parse(userStr);
+  } catch {
+    return { ok: false as const, error: 'BAD_USER_JSON' as const };
+  }
+
+  if (!userJson?.id) return { ok: false as const, error: 'NO_USER_ID' as const };
+
+  const user: TgUser = {
+    id: String(userJson.id),
+    username: userJson.username ? String(userJson.username) : null,
+    first_name: userJson.first_name ? String(userJson.first_name) : null,
+    last_name: userJson.last_name ? String(userJson.last_name) : null,
+  };
+
+  return { ok: true as const, user };
 }
 
 function clampText(s: any, max = 4000) {
@@ -64,10 +86,36 @@ function clampText(s: any, max = 4000) {
   return t.slice(0, max);
 }
 
+function pickInitData(req: Request) {
+  // 1) headers (как в клиенте)
+  const h1 = String(req.headers.get('x-telegram-init-data') || '').trim();
+  if (h1) return h1;
+
+  const h2 = String(req.headers.get('x-init-data') || '').trim();
+  if (h2) return h2;
+
+  // 2) cookie (fallback)
+  const c = cookies().get('tg_init_data')?.value || '';
+  return String(c || '').trim();
+}
+
 export async function POST(req: Request) {
   try {
-    const tgId = getTgIdFromCookies();
-    if (!tgId) return NextResponse.json({ ok: false, error: 'Открой из Telegram.' }, { status: 401 });
+    const botToken = envClean('TELEGRAM_BOT_TOKEN');
+    if (!botToken) return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
+
+    const initData = pickInitData(req);
+    if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
+
+    const v = verifyTelegramWebAppInitData(initData, botToken);
+    if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
+
+    // обновим cookie, чтобы дальше работали запросы “по куке”
+    try {
+      cookies().set('tg_init_data', initData, { path: '/', maxAge: 60 * 60 * 24 * 3, sameSite: 'lax' });
+    } catch {}
+
+    const tgId = String(v.user.id);
 
     const body = await req.json().catch(() => ({} as any));
     const doctorId = String(body?.doctorId ?? '').trim();
@@ -82,14 +130,18 @@ export async function POST(req: Request) {
     });
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
-    if (!doctor.consultationEnabled) return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
+
+    // вот это и даёт тебе красное CONSULTATIONS_DISABLED на скрине
+    if (!doctor.consultationEnabled) {
+      return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
+    }
 
     const price = Math.max(0, Math.round(Number(doctor.consultationPriceRub ?? 1000)));
 
     const c = await prisma.consultation.create({
       data: {
         doctorId: doctor.id,
-        authorTelegramId: String(tgId),
+        authorTelegramId: tgId,
         authorIsAnonymous: true,
         body: problemText,
         priceRub: price,
@@ -98,7 +150,10 @@ export async function POST(req: Request) {
       select: { id: true, priceRub: true },
     });
 
-    return NextResponse.json({ ok: true, consultationId: c.id, priceRub: c.priceRub }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { ok: true, consultationId: c.id, priceRub: c.priceRub },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (e: any) {
     console.error(e);
     return NextResponse.json({ ok: false, error: 'FAILED_CREATE', hint: String(e?.message || 'See logs') }, { status: 500 });
