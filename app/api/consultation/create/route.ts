@@ -85,6 +85,20 @@ function clampText(s: any, max = 4000) {
   return t.slice(0, max);
 }
 
+function isProActive(proUntil: Date | null) {
+  if (!proUntil) return false;
+  const t = proUntil.getTime();
+  if (!Number.isFinite(t)) return false;
+  return t > Date.now();
+}
+
+function clampPriceRub(v: any) {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return 1000;
+  // врач задаёт цену, но минимум 1000
+  return Math.max(1000, n);
+}
+
 export async function POST(req: Request) {
   try {
     const botToken = envClean('TELEGRAM_BOT_TOKEN');
@@ -111,28 +125,45 @@ export async function POST(req: Request) {
 
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
-      select: { id: true, consultationEnabled: true, consultationPriceRub: true, status: true },
+      select: {
+        id: true,
+        status: true,
+
+        proUntil: true,
+
+        consultationEnabled: true,
+        consultationPriceRub: true,
+      },
     });
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
 
-    // если хочешь ограничить только APPROVED — раскомментируй:
+    // (опционально) только APPROVED
     // if (doctor.status !== 'APPROVED') return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_APPROVED' }, { status: 403 });
 
+    // ✅ PRO обязателен, иначе консультации создавать нельзя
+    if (!isProActive(doctor.proUntil)) {
+      return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_PRO' }, { status: 403 });
+    }
+
+    // ✅ врач может выключить приём консультаций
     if (!doctor.consultationEnabled) {
       return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
     }
 
-    const price = Math.max(0, Math.round(Number(doctor.consultationPriceRub ?? 1000)));
+    // ✅ врач назначает цену, но минимум 1000
+    const price = clampPriceRub(doctor.consultationPriceRub);
 
     const c = await prisma.consultation.create({
       data: {
         doctorId: doctor.id,
+
         authorTelegramId: tgId,
         authorUsername: v.user.username,
         authorFirstName: v.user.first_name,
         authorLastName: v.user.last_name,
         authorIsAnonymous: true,
+
         body: problemText,
         priceRub: price,
         status: 'DRAFT',
@@ -146,7 +177,10 @@ export async function POST(req: Request) {
     );
   } catch (e: any) {
     console.error(e);
-    return NextResponse.json({ ok: false, error: 'FAILED_CREATE', hint: String(e?.message || 'See logs') }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: 'FAILED_CREATE', hint: String(e?.message || 'See logs') },
+      { status: 500 }
+    );
   }
 }
 
