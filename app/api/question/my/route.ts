@@ -74,7 +74,22 @@ export async function GET() {
         speciality: true,
         createdAt: true,
         status: true,
+
+        // ✅ цена — чтобы не было "Платно" на пустом месте
+        isFree: true,
+        priceRub: true,
+
+        // ✅ закрытие (как было)
         close: { select: { id: true } },
+
+        // ✅ СКОЛЬКО ОТВЕТОВ (только не удалённые)
+        _count: {
+          select: {
+            answers: {
+              where: { isDeleted: false },
+            },
+          },
+        },
       },
       take: 300,
     });
@@ -83,19 +98,30 @@ export async function GET() {
       const isClosed =
         !!q.close || String(q.status) === String(QuestionStatus.DONE) || String(q.status) === 'DONE';
 
+      const answersCount = Number(q?._count?.answers ?? 0);
+
+      const isFree = q?.isFree === true;
+      const priceRubRaw = q?.priceRub;
+      const priceRub =
+        typeof priceRubRaw === 'number' && Number.isFinite(priceRubRaw) ? Math.max(0, Math.round(priceRubRaw)) : 0;
+
       return {
         id: String(q.id),
         title: String(q.title || ''),
         speciality: String(q.speciality || ''),
         createdAt: q.createdAt instanceof Date ? q.createdAt.toISOString() : new Date(q.createdAt).toISOString(),
+
+        // ✅ то, что нужно странице/карточке
         isClosed,
+        answersCount,
+
+        // ✅ то, что нужно чтобы правильно рисовалась "Бесплатно/₽"
+        isFree,
+        priceRub,
       };
     });
 
-    return NextResponse.json(
-      { ok: true, items },
-      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
-    );
+    return NextResponse.json({ ok: true, items }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
