@@ -20,10 +20,10 @@ function tgAlert(msg: string) {
 type Plan = 'M1' | 'M3' | 'M6' | 'Y1';
 
 const PLANS: { id: Plan; label: string; months: number; priceRub: number }[] = [
-  { id: 'M1', label: '1 месяц', months: 1, priceRub: 199 },
-  { id: 'M3', label: '3 месяца', months: 3, priceRub: 499 },
-  { id: 'M6', label: '6 месяцев', months: 6, priceRub: 899 },
-  { id: 'Y1', label: '12 месяцев', months: 12, priceRub: 1499 },
+  { id: 'M1', label: '1 мес.', months: 1, priceRub: 199 },
+  { id: 'M3', label: '3 мес.', months: 3, priceRub: 499 },
+  { id: 'M6', label: '6 мес.', months: 6, priceRub: 899 },
+  { id: 'Y1', label: '12 мес.', months: 12, priceRub: 1499 },
 ];
 
 const FEATURES: { good?: boolean; text: string }[] = [
