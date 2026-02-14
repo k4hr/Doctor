@@ -81,6 +81,18 @@ type ReviewsOk = {
 type ReviewsErr = { ok: false; error: string; hint?: string };
 type ReviewsResponse = ReviewsOk | ReviewsErr;
 
+/** PRO gate from settings endpoint */
+type GateOk = {
+  ok: true;
+  proActive: boolean;
+  consultationEnabled: boolean;
+  consultationPriceRub: number;
+  thanksEnabled: boolean;
+  proUntil: string | null;
+};
+type GateErr = { ok: false; error: string; hint?: string };
+type GateResp = GateOk | GateErr;
+
 function fullName(d: PublicDoctorDto | null) {
   const a = String(d?.lastName ?? '').trim();
   const b = String(d?.firstName ?? '').trim();
@@ -196,6 +208,13 @@ export default function DoctorPublicProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
+  // ✅ gate (PRO)
+  const [gateLoading, setGateLoading] = useState(true);
+  const [proActive, setProActive] = useState(false);
+  const [consultationEnabled, setConsultationEnabled] = useState(false);
+  const [consultationPriceRub, setConsultationPriceRub] = useState<number>(1000);
+  const [thanksEnabled, setThanksEnabled] = useState(false);
+
   useEffect(() => {
     const WebApp: any = (window as any)?.Telegram?.WebApp;
     try {
@@ -245,6 +264,54 @@ export default function DoctorPublicProfilePage() {
       }
     })();
   }, [doctorId]);
+
+  // ✅ грузим gate (PRO) — именно он решает, показывать ли кнопки
+  useEffect(() => {
+    (async () => {
+      try {
+        setGateLoading(true);
+
+        // initData может не быть (если открыли не из телеги) — тогда считаем, что PRO нет и прячем кнопки
+        if (!doctorId || !initData) {
+          setProActive(false);
+          setConsultationEnabled(false);
+          setConsultationPriceRub(1000);
+          setThanksEnabled(false);
+          return;
+        }
+
+        const r = await fetch('/api/doctor/consultations/settings', {
+          method: 'GET',
+          headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
+          cache: 'no-store',
+        });
+
+        const j = (await r.json().catch(() => null)) as GateResp | null;
+
+        if (!r.ok || !j || (j as any).ok !== true) {
+          setProActive(false);
+          setConsultationEnabled(false);
+          setConsultationPriceRub(1000);
+          setThanksEnabled(false);
+          return;
+        }
+
+        const ok = j as GateOk;
+        setProActive(Boolean(ok.proActive));
+        setConsultationEnabled(Boolean(ok.consultationEnabled));
+        setConsultationPriceRub(Math.max(1000, Math.round(Number(ok.consultationPriceRub || 1000))));
+        setThanksEnabled(Boolean(ok.thanksEnabled));
+      } catch (e) {
+        console.error(e);
+        setProActive(false);
+        setConsultationEnabled(false);
+        setConsultationPriceRub(1000);
+        setThanksEnabled(false);
+      } finally {
+        setGateLoading(false);
+      }
+    })();
+  }, [doctorId, initData]);
 
   // грузим отзывы
   useEffect(() => {
@@ -315,9 +382,10 @@ export default function DoctorPublicProfilePage() {
   function onThanks() {
     haptic('light');
     if (!doctorId) return;
-    // если страницы ещё нет — просто сделай её позже, кнопка уже будет стоять красиво
     router.push(`/thanks?doctorId=${encodeURIComponent(doctorId)}`);
   }
+
+  const showActions = !gateLoading && proActive; // ✅ прячем полностью, если PRO нет
 
   return (
     <main className="page">
@@ -366,15 +434,51 @@ export default function DoctorPublicProfilePage() {
         </div>
       </section>
 
-      {/* ✅ две кнопки в одну строку: после stats и перед tabs */}
-      <section className="actions" aria-label="Действия">
-        <button type="button" className="btn btnPrimary" onClick={onConsultation}>
-          Консультация
-        </button>
-        <button type="button" className="btn btnSecondary" onClick={onThanks}>
-          Благодарность
-        </button>
-      </section>
+      {/* ✅ Кнопки ТОЛЬКО если PRO активен */}
+      {showActions ? (
+        <section className="actions" aria-label="Действия">
+          <button
+            type="button"
+            className={'actionBtn actionBtn--consult ' + (!consultationEnabled ? 'actionBtn--disabled' : '')}
+            onClick={onConsultation}
+            disabled={!consultationEnabled}
+          >
+            <span className="ic" aria-hidden="true">
+              💬
+            </span>
+            <span className="tx">
+              <span className="txT">Консультация</span>
+              <span className="txS">
+                {consultationEnabled ? (
+                  <>
+                    от <b>{Math.max(1000, consultationPriceRub)} ₽</b>
+                  </>
+                ) : (
+                  <>временно выключено</>
+                )}
+              </span>
+            </span>
+            <span className="go" aria-hidden="true">
+              →
+            </span>
+          </button>
+
+          {thanksEnabled ? (
+            <button type="button" className="actionBtn actionBtn--thanks" onClick={onThanks}>
+              <span className="ic" aria-hidden="true">
+                ❤️
+              </span>
+              <span className="tx">
+                <span className="txT">Благодарность</span>
+                <span className="txS">поддержать врача деньгами</span>
+              </span>
+              <span className="go" aria-hidden="true">
+                →
+              </span>
+            </button>
+          ) : null}
+        </section>
+      ) : null}
 
       {warn ? <p className="warn">{warn}</p> : null}
       {loading ? <p className="muted">Загрузка…</p> : null}
@@ -579,35 +683,107 @@ export default function DoctorPublicProfilePage() {
           justify-self: center;
         }
 
-        /* ✅ ACTION BUTTONS */
+        /* ✅ ACTIONS (sexy buttons) */
         .actions {
           margin-top: 10px;
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr;
           gap: 10px;
         }
 
-        .btn {
-          border-radius: 16px;
-          padding: 14px 12px;
-          font-size: 15px;
-          font-weight: 950;
+        .actionBtn {
+          width: 100%;
+          border: 1px solid rgba(15, 23, 42, 0.10);
+          border-radius: 18px;
+          padding: 12px 12px;
+          background: rgba(255, 255, 255, 0.92);
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          border: 1px solid rgba(15, 23, 42, 0.12);
+          display: grid;
+          grid-template-columns: 34px 1fr 20px;
+          align-items: center;
+          gap: 10px;
+
+          box-shadow: 0 12px 26px rgba(18, 28, 45, 0.08);
+          transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
         }
 
-        .btnPrimary {
-          border: none;
-          color: #fff;
-          background: #24c768;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.28);
+        .actionBtn:active {
+          transform: translateY(1px) scale(0.995);
+          box-shadow: 0 8px 18px rgba(18, 28, 45, 0.12);
         }
 
-        .btnSecondary {
-          color: rgba(17, 24, 39, 0.86);
-          background: rgba(255, 255, 255, 0.92);
-          box-shadow: 0 10px 20px rgba(18, 28, 45, 0.06);
+        .ic {
+          width: 34px;
+          height: 34px;
+          border-radius: 14px;
+          display: grid;
+          place-items: center;
+          font-size: 18px;
+          font-weight: 900;
+          background: rgba(17, 24, 39, 0.06);
+          border: 1px solid rgba(17, 24, 39, 0.08);
+        }
+
+        .tx {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+          text-align: left;
+        }
+
+        .txT {
+          font-size: 15px;
+          font-weight: 950;
+          color: #111827;
+          letter-spacing: -0.01em;
+        }
+
+        .txS {
+          font-size: 12px;
+          font-weight: 850;
+          color: rgba(17, 24, 39, 0.55);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .go {
+          justify-self: end;
+          font-size: 18px;
+          font-weight: 950;
+          color: rgba(17, 24, 39, 0.35);
+        }
+
+        .actionBtn--consult {
+          background: linear-gradient(135deg, rgba(36, 199, 104, 0.18), rgba(255, 255, 255, 0.92));
+          border-color: rgba(36, 199, 104, 0.20);
+        }
+        .actionBtn--consult .ic {
+          background: rgba(36, 199, 104, 0.14);
+          border-color: rgba(36, 199, 104, 0.20);
+        }
+
+        .actionBtn--thanks {
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(255, 255, 255, 0.92));
+          border-color: rgba(239, 68, 68, 0.18);
+        }
+        .actionBtn--thanks .ic {
+          background: rgba(239, 68, 68, 0.10);
+          border-color: rgba(239, 68, 68, 0.18);
+        }
+
+        .actionBtn--disabled {
+          filter: grayscale(0.2);
+        }
+
+        .actionBtn:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+        .actionBtn:disabled:active {
+          transform: none;
         }
 
         .warn {
