@@ -110,11 +110,6 @@ export default function ProBuyCard() {
                 >
                   <div className="pro-plan-top">
                     <span className="pro-plan-label">{p.label}</span>
-
-                    {/* ✅ фиксируем место под тег, чтобы все карточки были одинаковой высоты */}
-                    <span className={`pro-plan-tag ${p.id === 'Y1' ? 'is-show' : 'is-hide'}`}>
-                      выгодно
-                    </span>
                   </div>
 
                   <div className="pro-plan-price">{p.priceRub} ₽</div>
@@ -191,16 +186,18 @@ export default function ProBuyCard() {
 
         .pro-feature {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 10px;
           font-size: 14px;
           color: #374151;
+          line-height: 1.35;
         }
 
         .feat-icon {
           font-size: 16px;
           width: 20px;
           text-align: center;
+          margin-top: 1px;
         }
 
         .feat-icon.yes {
@@ -218,7 +215,6 @@ export default function ProBuyCard() {
           gap: 10px;
         }
 
-        /* ✅ одинаковые квадратики */
         .pro-plan {
           border-radius: 16px;
           border: 1px solid rgba(15, 23, 42, 0.08);
@@ -227,13 +223,11 @@ export default function ProBuyCard() {
           text-align: left;
           cursor: pointer;
           box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
-
           width: 100%;
-          min-height: 66px; /* фиксируем высоту, чтобы все были одинаковые */
+          min-height: 70px; /* чуть выше, чтобы 12 месяцев влезал без троеточий */
           display: grid;
           align-content: start;
           gap: 4px;
-
           -webkit-tap-highlight-color: transparent;
         }
 
@@ -248,57 +242,30 @@ export default function ProBuyCard() {
           background: rgba(255, 255, 255, 0.9);
         }
 
-        /* ✅ одинаковая “шапка” у всех */
         .pro-plan-top {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          align-items: center;
-          gap: 8px;
-          min-height: 18px; /* фиксируем строку под тег */
           min-width: 0;
         }
 
-        /* ✅ одинаковые шрифты */
+        /* ✅ без троеточий: даём 2 строки и чуть уменьшаем */
         .pro-plan-label {
-          font-size: 13px;
-          font-weight: 800;
+          font-size: 12px;
+          font-weight: 900;
           color: #111827;
+          line-height: 1.15;
 
-          min-width: 0;
+          white-space: normal;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .pro-plan-tag {
-          font-size: 11px;
-          font-weight: 800;
-          padding: 2px 8px;
-          border-radius: 999px;
-          border: 1px solid rgba(217, 119, 6, 0.75);
-          color: #b45309;
-          background: rgba(254, 243, 199, 0.9);
-          white-space: nowrap;
-
-          /* фиксируем “габарит” тега, даже когда скрыт */
-          height: 18px;
-          display: inline-flex;
-          align-items: center;
-        }
-
-        .pro-plan-tag.is-hide {
-          visibility: hidden; /* место остаётся => все карточки одинаковые */
-        }
-
-        .pro-plan-tag.is-show {
-          visibility: visible;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
         }
 
         .pro-plan-price {
-          font-size: 14px;
-          font-weight: 900;
+          font-size: 15px;
+          font-weight: 950;
           color: #111827;
-          line-height: 1.2;
+          line-height: 1.15;
+          white-space: nowrap;
         }
 
         .pro-bottom {
@@ -314,6 +281,7 @@ export default function ProBuyCard() {
           align-items: baseline;
           gap: 6px;
           min-width: 0;
+          flex: 1;
         }
 
         .pro-price-big {
@@ -323,13 +291,19 @@ export default function ProBuyCard() {
           white-space: nowrap;
         }
 
+        /* ✅ тут и было “меся…”
+           уменьшаем шрифт и убираем ellipsis, чтобы влезало */
         .pro-price-small {
-          font-size: 13px;
-          font-weight: 700;
+          font-size: 12px;
+          font-weight: 800;
           color: rgba(55, 65, 81, 0.85);
+
+          white-space: normal;
           overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          line-height: 1.15;
         }
 
         .pro-buy {
@@ -343,6 +317,7 @@ export default function ProBuyCard() {
           background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
           box-shadow: 0 10px 18px rgba(217, 119, 6, 0.25);
           min-width: 140px;
+          flex: 0 0 auto;
         }
 
         .pro-buy:disabled {
@@ -356,6 +331,17 @@ export default function ProBuyCard() {
           font-weight: 600;
           color: rgba(55, 65, 81, 0.8);
           text-align: center;
+        }
+
+        /* супер маленькие экраны: ещё чуть ужмём “/ срок” */
+        @media (max-width: 360px) {
+          .pro-price-small {
+            font-size: 11px;
+          }
+          .pro-buy {
+            min-width: 132px;
+            padding: 12px 12px;
+          }
         }
       `}</style>
     </>
