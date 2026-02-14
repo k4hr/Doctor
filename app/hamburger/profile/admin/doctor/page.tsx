@@ -34,6 +34,11 @@ export default function AdminDoctorPage() {
           <span className="item-title">Все врачи</span>
           <span className="item-sub">Поиск, фильтры, статусы</span>
         </button>
+
+        <button type="button" className="item pro" onClick={() => go('/hamburger/profile/admin/doctor/pro')}>
+          <span className="item-title">Выдать PRO</span>
+          <span className="item-sub">Открыть консультации врачу (и управление сроком)</span>
+        </button>
       </section>
 
       <section className="ideas">
@@ -103,6 +108,12 @@ export default function AdminDoctorPage() {
           color: #6b7280;
           line-height: 1.25;
         }
+
+        .item.pro {
+          border: 1px solid rgba(109, 40, 217, 0.35);
+          background: rgba(109, 40, 217, 0.06);
+        }
+
         .ideas {
           margin-top: 14px;
           background: #fff;
