@@ -31,13 +31,11 @@ enum QuestionFileKind {
   PHOTO
 }
 
-// Кто написал комментарий под ответом
 enum AnswerCommentAuthorType {
   USER
   DOCTOR
 }
 
-// ✅ Финансы врача
 enum DoctorTxType {
   IN
   OUT
@@ -68,10 +66,10 @@ enum QuestionCloseStatus {
 // ===========================
 
 enum DoctorProPlan {
-  M1 // 1 месяц
-  M3 // 3 месяца
-  M6 // 6 месяцев
-  Y1 // 12 месяцев
+  M1
+  M3
+  M6
+  Y1
 }
 
 enum DoctorProStatus {
@@ -92,18 +90,14 @@ model DoctorProSubscription {
   status DoctorProStatus @default(ACTIVE)
   plan   DoctorProPlan
 
-  // ✅ период действия
   startsAt DateTime @default(now())
   endsAt   DateTime
 
-  // ✅ цена на момент покупки (фиксируем)
   priceRub Int @default(199)
 
-  // ✅ платеж/провайдер (на будущее)
-  provider  String?  // "yookassa" | "cloudpayments" | "telegram" ...
-  paymentId String?  @unique
+  provider  String?
+  paymentId String? @unique
 
-  // ✅ служебное
   canceledAt DateTime?
   meta       Json? @db.Json
 
@@ -111,6 +105,27 @@ model DoctorProSubscription {
   @@index([doctorId, status])
   @@index([status])
   @@index([endsAt])
+}
+
+// ===========================
+// ✅ Консультации (чат)
+// ===========================
+
+enum ConsultationStatus {
+  DRAFT
+  PENDING
+  ACCEPTED
+  DECLINED
+  CLOSED
+}
+
+enum ConsultationFileKind {
+  PHOTO
+}
+
+enum ConsultationMessageAuthorType {
+  USER
+  DOCTOR
 }
 
 model Doctor {
@@ -153,10 +168,8 @@ model Doctor {
   achievements      String?
   publications      String?
 
-  // ✅ ручной онлайн/оффлайн
   isOnline Boolean @default(false) @map("isonline")
 
-  // ✅ фото профиля
   profilephotourl  String?
   profilephotocrop Json? @db.Json
 
@@ -168,21 +181,24 @@ model Doctor {
   answers        Answer[]
   answerComments AnswerComment[]
 
-  // ✅ Рейтинг (агрегаты по отзывам)
   ratingSum   Int @default(0)
   ratingCount Int @default(0)
 
-  // ✅ Отзывы о враче
   reviews DoctorReview[]
 
-  // ✅ Финансы
   wallet       DoctorWallet?
   transactions DoctorTransaction[]
   payouts      DoctorPayoutRequest[]
 
-  // ✅ ВРАЧ.PRO: активная подписка "срезом" для быстрого UI/фильтров
-  proUntil DateTime? // если null или < now() => не PRO
+  proUntil DateTime?
   proSubs  DoctorProSubscription[]
+
+  // ✅ Консультации: настройка доступности и цены
+  consultationEnabled  Boolean @default(false)
+  consultationPriceRub Int     @default(1000)
+
+  // ✅ Консультации: связи
+  consultations Consultation[]
 
   @@index([status])
   @@index([speciality1])
@@ -190,6 +206,7 @@ model Doctor {
   @@index([submittedAt])
   @@index([isOnline])
   @@index([proUntil])
+  @@index([consultationEnabled])
 }
 
 model DoctorFile {
@@ -224,17 +241,14 @@ model Question {
   authorIsAnonymous Boolean @default(true) @map("authorisanonymous")
 
   speciality String
-
-  title String
-  body  String
+  title      String
+  body       String
 
   keywords String[] @default([])
 
-  // ✅ Редактирование (1 раз): счетчик + дата последнего редактирования
   editCount Int       @default(0)
   editedAt  DateTime?
 
-  // ✅ ПЛАТНОСТЬ ВОПРОСА
   isFree   Boolean @default(true)
   priceRub Int     @default(0)
 
@@ -267,16 +281,11 @@ model QuestionClose {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   authorTelegramId String
+  status           QuestionCloseStatus @default(CREATED)
 
-  status QuestionCloseStatus @default(CREATED)
-
-  // выбранные врачи (до 3)
   selectedDoctorIds String[] @default([])
 
-  // сколько было распределено (0 для бесплатных)
-  totalRub Int @default(0)
-
-  // сколько получит каждый (для UI)
+  totalRub     Int @default(0)
   perDoctorRub Int @default(0)
 
   @@index([questionId])
@@ -313,8 +322,7 @@ model Answer {
   doctorId String
   doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
-  body String
-
+  body      String
   isDeleted Boolean @default(false)
 
   comments AnswerComment[]
@@ -340,8 +348,7 @@ model AnswerComment {
   authorDoctor   Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
 
   authorTelegramId String?
-
-  body String
+  body             String
 
   isDeleted Boolean @default(false)
 
@@ -361,7 +368,6 @@ model DoctorReview {
 
   authorTelegramId String
 
-  // ✅ анонимность отзыва
   isAnonymous Boolean @default(true) @map("isanonymous")
 
   rating Int
@@ -381,7 +387,6 @@ model DoctorReview {
   @@index([questionId])
   @@index([answerId])
 
-  // ✅ защита от дублей
   @@unique([doctorId, authorTelegramId, questionId])
   @@unique([doctorId, authorTelegramId, answerId])
 }
@@ -436,10 +441,90 @@ model DoctorPayoutRequest {
   status    DoctorPayoutStatus @default(PENDING)
 
   details Json?
-
   transaction DoctorTransaction?
 
   @@index([doctorId])
   @@index([doctorId, createdAt])
   @@index([doctorId, status, createdAt])
+}
+
+// ===========================
+// ✅ Консультации (новые таблицы)
+// ===========================
+
+model Consultation {
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  doctorId String
+  doctor   Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  // пациент (как у Question)
+  authorTelegramId  String
+  authorUsername    String?
+  authorFirstName   String?
+  authorLastName    String?
+  authorIsAnonymous Boolean @default(true) @map("consult_authorisanonymous")
+
+  // текст проблемы
+  body String
+
+  // цена консультации фиксируем на момент создания
+  priceRub Int @default(1000)
+
+  status ConsultationStatus @default(DRAFT)
+
+  files    ConsultationFile[]
+  messages ConsultationMessage[]
+
+  @@index([doctorId])
+  @@index([authorTelegramId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([doctorId, status, createdAt])
+  @@index([authorTelegramId, status, createdAt])
+}
+
+model ConsultationFile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  consultationId String
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  kind      ConsultationFileKind
+  url       String
+  mime      String?
+  sizeBytes Int?
+  sortOrder Int @default(0)
+
+  @@index([consultationId])
+  @@index([kind])
+  @@index([consultationId, kind])
+  @@index([consultationId, kind, sortOrder])
+}
+
+model ConsultationMessage {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consultationId String
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  authorType ConsultationMessageAuthorType
+
+  authorDoctorId String?
+  authorDoctor   Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
+
+  authorTelegramId String?
+  body             String
+
+  isDeleted Boolean @default(false)
+
+  @@index([consultationId])
+  @@index([authorDoctorId])
+  @@index([authorTelegramId])
+  @@index([consultationId, createdAt])
 }
