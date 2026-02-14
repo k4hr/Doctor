@@ -231,3 +231,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'UPLOAD_FAILED', hint: String(e?.message || 'See server logs') }, { status: 500 });
   }
 }
+
+// чтобы GET не светился 405 в логах
+export async function GET() {
+  return NextResponse.json({ ok: false, error: 'METHOD_NOT_ALLOWED', allow: ['POST'] }, { status: 405 });
+}
