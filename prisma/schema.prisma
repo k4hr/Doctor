@@ -128,6 +128,18 @@ enum ConsultationMessageAuthorType {
   DOCTOR
 }
 
+// ===========================
+// ✅ Благодарности (tips)
+// ===========================
+
+enum ThanksStatus {
+  DRAFT
+  PENDING
+  PAID
+  FAILED
+  CANCELED
+}
+
 model Doctor {
   id          String       @id @default(cuid())
   createdAt   DateTime     @default(now())
@@ -197,8 +209,14 @@ model Doctor {
   consultationEnabled  Boolean @default(false)
   consultationPriceRub Int     @default(1000)
 
+  // ✅ Благодарности: включено/выключено (доступно только при активной PRO, но флаг храним)
+  thanksEnabled Boolean @default(false)
+
   // ✅ Консультации: заявки к врачу
   consultations Consultation[]
+
+  // ✅ Благодарности: донаты врачу
+  thanks Thanks[]
 
   // ✅ Консультации: сообщения, где автор = этот врач (обратная сторона relation)
   consultationMessages ConsultationMessage[] @relation("ConsultationMessageAuthorDoctor")
@@ -210,6 +228,7 @@ model Doctor {
   @@index([isOnline])
   @@index([proUntil])
   @@index([consultationEnabled])
+  @@index([thanksEnabled])
 }
 
 model DoctorFile {
@@ -530,4 +549,37 @@ model ConsultationMessage {
   @@index([authorDoctorId])
   @@index([authorTelegramId])
   @@index([consultationId, createdAt])
+}
+
+// ===========================
+// ✅ Благодарности (tips)
+// ===========================
+
+model Thanks {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorId String
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  authorTelegramId  String
+  authorUsername    String?
+  authorFirstName   String?
+  authorLastName    String?
+  authorIsAnonymous Boolean @default(true) @map("thanks_authorisanonymous")
+
+  amountRub Int
+  message   String?
+
+  status ThanksStatus @default(DRAFT)
+
+  provider  String?
+  paymentId String? @unique
+  meta      Json?   @db.Json
+
+  @@index([doctorId])
+  @@index([doctorId, createdAt])
+  @@index([authorTelegramId])
+  @@index([status])
 }
