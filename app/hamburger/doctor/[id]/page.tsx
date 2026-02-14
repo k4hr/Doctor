@@ -173,7 +173,7 @@ function Stars({ value }: { value: number }) {
 }
 
 export default function DoctorPublicProfilePage() {
-  const router = useRouter(); // оставил, вдруг используешь дальше на странице
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const sp = useSearchParams();
 
@@ -306,6 +306,19 @@ export default function DoctorPublicProfilePage() {
     return Math.max(0, Math.min(5, v));
   }, [ratingAvg]);
 
+  function onConsultation() {
+    haptic('medium');
+    if (!doctorId) return;
+    router.push(`/consultations?doctorId=${encodeURIComponent(doctorId)}`);
+  }
+
+  function onThanks() {
+    haptic('light');
+    if (!doctorId) return;
+    // если страницы ещё нет — просто сделай её позже, кнопка уже будет стоять красиво
+    router.push(`/thanks?doctorId=${encodeURIComponent(doctorId)}`);
+  }
+
   return (
     <main className="page">
       <TopBarBack />
@@ -351,6 +364,16 @@ export default function DoctorPublicProfilePage() {
           <div className="statVal">{formatInt(ratingCount)}</div>
           <div className="statLab">отзывов</div>
         </div>
+      </section>
+
+      {/* ✅ две кнопки в одну строку: после stats и перед tabs */}
+      <section className="actions" aria-label="Действия">
+        <button type="button" className="btn btnPrimary" onClick={onConsultation}>
+          Консультация
+        </button>
+        <button type="button" className="btn btnSecondary" onClick={onThanks}>
+          Благодарность
+        </button>
       </section>
 
       {warn ? <p className="warn">{warn}</p> : null}
@@ -554,6 +577,37 @@ export default function DoctorPublicProfilePage() {
           height: 26px;
           background: rgba(17, 24, 39, 0.12);
           justify-self: center;
+        }
+
+        /* ✅ ACTION BUTTONS */
+        .actions {
+          margin-top: 10px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        .btn {
+          border-radius: 16px;
+          padding: 14px 12px;
+          font-size: 15px;
+          font-weight: 950;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+        }
+
+        .btnPrimary {
+          border: none;
+          color: #fff;
+          background: #24c768;
+          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.28);
+        }
+
+        .btnSecondary {
+          color: rgba(17, 24, 39, 0.86);
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 10px 20px rgba(18, 28, 45, 0.06);
         }
 
         .warn {
