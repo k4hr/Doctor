@@ -197,8 +197,11 @@ model Doctor {
   consultationEnabled  Boolean @default(false)
   consultationPriceRub Int     @default(1000)
 
-  // ✅ Консультации: связи
+  // ✅ Консультации: заявки к врачу
   consultations Consultation[]
+
+  // ✅ Консультации: сообщения, где автор = этот врач (обратная сторона relation)
+  consultationMessages ConsultationMessage[] @relation("ConsultationMessageAuthorDoctor")
 
   @@index([status])
   @@index([speciality1])
@@ -440,7 +443,7 @@ model DoctorPayoutRequest {
   amountRub Int
   status    DoctorPayoutStatus @default(PENDING)
 
-  details Json?
+  details     Json?
   transaction DoctorTransaction?
 
   @@index([doctorId])
@@ -453,12 +456,12 @@ model DoctorPayoutRequest {
 // ===========================
 
 model Consultation {
-  id        String             @id @default(cuid())
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   doctorId String
-  doctor   Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  doctor   Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 
   // пациент (как у Question)
   authorTelegramId  String
@@ -516,7 +519,7 @@ model ConsultationMessage {
   authorType ConsultationMessageAuthorType
 
   authorDoctorId String?
-  authorDoctor   Doctor? @relation(fields: [authorDoctorId], references: [id], onDelete: Cascade)
+  authorDoctor   Doctor? @relation("ConsultationMessageAuthorDoctor", fields: [authorDoctorId], references: [id], onDelete: Cascade)
 
   authorTelegramId String?
   body             String
