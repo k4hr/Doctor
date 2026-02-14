@@ -1,7 +1,6 @@
 /* path: app/api/consultation/create/route.ts */
-import crypto from 'crypto';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -86,52 +85,40 @@ function clampText(s: any, max = 4000) {
   return t.slice(0, max);
 }
 
-function pickInitData(req: Request) {
-  // 1) headers (как в клиенте)
-  const h1 = String(req.headers.get('x-telegram-init-data') || '').trim();
-  if (h1) return h1;
-
-  const h2 = String(req.headers.get('x-init-data') || '').trim();
-  if (h2) return h2;
-
-  // 2) cookie (fallback)
-  const c = cookies().get('tg_init_data')?.value || '';
-  return String(c || '').trim();
-}
-
 export async function POST(req: Request) {
   try {
     const botToken = envClean('TELEGRAM_BOT_TOKEN');
     if (!botToken) return NextResponse.json({ ok: false, error: 'NO_BOT_TOKEN' }, { status: 500 });
 
-    const initData = pickInitData(req);
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ ok: false, error: 'BAD_JSON' }, { status: 400 });
+    }
+
+    const initData = typeof (body as any).initData === 'string' ? String((body as any).initData).trim() : '';
     if (!initData) return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
 
     const v = verifyTelegramWebAppInitData(initData, botToken);
     if (!v.ok) return NextResponse.json({ ok: false, error: v.error }, { status: 401 });
 
-    // обновим cookie, чтобы дальше работали запросы “по куке”
-    try {
-      cookies().set('tg_init_data', initData, { path: '/', maxAge: 60 * 60 * 24 * 3, sameSite: 'lax' });
-    } catch {}
-
     const tgId = String(v.user.id);
 
-    const body = await req.json().catch(() => ({} as any));
-    const doctorId = String(body?.doctorId ?? '').trim();
-    const problemText = clampText(body?.problemText, 4000);
+    const doctorId = String((body as any).doctorId ?? '').trim();
+    const problemText = clampText((body as any).problemText, 4000);
 
     if (!doctorId) return NextResponse.json({ ok: false, error: 'NO_DOCTOR' }, { status: 400 });
     if (problemText.length < 10) return NextResponse.json({ ok: false, error: 'TOO_SHORT' }, { status: 400 });
 
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
-      select: { id: true, consultationEnabled: true, consultationPriceRub: true },
+      select: { id: true, consultationEnabled: true, consultationPriceRub: true, status: true },
     });
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
 
-    // вот это и даёт тебе красное CONSULTATIONS_DISABLED на скрине
+    // если хочешь ограничить только APPROVED — раскомментируй:
+    // if (doctor.status !== 'APPROVED') return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_APPROVED' }, { status: 403 });
+
     if (!doctor.consultationEnabled) {
       return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
     }
@@ -142,6 +129,9 @@ export async function POST(req: Request) {
       data: {
         doctorId: doctor.id,
         authorTelegramId: tgId,
+        authorUsername: v.user.username,
+        authorFirstName: v.user.first_name,
+        authorLastName: v.user.last_name,
         authorIsAnonymous: true,
         body: problemText,
         priceRub: price,
@@ -159,3 +149,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'FAILED_CREATE', hint: String(e?.message || 'See logs') }, { status: 500 });
   }
 }
+
+export const GET = POST;
