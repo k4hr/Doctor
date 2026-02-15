@@ -78,18 +78,17 @@ function addMonths(d: Date, months: number) {
   const day = x.getDate();
   x.setMonth(x.getMonth() + months);
 
-  // защита от “перепрыгивания” на следующий месяц
   if (x.getDate() < day) {
     x.setDate(0);
   }
   return x;
 }
 
-function computeEndsAt(now: Date, plan: Plan) {
-  if (plan === 'M1') return addMonths(now, 1);
-  if (plan === 'M3') return addMonths(now, 3);
-  if (plan === 'M6') return addMonths(now, 6);
-  return addMonths(now, 12);
+function computeEndsAt(from: Date, plan: Plan) {
+  if (plan === 'M1') return addMonths(from, 1);
+  if (plan === 'M3') return addMonths(from, 3);
+  if (plan === 'M6') return addMonths(from, 6);
+  return addMonths(from, 12);
 }
 
 function cleanPlan(v: any): Plan {
@@ -122,23 +121,29 @@ export async function POST(req: NextRequest) {
     const plan = cleanPlan((body as any).plan);
 
     const now = new Date();
-    const endsAt = computeEndsAt(now, plan);
 
+    // ✅ FIX: продление, а не наложение
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
-      select: { id: true },
+      select: { id: true, proUntil: true },
     });
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
 
+    const base =
+      doctor.proUntil && doctor.proUntil.getTime() > now.getTime()
+        ? new Date(doctor.proUntil.getTime())
+        : now;
+
+    const endsAt = computeEndsAt(base, plan);
+
     await prisma.$transaction(async (tx) => {
-      // 1) подписка-история (админская выдача)
       await tx.doctorProSubscription.create({
         data: {
           doctorId: doctorId,
           status: 'ACTIVE',
           plan: plan,
-          startsAt: now,
+          startsAt: base,
           endsAt: endsAt,
           priceRub: 0,
           provider: 'ADMIN',
@@ -146,12 +151,13 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 2) “быстрый флаг” на Doctor + открываем консультации
+      // ✅ PRO => открываем консультации и благодарности + ставим новый proUntil
       await tx.doctor.update({
         where: { id: doctorId },
         data: {
           proUntil: endsAt,
           consultationEnabled: true,
+          thanksEnabled: true,
         },
       });
     });
