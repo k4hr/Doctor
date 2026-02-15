@@ -75,39 +75,48 @@ export async function POST(req: NextRequest) {
     const { months, priceRub } = PLAN_META[plan];
 
     // ✅ если PRO уже есть и ещё не истёк — продлеваем от текущего proUntil, иначе от now
-    const baseStart = doctor.proUntil && new Date(doctor.proUntil).getTime() > now.getTime()
-      ? new Date(doctor.proUntil)
-      : now;
+    const baseStart =
+      doctor.proUntil && new Date(doctor.proUntil).getTime() > now.getTime()
+        ? new Date(doctor.proUntil)
+        : now;
 
     const startsAt = now; // момент покупки/активации (лог)
     const endsAt = addMonths(baseStart, months);
 
-    // ✅ создаём запись подписки (пока без реального платежа — считаем активной)
-    const sub = await prisma.doctorProSubscription.create({
-      data: {
-        doctorId: doctor.id,
-        plan,
-        status: 'ACTIVE',
-        startsAt,
-        endsAt,
-        priceRub,
-        provider: 'stub',
-        paymentId: `stub_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        meta: {
-          note: 'stub payment - replace with real provider later',
-          telegramId,
+    const sub = await prisma.$transaction(async (tx) => {
+      // ✅ создаём запись подписки
+      const created = await tx.doctorProSubscription.create({
+        data: {
+          doctorId: doctor.id,
           plan,
+          status: 'ACTIVE',
+          startsAt,
+          endsAt,
           priceRub,
-          months,
+          provider: 'stub',
+          paymentId: `stub_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          meta: {
+            note: 'stub payment - replace with real provider later',
+            telegramId,
+            plan,
+            priceRub,
+            months,
+          },
         },
-      },
-      select: { id: true, endsAt: true, status: true, plan: true },
-    });
+        select: { id: true, endsAt: true, status: true, plan: true },
+      });
 
-    // ✅ обновляем быстрый срез в Doctor
-    await prisma.doctor.update({
-      where: { id: doctor.id },
-      data: { proUntil: sub.endsAt },
+      // ✅ PRO => открываем консультации и благодарности + обновляем быстрый срез proUntil
+      await tx.doctor.update({
+        where: { id: doctor.id },
+        data: {
+          proUntil: created.endsAt,
+          consultationEnabled: true,
+          thanksEnabled: true,
+        },
+      });
+
+      return created;
     });
 
     // Заглушка на "успешную оплату" (потом будет ссылка провайдера)
