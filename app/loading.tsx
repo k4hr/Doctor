@@ -4,20 +4,35 @@
 import { useEffect, useState } from 'react';
 import FullScreenLoader from '@/components/Loading/FullScreenLoader';
 
-function pickSplash() {
-  if (typeof window === 'undefined') return '/splash/doctor-9x16.jpg';
-  return window.innerWidth >= 900 ? '/splash/doctor-16x9.jpg' : '/splash/doctor-9x16.jpg';
+function pick() {
+  if (typeof window === 'undefined') {
+    return {
+      mobile: '/splash/doctor-9x16.jpg',
+      desktop: '/splash/doctor-16x9.jpg',
+    };
+  }
+  return window.innerWidth >= 900
+    ? { mobile: '/splash/doctor-9x16.jpg', desktop: '/splash/doctor-16x9.jpg' }
+    : { mobile: '/splash/doctor-9x16.jpg', desktop: '/splash/doctor-16x9.jpg' };
 }
 
 export default function Loading() {
-  const [bgUrl, setBgUrl] = useState<string>(() => pickSplash());
+  const [bg, setBg] = useState(() => pick());
 
   useEffect(() => {
-    const onResize = () => setBgUrl(pickSplash());
+    const onResize = () => setBg(pick());
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  return <FullScreenLoader bgUrl={bgUrl} spinnerSize={70} spinnerXPercent={50} spinnerYPercent={72} />;
+  return (
+    <FullScreenLoader
+      bgMobileUrl={bg.mobile}
+      bgDesktopUrl={bg.desktop}
+      spinnerSize={70}
+      spinnerXPercent={50}
+      spinnerYPercent={72}
+    />
+  );
 }
