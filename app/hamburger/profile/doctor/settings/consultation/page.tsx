@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../../../../components/TopBarBack';
+import ConsultationCard, { type ConsultationCardData } from './Card';
 
 function tg(): any | null {
   try {
@@ -34,7 +35,7 @@ type Item = {
   priceRub: number;
   patientTelegramId: string;
   problemSnippet: string;
-  coverUrl: string | null;
+  coverUrl: string | null; // больше не используем в UI, но пусть приходит как раньше
 };
 
 type ApiOk = { ok: true; items: Item[] };
@@ -56,27 +57,6 @@ type SaveOk = { ok: true; consultationEnabled: boolean; consultationPriceRub: nu
 type SaveErr = { ok: false; error: string; hint?: string };
 type SaveResp = SaveOk | SaveErr;
 
-function timeAgoRu(input: string) {
-  const d = new Date(input);
-  const ts = d.getTime();
-  if (!Number.isFinite(ts)) return '—';
-
-  const diff = Date.now() - ts;
-  const sec = Math.max(0, Math.floor(diff / 1000));
-  if (sec < 60) return 'только что';
-
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} мин назад`;
-
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ч назад`;
-
-  const days = Math.floor(hr / 24);
-  if (days === 1) return '1 день назад';
-  if (days >= 2 && days <= 4) return `${days} дня назад`;
-  return `${days} дней назад`;
-}
-
 function fmtDateRu(iso: string) {
   try {
     const dt = new Date(iso);
@@ -94,10 +74,19 @@ function clampPriceInput(v: string) {
   return Math.max(1000, n);
 }
 
+type UiTab = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+type UiStatus = 'DRAFT' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CLOSED';
+
+function normalizeStatus(s: any): UiStatus {
+  const v = String(s || '').toUpperCase().trim();
+  if (v === 'DRAFT' || v === 'PENDING' || v === 'ACCEPTED' || v === 'DECLINED' || v === 'CLOSED') return v as UiStatus;
+  return 'PENDING';
+}
+
 export default function DoctorConsultationsPage() {
   const router = useRouter();
 
-  const [tab, setTab] = useState<'PENDING' | 'ACCEPTED' | 'DECLINED'>('PENDING');
+  const [tab, setTab] = useState<UiTab>('PENDING');
   const [loading, setLoading] = useState(true);
   const [warn, setWarn] = useState('');
   const [items, setItems] = useState<Item[]>([]);
@@ -189,12 +178,18 @@ export default function DoctorConsultationsPage() {
     })();
   }, []);
 
-  const filtered = useMemo(() => items.filter((x) => String(x.status) === tab), [items, tab]);
+  const filtered = useMemo(() => items.filter((x) => normalizeStatus(x.status) === tab), [items, tab]);
 
-  const open = (id: string) => {
-    haptic('light');
-    router.push(`/hamburger/profile/doctor/settings/consultation/${encodeURIComponent(id)}`);
-  };
+  const uiCards: ConsultationCardData[] = useMemo(() => {
+    return filtered.map((c) => ({
+      id: c.id,
+      status: normalizeStatus(c.status),
+      createdAt: c.createdAt,
+      priceRub: Number(c.priceRub || 0),
+      bodySnippet: String(c.problemSnippet || '').trim(),
+      priceBadge: 'PAID',
+    }));
+  }, [filtered]);
 
   async function saveSettings() {
     haptic('medium');
@@ -346,34 +341,14 @@ export default function DoctorConsultationsPage() {
         <div className="card">
           <div className="muted">Загрузка…</div>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : uiCards.length === 0 ? (
         <div className="card">
           <div className="muted">Пока пусто.</div>
         </div>
       ) : (
         <div className="list" aria-label="Список консультаций">
-          {filtered.map((c) => (
-            <button key={c.id} type="button" className="it" onClick={() => open(c.id)}>
-              <div className="left">
-                <div className="topRow">
-                  <span className={'st ' + (tab === 'PENDING' ? 'st--wait' : tab === 'ACCEPTED' ? 'st--ok' : 'st--no')}>
-                    {tab === 'PENDING' ? 'Ожидает решения' : tab === 'ACCEPTED' ? 'Принята' : 'Отказана'}
-                  </span>
-                  <span className="time">{timeAgoRu(c.createdAt)}</span>
-                </div>
-                <div className="txt">{c.problemSnippet || '—'}</div>
-                <div className="meta">
-                  Цена: <b>{Math.round(Number(c.priceRub || 0))} ₽</b>
-                </div>
-              </div>
-
-              {c.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="ph" src={c.coverUrl} alt="" />
-              ) : (
-                <div className="ph ph--empty">фото</div>
-              )}
-            </button>
+          {uiCards.map((c) => (
+            <ConsultationCard key={c.id} c={c} hrefBase="/hamburger/profile/doctor/settings/consultation" />
           ))}
         </div>
       )}
@@ -586,110 +561,7 @@ export default function DoctorConsultationsPage() {
         .list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
-        }
-
-        .it {
-          width: 100%;
-          text-align: left;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          touch-action: manipulation;
-
-          border: 1px solid rgba(10, 12, 20, 0.08);
-          background: rgba(255, 255, 255, 0.96);
-          border-radius: 18px;
-
-          padding: 12px;
-
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.07);
-
-          display: grid;
-          grid-template-columns: 1fr 70px;
-          gap: 12px;
-          align-items: center;
-        }
-
-        .it:active {
-          transform: translateY(1px);
-          box-shadow: 0 6px 18px rgba(18, 28, 45, 0.11);
-        }
-
-        .left {
-          min-width: 0;
-          display: grid;
-          gap: 6px;
-        }
-
-        .topRow {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
           gap: 10px;
-        }
-
-        .st {
-          font-size: 11px;
-          font-weight: 900;
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          white-space: nowrap;
-          line-height: 1;
-        }
-        .st--wait {
-          background: rgba(59, 130, 246, 0.12);
-          border-color: rgba(59, 130, 246, 0.28);
-          color: #2563eb;
-        }
-        .st--ok {
-          background: rgba(34, 197, 94, 0.12);
-          border-color: rgba(34, 197, 94, 0.26);
-          color: rgba(22, 163, 74, 1);
-        }
-        .st--no {
-          background: rgba(239, 68, 68, 0.10);
-          border-color: rgba(239, 68, 68, 0.22);
-          color: #ef4444;
-        }
-
-        .time {
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.5);
-          white-space: nowrap;
-        }
-
-        .txt {
-          font-size: 13px;
-          font-weight: 800;
-          color: rgba(17, 24, 39, 0.82);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .meta {
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(17, 24, 39, 0.55);
-        }
-
-        .ph {
-          width: 70px;
-          height: 70px;
-          border-radius: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          object-fit: cover;
-          background: rgba(249, 250, 251, 1);
-        }
-
-        .ph--empty {
-          display: grid;
-          place-items: center;
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.45);
         }
       `}</style>
     </main>
