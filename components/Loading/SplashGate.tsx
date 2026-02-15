@@ -6,12 +6,39 @@ import FullScreenLoader from '@/components/Loading/FullScreenLoader';
 
 type Props = {
   children: React.ReactNode;
-  bgUrl: string;
-  durationMs?: number; // сколько держать splash
+
+  bgMobileUrl: string; // 9:16
+  bgDesktopUrl?: string; // 16:9
+
+  durationMs?: number;
   spinnerSize?: number;
+
+  spinnerXPercent?: number;
+  spinnerYPercent?: number;
+
+  mobileObjectPosition?: string;
+  desktopObjectPosition?: string;
+
+  desktopMinWidthPx?: number;
 };
 
-export default function SplashGate({ children, bgUrl, durationMs = 3000, spinnerSize = 70 }: Props) {
+export default function SplashGate({
+  children,
+
+  bgMobileUrl,
+  bgDesktopUrl,
+
+  durationMs = 3000,
+  spinnerSize = 70,
+
+  spinnerXPercent = 50,
+  spinnerYPercent = 72,
+
+  mobileObjectPosition = '60% 45%',
+  desktopObjectPosition = '50% 45%',
+
+  desktopMinWidthPx = 900,
+}: Props) {
   const [show, setShow] = useState(true);
 
   useEffect(() => {
@@ -21,8 +48,19 @@ export default function SplashGate({ children, bgUrl, durationMs = 3000, spinner
 
   return (
     <>
-      {/* пока splash — НЕ показываем контент */}
-      {show ? <FullScreenLoader bgUrl={bgUrl} spinnerSize={spinnerSize} /> : null}
+      {show ? (
+        <FullScreenLoader
+          bgMobileUrl={bgMobileUrl}
+          bgDesktopUrl={bgDesktopUrl}
+          spinnerSize={spinnerSize}
+          spinnerXPercent={spinnerXPercent}
+          spinnerYPercent={spinnerYPercent}
+          mobileObjectPosition={mobileObjectPosition}
+          desktopObjectPosition={desktopObjectPosition}
+          desktopMinWidthPx={desktopMinWidthPx}
+        />
+      ) : null}
+
       <div style={{ display: show ? 'none' : 'block' }}>{children}</div>
     </>
   );
