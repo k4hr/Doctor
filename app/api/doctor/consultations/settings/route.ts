@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
           proUntil: true,
           consultationEnabled: true,
           consultationPriceRub: true,
-          thanksEnabled: true,
+          // thanksEnabled тут можно даже не выбирать — при PRO всегда true
+          // thanksEnabled: true,
         },
       });
 
@@ -52,7 +53,8 @@ export async function GET(req: NextRequest) {
           proActive,
           consultationEnabled: proActive ? Boolean(d.consultationEnabled) : false,
           consultationPriceRub: Number(d.consultationPriceRub ?? 1000),
-          thanksEnabled: proActive ? Boolean(d.thanksEnabled) : false,
+          // ✅ ВАЖНО: при PRO благодарность всегда доступна
+          thanksEnabled: proActive,
           proUntil: d.proUntil ? d.proUntil.toISOString() : null,
         },
         { headers: { 'Cache-Control': 'no-store' } }
@@ -80,7 +82,8 @@ export async function GET(req: NextRequest) {
         proUntil: true,
         consultationEnabled: true,
         consultationPriceRub: true,
-        thanksEnabled: true,
+        // thanksEnabled можно не тянуть — при PRO всегда true
+        // thanksEnabled: true,
       },
     });
 
@@ -96,7 +99,8 @@ export async function GET(req: NextRequest) {
         proActive,
         consultationEnabled: Boolean(doctor.consultationEnabled),
         consultationPriceRub: Number(doctor.consultationPriceRub ?? 1000),
-        thanksEnabled: proActive ? Boolean(doctor.thanksEnabled) : false,
+        // ✅ при PRO благодарность всегда доступна
+        thanksEnabled: proActive,
         proUntil: doctor.proUntil ? doctor.proUntil.toISOString() : null,
       },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -134,8 +138,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
     }
 
+    const proActive = isProActive(doctor.proUntil);
+
     // ✅ менять настройки консультаций можно только при активном PRO
-    if (!isProActive(doctor.proUntil)) {
+    if (!proActive) {
       return NextResponse.json({ ok: false, error: 'PRO_REQUIRED' }, { status: 403 });
     }
 
@@ -160,6 +166,8 @@ export async function POST(req: NextRequest) {
         ok: true,
         consultationEnabled,
         consultationPriceRub,
+        // ✅ раз уж PRO активен — благодарность тоже “доступна”
+        thanksEnabled: true,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
