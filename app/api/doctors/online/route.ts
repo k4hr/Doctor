@@ -85,6 +85,9 @@ export async function GET(req: NextRequest) {
         ratingSum: true,
         ratingCount: true,
 
+        // ✅ PRO (для золотой карточки)
+        proUntil: true,
+
         files: {
           where: { kind: DoctorFileKind.PROFILE_PHOTO },
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -94,25 +97,36 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const now = Date.now();
+
     return NextResponse.json({
       ok: true,
       count: doctors.length,
-      items: doctors.map((d) => ({
-        id: String(d.id),
-        firstName: d.firstName ?? null,
-        lastName: d.lastName ?? null,
-        middleName: d.middleName ?? null,
-        speciality1: d.speciality1 ?? null,
-        speciality2: d.speciality2 ?? null,
-        speciality3: d.speciality3 ?? null,
-        experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
-        avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
-        avatarCrop: pickCrop(d.profilephotocrop),
+      items: doctors.map((d) => {
+        const proUntilIso = d.proUntil ? new Date(d.proUntil).toISOString() : null;
+        const proActive = !!d.proUntil && new Date(d.proUntil).getTime() > now;
 
-        // ✅ отдаём агрегаты, карточка сама посчитает среднее
-        ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : 0,
-        ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : 0,
-      })),
+        return {
+          id: String(d.id),
+          firstName: d.firstName ?? null,
+          lastName: d.lastName ?? null,
+          middleName: d.middleName ?? null,
+          speciality1: d.speciality1 ?? null,
+          speciality2: d.speciality2 ?? null,
+          speciality3: d.speciality3 ?? null,
+          experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
+          avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
+          avatarCrop: pickCrop(d.profilephotocrop),
+
+          // ✅ отдаём агрегаты, карточка сама посчитает среднее
+          ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : 0,
+          ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : 0,
+
+          // ✅ PRO
+          proUntil: proUntilIso,
+          proActive,
+        };
+      }),
     });
   } catch (e: any) {
     console.error(e);
