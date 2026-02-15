@@ -1,7 +1,7 @@
 /* path: components/Loading/FullScreenLoader.tsx */
 'use client';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import DotSpinner from '@/components/Loading/DotSpinner';
 
 type Props = {
@@ -10,16 +10,13 @@ type Props = {
 
   spinnerSize?: number;
 
-  // ✅ позиции крутилки ОСТАВЛЯЕМ КАК У ТЕБЯ
   spinnerXPercent?: number; // 0..100
   spinnerYPercent?: number; // 0..100
 
-  // (опционально) подвинуть кадр фона, чтобы не резало лицо
-  mobileObjectPosition?: string; // например "60% 45%"
-  desktopObjectPosition?: string; // например "50% 45%"
+  mobileObjectPosition?: string; // "60% 45%"
+  desktopObjectPosition?: string; // "50% 45%"
 
-  // брейкпоинт переключения на десктоп-фон
-  desktopMinWidthPx?: number; // по умолчанию 900
+  desktopMinWidthPx?: number; // default 900
 };
 
 export default function FullScreenLoader({
@@ -35,21 +32,28 @@ export default function FullScreenLoader({
 
   desktopMinWidthPx = 900,
 }: Props) {
+  const [imgOk, setImgOk] = useState(true);
+
+  const safeMobile = useMemo(() => String(bgMobileUrl || '').trim(), [bgMobileUrl]);
+  const safeDesktop = useMemo(() => (bgDesktopUrl ? String(bgDesktopUrl).trim() : ''), [bgDesktopUrl]);
+
   return (
     <div className="wrap" aria-label="Загрузка приложения">
       <picture>
-        {bgDesktopUrl ? (
-          <source media={`(min-width: ${desktopMinWidthPx}px)`} srcSet={bgDesktopUrl} />
-        ) : null}
+        {safeDesktop ? <source media={`(min-width: ${desktopMinWidthPx}px)`} srcSet={safeDesktop} /> : null}
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="bg"
-          src={bgMobileUrl}
+          src={safeMobile}
           alt=""
           decoding="async"
           fetchPriority="high"
           draggable={false}
+          onError={() => setImgOk(false)}
+          style={{
+            opacity: imgOk ? 1 : 0,
+          }}
         />
       </picture>
 
@@ -72,7 +76,7 @@ export default function FullScreenLoader({
           position: fixed;
           inset: 0;
           z-index: 9999;
-          background: #000;
+          background: #f5f7fa; /* ✅ не чёрный, чтобы 404 не выглядел как смерть */
           overflow: hidden;
         }
 
@@ -96,7 +100,6 @@ export default function FullScreenLoader({
           }
         }
 
-        /* ✅ крутилка в заданной точке (оставлено 1в1 по твоему файлу) */
         .spinner {
           position: absolute;
           transform: translate(-50%, -50%);
