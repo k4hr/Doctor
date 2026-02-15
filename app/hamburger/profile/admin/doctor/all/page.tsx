@@ -150,7 +150,7 @@ export default async function DoctorAllPage() {
       id: true,
       firstName: true,
       lastName: true,
-      middleName: true, // оставляем в выборке, но не показываем
+      middleName: true,
       city: true,
       speciality1: true,
       speciality2: true,
@@ -159,11 +159,11 @@ export default async function DoctorAllPage() {
       submittedAt: true,
       updatedAt: true,
 
-      // ✅ рейтинг
       ratingSum: true,
       ratingCount: true,
 
-      // ✅ PRO (чтобы золото работало)
+      // ⚠️ если у тебя в Prisma этих полей нет — сборка упадёт.
+      // Тогда скажи как они реально называются (или уберём).
       proActive: true,
       proUntil: true,
 
@@ -202,45 +202,156 @@ export default async function DoctorAllPage() {
           doctors.map((d) => {
             const name = doctorNameLastFirst(d);
             const avatar = toPublicUrlMaybe(d.files?.[0]?.url || null);
-            const pro = isDoctorPro(d);
-            const ratingText = calcAvgRating(d.ratingSum, d.ratingCount);
+            const pro = isDoctorPro(d as any);
+            const ratingText = calcAvgRating((d as any).ratingSum, (d as any).ratingCount);
+
             const exp =
               typeof d.experienceYears === 'number' && Number.isFinite(d.experienceYears) ? d.experienceYears : null;
             const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
 
-            const specParts = [d.speciality1, d.speciality2, d.speciality3].filter(Boolean).map((x) => String(x).trim());
+            const specParts = [d.speciality1, d.speciality2, d.speciality3]
+              .filter(Boolean)
+              .map((x) => String(x).trim());
             const spec = specParts.length ? specParts.join(', ') : '—';
+
+            const cardStyle: React.CSSProperties = pro
+              ? {
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: 16,
+                  border: '1px solid rgba(180, 83, 9, 0.28)',
+                  background:
+                    'linear-gradient(135deg, rgba(254, 243, 199, 0.92), rgba(255, 255, 255, 0.88))',
+                  boxShadow: '0 8px 20px rgba(245, 158, 11, 0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  textAlign: 'left',
+                  transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+                }
+              : {
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  borderRadius: 16,
+                  border: '1px solid rgba(34, 197, 94, 0.22)',
+                  background: 'rgba(220, 252, 231, 0.75)',
+                  boxShadow: '0 8px 20px rgba(22, 163, 74, 0.16)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  textAlign: 'left',
+                  transition: 'transform 120ms ease, box-shadow 120ms ease, filter 120ms ease',
+                };
+
+            const avatarStyle: React.CSSProperties = {
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              background: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 18,
+              color: pro ? '#92400e' : '#16a34a',
+              boxShadow: pro ? '0 4px 10px rgba(245, 158, 11, 0.28)' : '0 4px 10px rgba(22, 163, 74, 0.3)',
+              flexShrink: 0,
+              overflow: 'hidden',
+            };
+
+            const nameStyle: React.CSSProperties = {
+              fontSize: 14,
+              fontWeight: 700,
+              color: pro ? 'rgba(124, 45, 18, 0.95)' : '#022c22',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            };
+
+            const specStyle: React.CSSProperties = {
+              fontSize: 12,
+              color: pro ? 'rgba(124, 45, 18, 0.72)' : 'rgba(15, 23, 42, 0.8)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            };
+
+            const expStyle: React.CSSProperties = pro
+              ? {
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'rgba(255, 255, 255, 0.92)',
+                  border: '1px solid rgba(180, 83, 9, 0.14)',
+                  color: 'rgba(124, 45, 18, 0.9)',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                }
+              : {
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  color: '#15803d',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                };
+
+            const ratingStyle: React.CSSProperties = {
+              color: pro ? 'rgba(124, 45, 18, 0.92)' : '#166534',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            };
+
+            const metaStyle: React.CSSProperties = {
+              marginTop: 6,
+              fontSize: 11,
+              color: 'rgba(15, 23, 42, 0.55)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            };
 
             return (
               <Link
                 key={d.id}
                 href={`/hamburger/profile/admin/doctor/${encodeURIComponent(d.id)}`}
-                className={'doconline-card' + (pro ? ' isPro' : '')}
-                style={{ textDecoration: 'none' }}
+                style={{ textDecoration: 'none', color: 'inherit' }}
               >
-                <div className="doconline-avatar" aria-label="Фото врача">
-                  {avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={avatar} alt="" />
-                  ) : (
-                    <span>{doctorAvatarLetter(d)}</span>
-                  )}
-                </div>
-
-                <div className="doconline-main">
-                  <div className="doconline-name-row">
-                    <span className="doconline-name">{name}</span>
+                <div style={cardStyle}>
+                  <div style={avatarStyle} aria-label="Фото врача">
+                    {avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={avatar}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    ) : (
+                      <span>{doctorAvatarLetter(d)}</span>
+                    )}
                   </div>
 
-                  <span className="doconline-spec">{spec}</span>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
+                      <span style={nameStyle}>{name}</span>
+                    </div>
 
-                  <div className="doconline-bottom">
-                    <span className="doconline-exp">{expLabel}</span>
-                    {ratingText ? <span className="doconline-rating">⭐ {ratingText}</span> : null}
-                  </div>
+                    <span style={specStyle}>{spec}</span>
 
-                  <div className="admin-meta">
-                    Одобрено: {fmtDate(d.submittedAt)} • Обновлено: {fmtDate(d.updatedAt)}
+                    <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, gap: 10 }}>
+                      <span style={expStyle}>{expLabel}</span>
+                      {ratingText ? <span style={ratingStyle}>⭐ {ratingText}</span> : null}
+                    </div>
+
+                    <div style={metaStyle}>
+                      Одобрено: {fmtDate(d.submittedAt)} • Обновлено: {fmtDate(d.updatedAt)}
+                    </div>
                   </div>
                 </div>
               </Link>
@@ -248,162 +359,6 @@ export default async function DoctorAllPage() {
           })
         )}
       </div>
-
-      <style jsx>{`
-        .doconline-card {
-          width: 100%;
-          box-sizing: border-box;
-
-          padding: 10px 12px;
-          border-radius: 16px;
-
-          border: 1px solid rgba(34, 197, 94, 0.22);
-          background: rgba(220, 252, 231, 0.75);
-          box-shadow: 0 8px 20px rgba(22, 163, 74, 0.16);
-
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-          text-align: left;
-
-          transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
-        }
-
-        .doconline-card:active {
-          transform: translateY(1px);
-          box-shadow: 0 6px 16px rgba(22, 163, 74, 0.24);
-        }
-
-        /* ✅ PRO = золото */
-        .doconline-card.isPro {
-          border: 1px solid rgba(180, 83, 9, 0.28);
-          background: linear-gradient(135deg, rgba(254, 243, 199, 0.92), rgba(255, 255, 255, 0.88));
-          box-shadow: 0 8px 20px rgba(245, 158, 11, 0.18);
-        }
-
-        .doconline-card.isPro:active {
-          box-shadow: 0 6px 16px rgba(245, 158, 11, 0.26);
-        }
-
-        .doconline-avatar {
-          width: 44px;
-          height: 44px;
-          border-radius: 999px;
-          background: #ffffff;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          font-weight: 700;
-          font-size: 18px;
-          color: #16a34a;
-
-          box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
-          flex-shrink: 0;
-          overflow: hidden;
-        }
-
-        .doconline-card.isPro .doconline-avatar {
-          color: #92400e;
-          box-shadow: 0 4px 10px rgba(245, 158, 11, 0.28);
-        }
-
-        .doconline-avatar img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .doconline-main {
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .doconline-name-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .doconline-name {
-          font-size: 14px;
-          font-weight: 700;
-          color: #022c22;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          min-width: 0;
-        }
-
-        .doconline-card.isPro .doconline-name {
-          color: rgba(124, 45, 18, 0.95);
-        }
-
-        .doconline-spec {
-          font-size: 12px;
-          color: rgba(15, 23, 42, 0.8);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .doconline-card.isPro .doconline-spec {
-          color: rgba(124, 45, 18, 0.72);
-        }
-
-        .doconline-bottom {
-          margin-top: 4px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-size: 11px;
-          gap: 10px;
-        }
-
-        .doconline-exp {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.9);
-          color: #15803d;
-          font-weight: 500;
-          white-space: nowrap;
-        }
-
-        .doconline-card.isPro .doconline-exp {
-          color: rgba(124, 45, 18, 0.9);
-          background: rgba(255, 255, 255, 0.92);
-          border: 1px solid rgba(180, 83, 9, 0.14);
-        }
-
-        .doconline-rating {
-          color: #166534;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .doconline-card.isPro .doconline-rating {
-          color: rgba(124, 45, 18, 0.92);
-        }
-
-        .admin-meta {
-          margin-top: 6px;
-          font-size: 11px;
-          color: rgba(15, 23, 42, 0.55);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-      `}</style>
     </main>
   );
 }
