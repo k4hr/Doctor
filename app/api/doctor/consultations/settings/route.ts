@@ -27,6 +27,39 @@ function clampPriceRub(v: any) {
 
 export async function GET(req: NextRequest) {
   try {
+    const url = new URL(req.url);
+    const doctorId = String(url.searchParams.get('doctorId') || '').trim();
+
+    // ✅ Публичный gate по doctorId (для страницы профиля врача)
+    if (doctorId) {
+      const d = await prisma.doctor.findUnique({
+        where: { id: doctorId },
+        select: {
+          proUntil: true,
+          consultationEnabled: true,
+          consultationPriceRub: true,
+          thanksEnabled: true,
+        },
+      });
+
+      if (!d) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
+
+      const proActive = isProActive(d.proUntil);
+
+      return NextResponse.json(
+        {
+          ok: true,
+          proActive,
+          consultationEnabled: proActive ? Boolean(d.consultationEnabled) : false,
+          consultationPriceRub: Number(d.consultationPriceRub ?? 1000),
+          thanksEnabled: proActive ? Boolean(d.thanksEnabled) : false,
+          proUntil: d.proUntil ? d.proUntil.toISOString() : null,
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
+    // ✅ Приватные настройки для врача (по initData)
     const initData = await getInitDataFrom(req);
     if (!initData) {
       return NextResponse.json({ ok: false, error: 'NO_INIT_DATA' }, { status: 401 });
@@ -47,6 +80,7 @@ export async function GET(req: NextRequest) {
         proUntil: true,
         consultationEnabled: true,
         consultationPriceRub: true,
+        thanksEnabled: true,
       },
     });
 
@@ -62,8 +96,7 @@ export async function GET(req: NextRequest) {
         proActive,
         consultationEnabled: Boolean(doctor.consultationEnabled),
         consultationPriceRub: Number(doctor.consultationPriceRub ?? 1000),
-        // ✅ благодарности — производное от PRO
-        thanksEnabled: proActive,
+        thanksEnabled: proActive ? Boolean(doctor.thanksEnabled) : false,
         proUntil: doctor.proUntil ? doctor.proUntil.toISOString() : null,
       },
       { headers: { 'Cache-Control': 'no-store' } }
