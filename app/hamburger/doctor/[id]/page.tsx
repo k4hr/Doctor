@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import TopBarBack from '../../../../components/TopBarBack';
 
+// ✅ badges
+import DocumentBadge from '../../../../components/bage/document';
+import ProBadge from '../../../../components/bage/pro';
+
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
     (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
@@ -208,7 +212,7 @@ export default function DoctorPublicProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
-  // ✅ gate (PRO) — теперь по doctorId (публично)
+  // ✅ gate (PRO) — по doctorId (публично)
   const [gateLoading, setGateLoading] = useState(true);
   const [proActive, setProActive] = useState(false);
   const [consultationEnabled, setConsultationEnabled] = useState(false);
@@ -383,7 +387,7 @@ export default function DoctorPublicProfilePage() {
     router.push(`/thanks?doctorId=${encodeURIComponent(doctorId)}`);
   }
 
-  const showActions = !gateLoading && proActive; // ✅ показываем блок только при активном PRO у врача
+  const showActions = !gateLoading && proActive; // ✅ кнопки — только при активном PRO
 
   return (
     <main className="page">
@@ -408,6 +412,12 @@ export default function DoctorPublicProfilePage() {
 
         <div className="ratingText">
           Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
+        </div>
+
+        {/* ✅ badges: документы у всех, PRO только если активен */}
+        <div className="badgesRow" aria-label="Бейджи">
+          <DocumentBadge size="sm" text="Документы подтверждены" />
+          {!gateLoading && proActive ? <ProBadge size="sm" text="Имеет статус ВРАЧ.PRO" /> : null}
         </div>
       </section>
 
@@ -642,6 +652,14 @@ export default function DoctorPublicProfilePage() {
           color: rgba(17, 24, 39, 0.45);
         }
 
+        .badgesRow {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 8px;
+        }
+
         .stats {
           margin-top: 10px;
           background: #fff;
@@ -691,7 +709,7 @@ export default function DoctorPublicProfilePage() {
 
         .actionBtn {
           width: 100%;
-          border: 1px solid rgba(15, 23, 42, 0.10);
+          border: 1px solid rgba(15, 23, 42, 0.1);
           border-radius: 18px;
           padding: 12px 12px;
           background: rgba(255, 255, 255, 0.92);
@@ -755,11 +773,11 @@ export default function DoctorPublicProfilePage() {
 
         .actionBtn--consult {
           background: linear-gradient(135deg, rgba(36, 199, 104, 0.18), rgba(255, 255, 255, 0.92));
-          border-color: rgba(36, 199, 104, 0.20);
+          border-color: rgba(36, 199, 104, 0.2);
         }
         .actionBtn--consult .ic {
           background: rgba(36, 199, 104, 0.14);
-          border-color: rgba(36, 199, 104, 0.20);
+          border-color: rgba(36, 199, 104, 0.2);
         }
 
         .actionBtn--thanks {
@@ -767,7 +785,7 @@ export default function DoctorPublicProfilePage() {
           border-color: rgba(239, 68, 68, 0.18);
         }
         .actionBtn--thanks .ic {
-          background: rgba(239, 68, 68, 0.10);
+          background: rgba(239, 68, 68, 0.1);
           border-color: rgba(239, 68, 68, 0.18);
         }
 
