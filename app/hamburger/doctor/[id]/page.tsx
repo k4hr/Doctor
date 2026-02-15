@@ -81,7 +81,7 @@ type ReviewsOk = {
 type ReviewsErr = { ok: false; error: string; hint?: string };
 type ReviewsResponse = ReviewsOk | ReviewsErr;
 
-/** PRO gate from settings endpoint */
+/** PRO gate */
 type GateOk = {
   ok: true;
   proActive: boolean;
@@ -208,7 +208,7 @@ export default function DoctorPublicProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
-  // ✅ gate (PRO)
+  // ✅ gate (PRO) — теперь по doctorId (публично)
   const [gateLoading, setGateLoading] = useState(true);
   const [proActive, setProActive] = useState(false);
   const [consultationEnabled, setConsultationEnabled] = useState(false);
@@ -265,14 +265,13 @@ export default function DoctorPublicProfilePage() {
     })();
   }, [doctorId]);
 
-  // ✅ грузим gate (PRO) — именно он решает, показывать ли кнопки
+  // ✅ грузим gate (PRO) — ПУБЛИЧНО по doctorId
   useEffect(() => {
     (async () => {
       try {
         setGateLoading(true);
 
-        // initData может не быть (если открыли не из телеги) — тогда считаем, что PRO нет и прячем кнопки
-        if (!doctorId || !initData) {
+        if (!doctorId) {
           setProActive(false);
           setConsultationEnabled(false);
           setConsultationPriceRub(1000);
@@ -280,9 +279,8 @@ export default function DoctorPublicProfilePage() {
           return;
         }
 
-        const r = await fetch('/api/doctor/consultations/settings', {
+        const r = await fetch(`/api/doctor/consultations/settings?doctorId=${encodeURIComponent(doctorId)}`, {
           method: 'GET',
-          headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
           cache: 'no-store',
         });
 
@@ -311,7 +309,7 @@ export default function DoctorPublicProfilePage() {
         setGateLoading(false);
       }
     })();
-  }, [doctorId, initData]);
+  }, [doctorId]);
 
   // грузим отзывы
   useEffect(() => {
@@ -385,7 +383,7 @@ export default function DoctorPublicProfilePage() {
     router.push(`/thanks?doctorId=${encodeURIComponent(doctorId)}`);
   }
 
-  const showActions = !gateLoading && proActive; // ✅ прячем полностью, если PRO нет
+  const showActions = !gateLoading && proActive; // ✅ показываем блок только при активном PRO у врача
 
   return (
     <main className="page">
@@ -434,7 +432,7 @@ export default function DoctorPublicProfilePage() {
         </div>
       </section>
 
-      {/* ✅ Кнопки ТОЛЬКО если PRO активен */}
+      {/* ✅ Кнопки ТОЛЬКО если PRO активен у врача */}
       {showActions ? (
         <section className="actions" aria-label="Действия">
           <button
@@ -683,7 +681,7 @@ export default function DoctorPublicProfilePage() {
           justify-self: center;
         }
 
-        /* ✅ ACTIONS (sexy buttons) */
+        /* ✅ ACTIONS */
         .actions {
           margin-top: 10px;
           display: grid;
