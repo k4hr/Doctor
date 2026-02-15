@@ -66,9 +66,12 @@ export async function GET(req: Request) {
         experienceYears: true,
         profilephotocrop: true,
 
-        // ✅ ВОТ ОНО
+        // ✅ рейтинг
         ratingSum: true,
         ratingCount: true,
+
+        // ✅ PRO (для золотой карточки)
+        proUntil: true,
 
         files: {
           where: { kind: DoctorFileKind.PROFILE_PHOTO },
@@ -79,23 +82,34 @@ export async function GET(req: Request) {
       },
     });
 
-    const items = doctors.map((d) => ({
-      id: String(d.id),
-      firstName: String(d.firstName ?? ''),
-      lastName: String(d.lastName ?? ''),
-      middleName: d.middleName ? String(d.middleName) : null,
-      city: d.city ? String(d.city) : null,
-      speciality1: String(d.speciality1 ?? ''),
-      speciality2: d.speciality2 ? String(d.speciality2) : null,
-      speciality3: d.speciality3 ? String(d.speciality3) : null,
-      experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
-      avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
-      avatarCrop: pickCrop(d.profilephotocrop),
+    const now = Date.now();
 
-      // ✅ прокидываем агрегаты
-      ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : Number(d.ratingSum ?? 0),
-      ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : Number(d.ratingCount ?? 0),
-    }));
+    const items = doctors.map((d) => {
+      const proUntilIso = d.proUntil ? new Date(d.proUntil).toISOString() : null;
+      const proActive = !!d.proUntil && new Date(d.proUntil).getTime() > now;
+
+      return {
+        id: String(d.id),
+        firstName: String(d.firstName ?? ''),
+        lastName: String(d.lastName ?? ''),
+        middleName: d.middleName ? String(d.middleName) : null,
+        city: d.city ? String(d.city) : null,
+        speciality1: String(d.speciality1 ?? ''),
+        speciality2: d.speciality2 ? String(d.speciality2) : null,
+        speciality3: d.speciality3 ? String(d.speciality3) : null,
+        experienceYears: typeof d.experienceYears === 'number' ? d.experienceYears : null,
+        avatarUrl: toPublicUrlMaybe(d.files?.[0]?.url ?? null),
+        avatarCrop: pickCrop(d.profilephotocrop),
+
+        // ✅ агрегаты рейтинга
+        ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : Number(d.ratingSum ?? 0),
+        ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : Number(d.ratingCount ?? 0),
+
+        // ✅ PRO
+        proUntil: proUntilIso,
+        proActive,
+      };
+    });
 
     return NextResponse.json({ ok: true, items });
   } catch (e) {
