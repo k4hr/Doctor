@@ -26,6 +26,33 @@ function tgAlert(msg: string) {
   alert(msg);
 }
 
+/* cookie helpers (чтобы админка работала стабильнее в Safari/iOS) */
+function setCookie(name: string, value: string, days = 3) {
+  try {
+    const maxAge = days * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  } catch {}
+}
+function getCookie(name: string): string {
+  try {
+    const rows = document.cookie ? document.cookie.split('; ') : [];
+    for (const row of rows) {
+      const [k, ...rest] = row.split('=');
+      if (decodeURIComponent(k) === name) return decodeURIComponent(rest.join('='));
+    }
+  } catch {}
+  return '';
+}
+
+function getInitData(): string {
+  const WebApp: any = tg();
+  const idata = (WebApp?.initData as string) || getCookie('tg_init_data') || '';
+  if (WebApp?.initData && typeof WebApp.initData === 'string' && WebApp.initData.length > 0) {
+    setCookie('tg_init_data', WebApp.initData, 3);
+  }
+  return String(idata || '').trim();
+}
+
 type DoctorItem = {
   id: string;
   status: string;
@@ -45,6 +72,7 @@ type DoctorItem = {
   proUntil: string | null; // ISO
   consultationEnabled: boolean;
   consultationPriceRub: number;
+  thanksEnabled: boolean;
 
   avatarUrl: string | null;
 };
@@ -110,11 +138,22 @@ export default function AdminDoctorProPage() {
       return;
     }
 
+    const initData = getInitData();
+    if (!initData) {
+      setWarn('NO_INIT_DATA');
+      tgAlert('Открой админку через Telegram (initData обязателен).');
+      return;
+    }
+
     setLoading(true);
     try {
       const r = await fetch(`/api/admin/doctors/search?q=${encodeURIComponent(query)}&limit=30`, {
         method: 'GET',
         cache: 'no-store',
+        headers: {
+          'X-Telegram-Init-Data': initData,
+          'X-Init-Data': initData,
+        },
       });
 
       const j = (await r.json().catch(() => null)) as SearchResp | null;
@@ -139,10 +178,22 @@ export default function AdminDoctorProPage() {
     setWarn('');
     setGrantLoadingId(doctorId);
 
+    const initData = getInitData();
+    if (!initData) {
+      setWarn('NO_INIT_DATA');
+      tgAlert('Открой админку через Telegram (initData обязателен).');
+      setGrantLoadingId('');
+      return;
+    }
+
     try {
       const r = await fetch('/api/admin/doctor/pro/grant', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': initData,
+          'X-Init-Data': initData,
+        },
         cache: 'no-store',
         body: JSON.stringify({ doctorId, plan }),
       });
@@ -156,14 +207,14 @@ export default function AdminDoctorProPage() {
 
       tgAlert(`PRO выдан до ${fmtDateRu((j as GrantOk).proUntil)} (${planLabel((j as GrantOk).plan)})`);
 
-      // мягко обновим список, чтобы сразу видеть proUntil
       setItems((prev) =>
         prev.map((x) =>
           x.id === doctorId
             ? {
                 ...x,
                 proUntil: (j as GrantOk).proUntil,
-                consultationEnabled: true, // при выдаче PRO включаем
+                consultationEnabled: true,
+                thanksEnabled: true,
               }
             : x
         )
@@ -179,7 +230,7 @@ export default function AdminDoctorProPage() {
     <main className="wrap">
       <TopBarBack />
       <h1 className="title">Выдать PRO</h1>
-      <p className="sub">Поиск врача и выдача PRO (открывает консультации). Благодарности — всегда доступны.</p>
+      <p className="sub">Поиск врача и выдача PRO (открывает консультации и благодарности).</p>
 
       <section className="card">
         <div className="row">
@@ -255,6 +306,8 @@ export default function AdminDoctorProPage() {
                   <span className="metaText">
                     consultations: {d.consultationEnabled ? 'ON' : 'OFF'} · {d.consultationPriceRub} ₽
                   </span>
+                  <span className="dot">·</span>
+                  <span className="metaText">thanks: {d.thanksEnabled ? 'ON' : 'OFF'}</span>
                 </div>
               </div>
             </div>
