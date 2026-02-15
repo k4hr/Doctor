@@ -22,6 +22,11 @@ export type DoctorCardItem = {
 
   // 2) если API уже отдаёт готовое значение
   ratingValue?: number | null;
+
+  // ✅ PRO (для золота)
+  // Можно отдавать что-то одно: proActive ИЛИ proUntil
+  proActive?: boolean | null;
+  proUntil?: string | null; // ISO (например из Doctor.proUntil)
 };
 
 type Props = {
@@ -66,7 +71,6 @@ function round1(x: number) {
 
 function fmtRatingLabel(v: number) {
   const x = Number.isFinite(v) ? round1(v) : 0;
-  // для карточек обычно красивее "4.8", но если хочешь "4,8" — замени точку на запятую
   return x.toFixed(1);
 }
 
@@ -86,6 +90,21 @@ function calcRatingFromDoctor(d: DoctorCardItem): number | null {
   return null;
 }
 
+function isDoctorPro(d: DoctorCardItem): boolean {
+  if (d?.proActive === true) return true;
+
+  const iso = String(d?.proUntil || '').trim();
+  if (!iso) return false;
+
+  try {
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return false;
+    return t > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
   const name = useMemo(() => doctorFullName(doctor), [doctor]);
   const spec = useMemo(() => doctorSpecsLine(doctor), [doctor]);
@@ -96,9 +115,6 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
       : null;
   const expLabel = exp !== null ? `Стаж: ${exp} лет` : 'Стаж: —';
 
-  // ✅ приоритет:
-  // 1) ratingLabel если передали
-  // 2) иначе считаем из doctor.ratingValue / ratingSum+ratingCount
   const ratingText = useMemo(() => {
     const manual = normalizeRatingLabel(ratingLabel);
     if (manual) return manual;
@@ -108,11 +124,13 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
     return fmtRatingLabel(computed);
   }, [doctor, ratingLabel]);
 
+  const pro = useMemo(() => isDoctorPro(doctor), [doctor]);
+
   return (
     <>
       <button
         type="button"
-        className="doconline-card"
+        className={'doconline-card' + (pro ? ' isPro' : '')}
         onClick={() => {
           haptic('light');
           onClick?.(doctor);
@@ -149,6 +167,7 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
 
           padding: 10px 12px;
           border-radius: 16px;
+
           border: 1px solid rgba(34, 197, 94, 0.22);
           background: rgba(220, 252, 231, 0.75);
           box-shadow: 0 8px 20px rgba(22, 163, 74, 0.16);
@@ -160,11 +179,24 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           text-align: left;
+
+          transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
         }
 
         .doconline-card:active {
           transform: translateY(1px);
           box-shadow: 0 6px 16px rgba(22, 163, 74, 0.24);
+        }
+
+        /* ✅ PRO = золото */
+        .doconline-card.isPro {
+          border: 1px solid rgba(180, 83, 9, 0.28);
+          background: linear-gradient(135deg, rgba(254, 243, 199, 0.92), rgba(255, 255, 255, 0.88));
+          box-shadow: 0 8px 20px rgba(245, 158, 11, 0.18);
+        }
+
+        .doconline-card.isPro:active {
+          box-shadow: 0 6px 16px rgba(245, 158, 11, 0.26);
         }
 
         .doconline-avatar {
@@ -184,6 +216,11 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
           box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
           flex-shrink: 0;
           overflow: hidden;
+        }
+
+        .doconline-card.isPro .doconline-avatar {
+          color: #92400e;
+          box-shadow: 0 4px 10px rgba(245, 158, 11, 0.28);
         }
 
         .doconline-avatar img {
@@ -219,12 +256,20 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
           min-width: 0;
         }
 
+        .doconline-card.isPro .doconline-name {
+          color: rgba(124, 45, 18, 0.95);
+        }
+
         .doconline-spec {
           font-size: 12px;
           color: rgba(15, 23, 42, 0.8);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .doconline-card.isPro .doconline-spec {
+          color: rgba(124, 45, 18, 0.72);
         }
 
         .doconline-bottom {
@@ -245,10 +290,20 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
           white-space: nowrap;
         }
 
+        .doconline-card.isPro .doconline-exp {
+          color: rgba(124, 45, 18, 0.9);
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(180, 83, 9, 0.14);
+        }
+
         .doconline-rating {
           color: #166534;
           font-weight: 600;
           white-space: nowrap;
+        }
+
+        .doconline-card.isPro .doconline-rating {
+          color: rgba(124, 45, 18, 0.92);
         }
       `}</style>
     </>
