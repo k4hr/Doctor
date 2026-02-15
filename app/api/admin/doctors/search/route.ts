@@ -82,10 +82,6 @@ function toPublicUrlMaybe(value: string | null) {
   return `${base.replace(/\/$/, '')}/${v}`;
 }
 
-function norm(s: any) {
-  return String(s ?? '').trim().toLowerCase();
-}
-
 export async function GET(req: NextRequest) {
   try {
     const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -106,13 +102,13 @@ export async function GET(req: NextRequest) {
 
     if (!qRaw || qRaw.length < 2) return NextResponse.json({ ok: true, items: [] });
 
-    const q = norm(qRaw);
-
     const where: any = {
       OR: [
         { id: { contains: qRaw, mode: 'insensitive' } },
         { telegramId: { contains: qRaw, mode: 'insensitive' } },
         { telegramUsername: { contains: qRaw, mode: 'insensitive' } },
+        { telegramFirstName: { contains: qRaw, mode: 'insensitive' } },
+        { telegramLastName: { contains: qRaw, mode: 'insensitive' } },
         { firstName: { contains: qRaw, mode: 'insensitive' } },
         { lastName: { contains: qRaw, mode: 'insensitive' } },
         { middleName: { contains: qRaw, mode: 'insensitive' } },
@@ -142,6 +138,7 @@ export async function GET(req: NextRequest) {
         proUntil: true,
         consultationEnabled: true,
         consultationPriceRub: true,
+        thanksEnabled: true,
 
         profilephotourl: true,
       },
@@ -166,6 +163,7 @@ export async function GET(req: NextRequest) {
       proUntil: d.proUntil ? d.proUntil.toISOString() : null,
       consultationEnabled: Boolean(d.consultationEnabled),
       consultationPriceRub: Number(d.consultationPriceRub ?? 1000),
+      thanksEnabled: Boolean(d.thanksEnabled),
 
       avatarUrl: toPublicUrlMaybe(d.profilephotourl ?? null),
     }));
