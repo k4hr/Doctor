@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import DoctorCard, { type DoctorAvatarCrop, type DoctorCardData } from '@/components/DoctorCard/DoctorCard';
+import DoctorCard, { type DoctorCardItem } from '@/components/DoctorCard/DoctorCard';
 
 type ApiDoctor = {
   id: string;
@@ -15,11 +15,14 @@ type ApiDoctor = {
   speciality3: string | null;
   experienceYears: number | null;
   avatarUrl: string | null;
-  avatarCrop?: DoctorAvatarCrop | null;
 
   // ✅ рейтинг из API
   ratingSum: number;
   ratingCount: number;
+
+  // ✅ PRO из API (нужно чтобы цвет менялся)
+  proActive?: boolean | null;
+  proUntil?: string | null; // ISO
 };
 
 type ApiOk = { ok: true; count: number; items: ApiDoctor[] };
@@ -142,33 +145,30 @@ export default function VrachiOnlineBlock() {
             <div className="doconline-empty">Сейчас нет врачей онлайн</div>
           ) : (
             uiItems.map((d) => {
-              const card: DoctorCardData = {
+              const card: DoctorCardItem = {
                 id: d.id,
                 firstName: d.firstName,
                 lastName: d.lastName,
                 middleName: d.middleName,
+
+                city: null,
+
                 speciality1: d.speciality1,
                 speciality2: d.speciality2,
                 speciality3: d.speciality3,
+
                 experienceYears: d.experienceYears,
                 avatarUrl: d.avatarUrl,
-                avatarCrop: d.avatarCrop ?? null,
 
-                // ✅ прокидываем агрегаты в карточку
                 ratingSum: typeof d.ratingSum === 'number' ? d.ratingSum : 0,
                 ratingCount: typeof d.ratingCount === 'number' ? d.ratingCount : 0,
+
+                // ✅ ВОТ ЭТОГО НЕ ХВАТАЛО — без этого золота не будет
+                proActive: d.proActive ?? null,
+                proUntil: d.proUntil ?? null,
               };
 
-              return (
-                <DoctorCard
-                  key={d.id}
-                  doctor={card}
-                  disabled={false}
-                  onClick={() => handleDoctorClick(d)}
-                  showRating={true}
-                  // ❌ НЕ ПЕРЕДАЁМ ratingLabel="5.0"
-                />
-              );
+              return <DoctorCard key={d.id} doctor={card} onClick={() => handleDoctorClick(d)} />;
             })
           )}
         </div>
