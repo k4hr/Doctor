@@ -5,35 +5,33 @@ import React, { useMemo } from 'react';
 
 export type DoctorCardItem = {
   id: string;
-  firstName: string;
-  lastName: string;
+
+  firstName: string | null;
+  lastName: string | null;
   middleName: string | null;
+
   city: string | null;
-  speciality1: string;
+
+  speciality1: string | null;
   speciality2: string | null;
   speciality3: string | null;
+
   experienceYears: number | null;
   avatarUrl: string | null;
 
-  // ✅ РЕАЛЬНЫЙ РЕЙТИНГ (может прийти разными способами)
-  // 1) прямо из Doctor (агрегаты)
+  // ✅ РЕАЛЬНЫЙ РЕЙТИНГ
   ratingSum?: number | null;
   ratingCount?: number | null;
-
-  // 2) если API уже отдаёт готовое значение
   ratingValue?: number | null;
 
-  // ✅ PRO (для золота)
-  // Можно отдавать что-то одно: proActive ИЛИ proUntil
+  // ✅ PRO
   proActive?: boolean | null;
-  proUntil?: string | null; // ISO (например из Doctor.proUntil)
+  proUntil?: string | null; // ISO
 };
 
 type Props = {
   doctor: DoctorCardItem;
   onClick?: (doctor: DoctorCardItem) => void;
-
-  // можно оставить для ручной подмены (но по умолчанию берём из doctor.*)
   ratingLabel?: string; // "5.0" и т.п. (БЕЗ ⭐)
 };
 
@@ -44,9 +42,11 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 function doctorFullName(d: DoctorCardItem) {
-  const ln = String(d?.lastName || '').trim();
-  const fn = String(d?.firstName || '').trim();
-  return [ln, fn].filter(Boolean).join(' ').trim() || '—';
+  const ln = String(d?.lastName ?? '').trim();
+  const fn = String(d?.firstName ?? '').trim();
+  const mn = String(d?.middleName ?? '').trim();
+  const base = [ln, fn].filter(Boolean).join(' ').trim();
+  return base || mn ? [base, mn].filter(Boolean).join(' ').trim() : '—';
 }
 
 function doctorSpecsLine(d: DoctorCardItem) {
@@ -75,13 +75,12 @@ function fmtRatingLabel(v: number) {
 }
 
 function calcRatingFromDoctor(d: DoctorCardItem): number | null {
-  // 1) если уже есть готовое значение
   const rv = typeof d.ratingValue === 'number' ? d.ratingValue : Number(d.ratingValue);
   if (Number.isFinite(rv) && rv > 0) return Math.max(0, Math.min(5, rv));
 
-  // 2) если есть агрегаты
   const sum = typeof d.ratingSum === 'number' ? d.ratingSum : Number(d.ratingSum);
   const cnt = typeof d.ratingCount === 'number' ? d.ratingCount : Number(d.ratingCount);
+
   if (Number.isFinite(sum) && Number.isFinite(cnt) && cnt > 0) {
     const avg = sum / cnt;
     return Math.max(0, Math.min(5, avg));
@@ -154,7 +153,6 @@ export default function DoctorCard({ doctor, onClick, ratingLabel }: Props) {
 
           <div className="doconline-bottom">
             <span className="doconline-exp">{expLabel}</span>
-
             {ratingText ? <span className="doconline-rating">⭐ {ratingText}</span> : null}
           </div>
         </div>
