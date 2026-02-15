@@ -152,6 +152,9 @@ function doctorLastFirst(d: any) {
 }
 
 function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardItem {
+  const proUntilIso = d?.proUntil ? new Date(d.proUntil).toISOString() : null;
+  const proActive = !!proUntilIso && new Date(proUntilIso).getTime() > Date.now();
+
   return {
     id: String(d?.id || ''),
     firstName: String(d?.firstName || '').trim() || '—',
@@ -164,14 +167,17 @@ function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardI
     experienceYears: typeof d?.experienceYears === 'number' ? d.experienceYears : null,
     avatarUrl: avatarUrl ?? null,
 
-    // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬНО, иначе DoctorCard не сможет посчитать рейтинг
+    // ✅ рейтинг агрегаты
     ratingSum: typeof d?.ratingSum === 'number' ? d.ratingSum : d?.ratingSum != null ? Number(d.ratingSum) : null,
     ratingCount:
       typeof d?.ratingCount === 'number' ? d.ratingCount : d?.ratingCount != null ? Number(d.ratingCount) : null,
 
-    // если когда-нибудь начнёшь отдавать готовый avg — тоже поддержим
     ratingValue:
       typeof d?.ratingValue === 'number' ? d.ratingValue : d?.ratingValue != null ? Number(d.ratingValue) : null,
+
+    // ✅ PRO (для золота в DoctorCard)
+    proUntil: proUntilIso,
+    proActive,
   };
 }
 
@@ -224,12 +230,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     );
   }
 
-  // ✅ ВАЖНО: Prisma include выше тащит doctor целиком, но без агрегатов ratingSum/ratingCount,
-  // если они не выбраны. Поэтому ниже мы ДОЗАПРАШИВАЕМ ответы корректно через отдельный findUnique?
-  //
-  // Проще и надежнее: вместо include:doctor выше, делаем include с select.
-  // Но раз ты просишь минимум изменений — делаем второй запрос на answers с нужными полями врача.
-
   const q2 = await prisma.question.findUnique({
     where: { id },
     include: {
@@ -257,7 +257,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               ratingSum: true,
               ratingCount: true,
 
-              // файлы (аватар)
+              // ✅ PRO (для золота)
+              proUntil: true,
+
               files: {
                 where: { kind: DoctorFileKind.PROFILE_PHOTO },
                 orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -320,7 +322,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     answers.length < 10 &&
     !isClosed;
 
-  // ✅ Фото: автор ИЛИ врач выбранной категории ИЛИ назначенный врач
   const doctorCanSeeByCategory = isApprovedDoctor ? doctorSpecs.has(qSpec) : false;
   const doctorCanSeeByAssignment =
     isApprovedDoctor && viewerDoctor?.id && (qFinal as any).assignedDoctorId
@@ -589,7 +590,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                   }}
                 >
                   <div style={{ padding: 12, paddingBottom: 0 }}>
-                    {/* ✅ ratingLabel НЕ передаём: DoctorCard сам возьмёт из doctorCard.ratingSum/count */}
                     <AnswerDoctorCardLink doctor={doctorCard} href={doctorHref} />
                   </div>
 
