@@ -96,6 +96,11 @@ type ReviewsOk = {
 type ReviewsErr = { ok: false; error: string; hint?: string };
 type ReviewsResponse = ReviewsOk | ReviewsErr;
 
+// ✅ PRO статус (реальный)
+type ProStatusOk = { ok: true; isDoctor: boolean; isPro: boolean; proUntil: string | null };
+type ProStatusErr = { ok: false; error: string; hint?: string };
+type ProStatusResp = ProStatusOk | ProStatusErr;
+
 function fullName(d: DoctorDto | null) {
   const a = String(d?.lastName ?? '').trim();
   const b = String(d?.firstName ?? '').trim();
@@ -201,8 +206,10 @@ export default function DoctorProfilePage() {
   const [ratingAvg, setRatingAvg] = useState(0);
   const [ratingCount, setRatingCount] = useState(0);
 
-  // ✅ только для визуальной проверки бейджа PRO (потом заменишь на /api/pro/status)
-  const isProPreview = true;
+  // ✅ PRO status (реальный)
+  const [proLoading, setProLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
+  const [proUntil, setProUntil] = useState<string | null>(null);
 
   const onOpenCabinet = () => {
     haptic('light');
@@ -261,7 +268,6 @@ export default function DoctorProfilePage() {
         const d = (jDoc as DoctorMeOk).doctor;
         setDoctor(d);
 
-        // ✅ кабинет только для APPROVED
         const isApproved = String(d?.status || '').toUpperCase() === 'APPROVED';
         setCanOpenCabinet(isApproved);
 
@@ -277,6 +283,43 @@ export default function DoctorProfilePage() {
       }
     })();
   }, [router]);
+
+  // ✅ грузим PRO статус врача (по initData)
+  useEffect(() => {
+    (async () => {
+      try {
+        setProLoading(true);
+        setIsPro(false);
+        setProUntil(null);
+
+        if (!initData) return;
+
+        const r = await fetch('/api/pro/status', {
+          method: 'GET',
+          headers: { 'X-Telegram-Init-Data': initData, 'X-Init-Data': initData },
+          cache: 'no-store',
+        });
+
+        const j = (await r.json().catch(() => null)) as ProStatusResp | null;
+
+        if (!r.ok || !j || (j as any).ok !== true) {
+          setIsPro(false);
+          setProUntil(null);
+          return;
+        }
+
+        const ok = j as ProStatusOk;
+        setIsPro(Boolean(ok.isPro));
+        setProUntil(ok.proUntil ? String(ok.proUntil) : null);
+      } catch (e) {
+        console.error(e);
+        setIsPro(false);
+        setProUntil(null);
+      } finally {
+        setProLoading(false);
+      }
+    })();
+  }, [initData]);
 
   // грузим отзывы, когда знаем doctor.id
   useEffect(() => {
@@ -334,6 +377,8 @@ export default function DoctorProfilePage() {
     return Math.max(0, Math.min(5, v));
   }, [ratingAvg]);
 
+  const showProBadge = !proLoading && isPro;
+
   return (
     <main className="page">
       <TopBarBack />
@@ -373,9 +418,15 @@ export default function DoctorProfilePage() {
             Рейтинг: <b>{ratingLabel}</b> <span className="ratingCount">({formatInt(ratingCount)})</span>
           </div>
 
+          {/* ✅ badges: документы у всех, PRO только если активен */}
           <div className="badgesRow" aria-label="Бейджи">
-            <DocumentBadge size="sm" />
-            {isProPreview ? <ProBadge size="sm" /> : null}
+            <DocumentBadge size="sm" text="Документы подтверждены" />
+            {showProBadge ? (
+              <ProBadge
+                size="sm"
+                text={proUntil ? `Имеет статус ВРАЧ.PRO\nАктивно до: ${String(proUntil).slice(0, 10)}` : 'Имеет статус ВРАЧ.PRO'}
+              />
+            ) : null}
           </div>
         </section>
 
@@ -407,11 +458,7 @@ export default function DoctorProfilePage() {
             О враче
           </button>
 
-          <button
-            type="button"
-            className={tab === 'reviews' ? 'tab tabActive' : 'tab'}
-            onClick={() => setTab('reviews')}
-          >
+          <button type="button" className={tab === 'reviews' ? 'tab tabActive' : 'tab'} onClick={() => setTab('reviews')}>
             Отзывы
           </button>
         </section>
@@ -473,11 +520,7 @@ export default function DoctorProfilePage() {
                       <span className="reviewDate">{fmtDateRu(r.createdAt)}</span>
                     </div>
 
-                    {r.text ? (
-                      <div className="reviewText">{r.text}</div>
-                    ) : (
-                      <div className="reviewText muted">Без текста</div>
-                    )}
+                    {r.text ? <div className="reviewText">{r.text}</div> : <div className="reviewText muted">Без текста</div>}
 
                     {r.isVerified ? <div className="badgeOk">проверен</div> : null}
                   </div>
@@ -487,7 +530,6 @@ export default function DoctorProfilePage() {
           )}
         </section>
 
-        {/* ✅ Внутри wrap — одинаковая ширина/центровка */}
         <DownBarDoctor />
       </div>
 
