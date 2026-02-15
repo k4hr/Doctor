@@ -95,7 +95,6 @@ function isProActive(proUntil: Date | null) {
 function clampPriceRub(v: any) {
   const n = Math.round(Number(v));
   if (!Number.isFinite(n)) return 1000;
-  // врач задаёт цену, но минимум 1000
   return Math.max(1000, n);
 }
 
@@ -138,10 +137,7 @@ export async function POST(req: Request) {
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
 
-    // (опционально) только APPROVED
-    // if (doctor.status !== 'APPROVED') return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_APPROVED' }, { status: 403 });
-
-    // ✅ PRO обязателен, иначе консультации создавать нельзя
+    // ✅ PRO обязателен
     if (!isProActive(doctor.proUntil)) {
       return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_PRO' }, { status: 403 });
     }
@@ -151,7 +147,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
     }
 
-    // ✅ врач назначает цену, но минимум 1000
     const price = clampPriceRub(doctor.consultationPriceRub);
 
     const c = await prisma.consultation.create({
