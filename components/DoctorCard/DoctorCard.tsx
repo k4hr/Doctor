@@ -42,11 +42,11 @@ function haptic(type: 'light' | 'medium' = 'light') {
 }
 
 function doctorFullName(d: DoctorCardItem) {
+  // ✅ ТОЛЬКО: Фамилия + Имя (без отчества)
   const ln = String(d?.lastName ?? '').trim();
   const fn = String(d?.firstName ?? '').trim();
-  const mn = String(d?.middleName ?? '').trim();
   const base = [ln, fn].filter(Boolean).join(' ').trim();
-  return base || mn ? [base, mn].filter(Boolean).join(' ').trim() : '—';
+  return base || '—';
 }
 
 function doctorSpecsLine(d: DoctorCardItem) {
