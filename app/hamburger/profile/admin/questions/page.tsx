@@ -3,14 +3,25 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../../../../components/TopBarBack';
-import PhotoLightbox from '../../../../vopros/[id]/PhotoLightbox';
+
+// ✅ карточка как на главной / "Мои вопросы"
+import QuestionCard, { type QuestionCardData } from '../../../../vopros/main/QuestionCard';
+
+/* -------- tg helpers -------- */
+function tg(): any | null {
+  try {
+    return (window as any)?.Telegram?.WebApp || null;
+  } catch {
+    return null;
+  }
+}
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
-    (window as any)?.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(type);
+    tg()?.HapticFeedback?.impactOccurred?.(type);
   } catch {}
 }
 
@@ -41,7 +52,7 @@ function getInitDataFromCookie(): string {
 type AdminQuestion = {
   id: string;
   createdAt: string; // ISO
-  status: string;
+  status: string; // OPEN | IN_PROGRESS | DONE (или старые)
   speciality: string;
   title: string;
   body: string;
@@ -50,16 +61,16 @@ type AdminQuestion = {
   authorUsername: string | null;
   authorFirstName: string | null;
   authorLastName: string | null;
-  photoUrls: string[];
+
+  // опционально — если отдашь из API
+  isFree?: boolean | null;
+  priceRub?: number | null;
+  answersCount?: number | null;
 };
 
 type ListOk = { ok: true; items: AdminQuestion[] };
 type ListErr = { ok: false; error: string; hint?: string };
 type ListResp = ListOk | ListErr;
-
-type DelOk = { ok: true };
-type DelErr = { ok: false; error: string; hint?: string };
-type DelResp = DelOk | DelErr;
 
 function fmtDateTimeRuMsk(input: string) {
   const d = new Date(input);
@@ -81,7 +92,7 @@ function fmtDateTimeRuMsk(input: string) {
     hour12: false,
   }).format(d);
 
-  return `${datePart} г., ${timePart}`;
+  return `${datePart} ${timePart} (МСК)`;
 }
 
 function authorName(q: AdminQuestion) {
@@ -93,41 +104,67 @@ function authorName(q: AdminQuestion) {
   return `tg:${q.authorTelegramId}`;
 }
 
-function short(s: string, max = 140) {
-  const t = String(s || '').trim();
-  if (t.length <= max) return t;
-  return t.slice(0, max - 1).trimEnd() + '…';
+function answersSuffix(cnt: number) {
+  const n = Math.max(0, Math.trunc(cnt));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return '';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'а';
+  return 'ов';
 }
 
-function statusRu(s: string) {
+function mapStatusToUI(s: string): 'WAITING' | 'ANSWERING' | 'CLOSED' {
   const v = String(s || '').toUpperCase();
-  if (v === 'ANSWERING') return 'Отвечают';
-  if (v === 'WAITING') return 'Ожидает';
-  if (v === 'DONE') return 'Готово';
-  if (v === 'CLOSED') return 'Закрыт';
-  return s || '—';
+  // новая схема
+  if (v === 'DONE') return 'CLOSED';
+  if (v === 'IN_PROGRESS') return 'ANSWERING';
+  if (v === 'OPEN') return 'WAITING';
+
+  // старая схема (если где-то ещё прилетает)
+  if (v === 'CLOSED') return 'CLOSED';
+  if (v === 'ANSWERING') return 'ANSWERING';
+  if (v === 'WAITING') return 'WAITING';
+
+  return 'WAITING';
 }
 
-function statusTone(s: string): 'green' | 'yellow' | 'gray' | 'red' {
-  const v = String(s || '').toUpperCase();
-  if (v === 'DONE') return 'green';
-  if (v === 'ANSWERING') return 'yellow';
-  if (v === 'CLOSED') return 'red';
-  return 'gray';
-}
+function toQuestionCardData(q: AdminQuestion): QuestionCardData {
+  const cnt = typeof q.answersCount === 'number' && Number.isFinite(q.answersCount) ? Math.max(0, q.answersCount) : 0;
 
-function toneBg(t: string) {
-  if (t === 'green') return 'rgba(34,197,94,.12)';
-  if (t === 'yellow') return 'rgba(245,158,11,.14)';
-  if (t === 'red') return 'rgba(239,68,68,.12)';
-  return 'rgba(148,163,184,.18)';
-}
+  const isFree = q.isFree === true;
+  const price = typeof q.priceRub === 'number' && Number.isFinite(q.priceRub) ? Math.max(0, q.priceRub) : 0;
 
-function toneFg(t: string) {
-  if (t === 'green') return 'rgb(22,163,74)';
-  if (t === 'yellow') return 'rgb(180,83,9)';
-  if (t === 'red') return 'rgb(185,28,28)';
-  return 'rgb(71,85,105)';
+  const status = mapStatusToUI(q.status);
+
+  const priceBadge: QuestionCardData['priceBadge'] = isFree ? 'FREE' : q.isFree === false ? 'PAID' : 'FREE';
+  const priceText = isFree ? 'Бесплатно' : price > 0 ? `${Math.round(price)} ₽` : q.isFree === false ? 'Платно' : 'Бесплатно';
+
+  const author = authorName(q);
+  const created = fmtDateTimeRuMsk(q.createdAt);
+
+  // верхняя строка мелким — коротко и по делу
+  const authorLabel =
+    status === 'CLOSED'
+      ? `Закрыт · ${author}`
+      : cnt > 0
+      ? `${cnt} ответ${answersSuffix(cnt)} · ${author}`
+      : `Ждёт ответа · ${author}`;
+
+  return {
+    id: q.id,
+    title: String(q.title || '').trim() || '—',
+    bodySnippet: '',
+    createdAt: q.createdAt,
+
+    doctorLabel: String(q.speciality || '').trim() || '—',
+    authorLabel: `${authorLabel} · ${created}`,
+
+    status,
+    answersCount: cnt,
+
+    priceText,
+    priceBadge,
+  };
 }
 
 export default function AdminQuestionsPage() {
@@ -139,15 +176,14 @@ export default function AdminQuestionsPage() {
 
   const [initData, setInitData] = useState<string>('');
 
-  const [lbOpen, setLbOpen] = useState(false);
-  const [lbUrls, setLbUrls] = useState<string[]>([]);
-  const [lbIndex, setLbIndex] = useState(0);
-
-  const PhotoLightboxAny = PhotoLightbox as any;
-
   useEffect(() => {
     try {
-      const WebApp: any = (window as any)?.Telegram?.WebApp;
+      tg()?.ready?.();
+      tg()?.expand?.();
+    } catch {}
+
+    try {
+      const WebApp: any = tg();
       const v = (WebApp?.initData as string) || getInitDataFromCookie();
       if (WebApp?.initData) setCookie('tg_init_data', WebApp.initData, 3);
       setInitData(String(v || ''));
@@ -180,13 +216,13 @@ export default function AdminQuestionsPage() {
 
       const j = (await res.json().catch(() => null)) as ListResp | null;
 
-      if (!res.ok || !j || j.ok !== true) {
+      if (!res.ok || !j || (j as any).ok !== true) {
         setWarn((j as any)?.hint || (j as any)?.error || 'Ошибка загрузки');
         setItems([]);
         return;
       }
 
-      setItems(j.items || []);
+      setItems(Array.isArray((j as any).items) ? (j as any).items : []);
     } catch {
       setWarn('Сеть/сервер недоступны');
       setItems([]);
@@ -201,513 +237,127 @@ export default function AdminQuestionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initData]);
 
-  const openQuestion = (id: string) => {
-    haptic('light');
-    router.push(`/hamburger/profile/admin/questions/${encodeURIComponent(id)}`);
-  };
-
-  const openLightbox = (urls: string[], index: number) => {
-    if (!urls || urls.length === 0) return;
-    setLbUrls(urls);
-    setLbIndex(Math.max(0, Math.min(index, urls.length - 1)));
-    setLbOpen(true);
-  };
-
-  const removeQuestion = async (id: string) => {
-    if (!initData) return;
-
-    const ok = window.confirm('Удалить вопрос? Он исчезнет из общего списка.');
-    if (!ok) return;
-
-    haptic('medium');
-
-    const prev = items;
-    setItems((x) => x.filter((q) => q.id !== id));
-
-    try {
-      const res = await fetch('/api/admin/questions/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': initData,
-          'X-Init-Data': initData,
-        },
-        body: JSON.stringify({ id }),
-        cache: 'no-store',
-      });
-
-      const j = (await res.json().catch(() => null)) as DelResp | null;
-
-      if (!res.ok || !j || j.ok !== true) {
-        setWarn((j as any)?.hint || (j as any)?.error || 'Ошибка удаления');
-        setItems(prev);
-        haptic('light');
-        return;
-      }
-    } catch {
-      setWarn('Ошибка сети при удалении');
-      setItems(prev);
-      haptic('light');
-    }
-  };
+  const cards = useMemo(() => items.map(toQuestionCardData), [items]);
 
   return (
-    <main className="aqPage">
+    <main className="p">
       <TopBarBack />
 
-      <div className="aqWrap">
-        <div className="aqHead">
-          <h1 className="aqTitle">Вопросы</h1>
+      <h1 className="t">Вопросы</h1>
+      <p className="s">Админский список (карточки как в ленте)</p>
 
-          <div className="aqActions">
-            <button
-              className="aqBtn"
-              type="button"
-              onClick={() => {
-                haptic('light');
-                load(initData);
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Загрузка…' : 'Обновить'}
-            </button>
+      <div className="actions">
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            haptic('light');
+            load(initData);
+          }}
+          disabled={loading}
+        >
+          {loading ? 'Загрузка…' : 'Обновить'}
+        </button>
 
-            <button
-              className="aqBtn aqBtnGhost"
-              type="button"
-              onClick={() => {
-                haptic('light');
-                router.push('/vopros');
-              }}
-            >
-              Открыть ленту
-            </button>
-          </div>
-        </div>
-
-        {warn ? <div className="aqWarn">{warn}</div> : null}
-
-        {loading ? (
-          <div className="aqMuted">Загружаем вопросы…</div>
-        ) : items.length === 0 ? (
-          <div className="aqMuted">Пока нет вопросов.</div>
-        ) : (
-          <div className="aqList">
-            {items.map((q) => {
-              const tone = statusTone(q.status);
-              const thumb = Array.isArray(q.photoUrls) && q.photoUrls.length > 0 ? q.photoUrls[0] : '';
-
-              return (
-                <section
-                  key={q.id}
-                  className="aqCard"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Открыть вопрос: ${q.title}`}
-                  onClick={() => openQuestion(q.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      openQuestion(q.id);
-                    }
-                  }}
-                >
-                  <div className="aqCardInner">
-                    <div className="aqThumb">
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={thumb}
-                          alt=""
-                          className="aqThumbImg"
-                          loading="lazy"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptic('light');
-                            openLightbox(q.photoUrls, 0);
-                          }}
-                        />
-                      ) : (
-                        <div className="aqThumbPh" aria-hidden="true">
-                          ?
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="aqMain">
-                      <div className="aqLineTop">
-                        <div className="aqName">{q.title || 'Без названия'}</div>
-
-                        <div className="aqMiniBtns">
-                          <button
-                            type="button"
-                            className="aqMiniBtn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              haptic('light');
-                              openQuestion(q.id);
-                            }}
-                          >
-                            Открыть
-                          </button>
-
-                          <button
-                            type="button"
-                            className="aqMiniBtn aqMiniBtnDanger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeQuestion(q.id);
-                            }}
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="aqSub">
-                        <span
-                          className="aqBadge"
-                          style={{
-                            background: toneBg(tone),
-                            color: toneFg(tone),
-                          }}
-                        >
-                          {statusRu(q.status)}
-                        </span>
-
-                        <span className="aqDot">•</span>
-                        <span className="aqSubText">{q.speciality || '—'}</span>
-                      </div>
-
-                      <div className="aqMeta">
-                        <div className="aqMetaRow">
-                          <span className="aqMetaKey">Автор:</span>
-                          <span className="aqMetaVal">{authorName(q)}</span>
-                        </div>
-                        <div className="aqMetaRow">
-                          <span className="aqMetaKey">Создан:</span>
-                          <span className="aqMetaVal">{fmtDateTimeRuMsk(q.createdAt)}</span>
-                        </div>
-                      </div>
-
-                      {q.body ? <div className="aqPreview">{short(q.body, 160)}</div> : null}
-
-                      {Array.isArray(q.photoUrls) && q.photoUrls.length > 1 ? (
-                        <div className="aqPhotosLine">
-                          <button
-                            type="button"
-                            className="aqPhotoMore"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              haptic('light');
-                              openLightbox(q.photoUrls, 0);
-                            }}
-                          >
-                            Фото: {q.photoUrls.length}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        )}
+        <button
+          className="btn btnGhost"
+          type="button"
+          onClick={() => {
+            haptic('light');
+            router.push('/vopros');
+          }}
+        >
+          Открыть ленту
+        </button>
       </div>
 
-      <PhotoLightboxAny open={lbOpen} urls={lbUrls} startIndex={lbIndex} onClose={() => setLbOpen(false)} />
+      {warn ? <div className="warn">{warn}</div> : null}
+
+      {loading ? (
+        <div className="muted">Загрузка…</div>
+      ) : cards.length === 0 ? (
+        <div className="muted">Пока нет вопросов.</div>
+      ) : (
+        <section className="cards" aria-label="Список вопросов">
+          {cards.map((q) => (
+            <QuestionCard key={q.id} q={q} hrefBase="/hamburger/profile/admin/questions" />
+          ))}
+        </section>
+      )}
 
       <style jsx>{`
-        .aqPage {
-          min-height: 100vh;
-          background: linear-gradient(180deg, rgba(241, 245, 249, 1), rgba(248, 250, 252, 1));
-          overflow-x: hidden; /* ✅ убираем горизонтальный скролл */
+        .p {
+          min-height: 100dvh;
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+          background: #f6f7fb;
         }
 
-        /* ✅ как в /vopros/[id]: страница на всю ширину, без max-width */
-        .aqWrap {
-          width: 100%;
-          padding: 14px 14px 28px;
-          overflow-x: hidden;
-        }
-
-        .aqHead {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 12px;
-          margin: 10px 0 14px;
-          min-width: 0;
-        }
-
-        .aqTitle {
-          font-size: 28px;
-          line-height: 1.15;
+        .t {
+          margin: 6px 0 0;
+          font-size: 34px;
+          font-weight: 950;
           letter-spacing: -0.02em;
-          margin: 0;
-          min-width: 0;
+          color: #111827;
         }
 
-        .aqActions {
+        .s {
+          margin: 8px 0 14px;
+          font-size: 16px;
+          font-weight: 600;
+          color: rgba(17, 24, 39, 0.58);
+        }
+
+        .actions {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
-          justify-content: flex-end;
-          flex-shrink: 0;
+          margin: 6px 0 14px;
         }
 
-        .aqBtn {
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #fff;
-          border-radius: 12px;
-          padding: 10px 12px;
-          font-size: 14px;
+        .btn {
+          border: 1px solid rgba(15, 23, 42, 0.14);
+          background: rgba(255, 255, 255, 0.92);
+          border-radius: 18px;
+          padding: 12px 14px;
+          font-weight: 900;
+          font-size: 16px;
+          cursor: pointer;
           -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.05);
         }
 
-        .aqBtn:disabled {
-          opacity: 0.6;
-        }
-
-        .aqBtnGhost {
+        .btnGhost {
           background: rgba(255, 255, 255, 0.6);
         }
 
-        .aqWarn {
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.18);
-          color: rgb(153, 27, 27);
-          padding: 10px 12px;
-          border-radius: 14px;
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .warn {
           margin: 0 0 12px;
-          font-size: 14px;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .aqMuted {
-          color: rgba(71, 85, 105, 0.9);
-          font-size: 14px;
-          padding: 10px 2px;
-        }
-
-        .aqList {
-          display: grid;
-          gap: 12px;
-          min-width: 0;
-        }
-
-        .aqCard {
-          background: #fff;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 18px;
-          padding: 12px;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-          cursor: pointer;
-          user-select: none;
-          outline: none;
-
-          width: 100%;
-          max-width: 100%;
-          overflow: hidden; /* ✅ всё держим внутри карточки */
-        }
-
-        .aqCard:focus {
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14), 0 8px 18px rgba(15, 23, 42, 0.06);
-        }
-
-        .aqCardInner {
-          display: grid;
-          grid-template-columns: 54px 1fr;
-          gap: 12px;
-          align-items: start;
-          min-width: 0;
-        }
-
-        .aqThumb {
-          width: 54px;
-          height: 54px;
-          border-radius: 14px;
-          overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(241, 245, 249, 1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex: 0 0 auto;
-        }
-
-        .aqThumbImg {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-          max-width: 100%;
-        }
-
-        .aqThumbPh {
-          font-weight: 700;
-          color: rgba(71, 85, 105, 0.9);
-        }
-
-        .aqMain {
-          min-width: 0;
-        }
-
-        .aqLineTop {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 10px;
-          min-width: 0;
-        }
-
-        .aqName {
-          min-width: 0;
-          font-size: 16px;
-          font-weight: 750;
-          line-height: 1.25;
-          margin: 0;
-          color: rgba(15, 23, 42, 1);
-
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .aqMiniBtns {
-          display: flex;
-          gap: 8px;
-          flex-shrink: 0;
-        }
-
-        .aqMiniBtn {
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: rgba(255, 255, 255, 0.9);
-          border-radius: 10px;
-          padding: 6px 10px;
           font-size: 12px;
-          line-height: 1;
-          color: rgba(15, 23, 42, 0.9);
-          -webkit-tap-highlight-color: transparent;
-          white-space: nowrap;
-        }
-
-        .aqMiniBtnDanger {
-          border-color: rgba(239, 68, 68, 0.28);
-          background: rgba(239, 68, 68, 0.08);
-          color: rgb(185, 28, 28);
-        }
-
-        .aqSub {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 6px;
-          flex-wrap: wrap;
-          min-width: 0;
-        }
-
-        .aqBadge {
-          font-size: 12px;
-          font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.06);
-          white-space: nowrap;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .aqDot {
-          color: rgba(148, 163, 184, 1);
-        }
-
-        .aqSubText {
-          color: rgba(71, 85, 105, 1);
-          font-size: 13px;
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 100%;
-        }
-
-        .aqMeta {
-          margin-top: 8px;
-          display: grid;
-          gap: 4px;
-          min-width: 0;
-        }
-
-        .aqMetaRow {
-          display: grid;
-          grid-template-columns: 54px 1fr;
-          gap: 8px;
-          font-size: 12px;
-          line-height: 1.25;
-          min-width: 0;
-        }
-
-        .aqMetaKey {
-          color: rgba(100, 116, 139, 1);
-          white-space: nowrap;
-        }
-
-        .aqMetaVal {
-          color: rgba(30, 41, 59, 0.92);
-          min-width: 0;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .aqPreview {
-          margin-top: 8px;
-          font-size: 13px;
           line-height: 1.35;
-          color: rgba(30, 41, 59, 0.86);
+          color: #ef4444;
+          font-weight: 900;
           overflow-wrap: anywhere;
-          word-break: break-word;
         }
 
-        .aqPhotosLine {
-          margin-top: 10px;
-          min-width: 0;
-        }
-
-        .aqPhotoMore {
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: rgba(241, 245, 249, 1);
-          border-radius: 12px;
-          padding: 7px 10px;
+        .muted {
           font-size: 12px;
-          color: rgba(15, 23, 42, 0.85);
-          -webkit-tap-highlight-color: transparent;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          color: rgba(15, 23, 42, 0.6);
+          padding: 8px 0;
+          font-weight: 800;
         }
 
-        @media (max-width: 420px) {
-          .aqTitle {
-            font-size: 24px;
-          }
-          .aqMiniBtns {
-            display: none;
-          }
-        }
-      `}</style>
-
-      {/* ✅ страховка на уровне документа от горизонтального скролла */}
-      <style jsx global>{`
-        html,
-        body {
-          overflow-x: hidden;
-        }
-        img {
-          max-width: 100%;
-          height: auto;
+        .cards {
+          display: flex;
+          flex-direction: column;
+          gap: 10px; /* ✅ как на главной */
+          margin-top: 8px;
         }
       `}</style>
     </main>
