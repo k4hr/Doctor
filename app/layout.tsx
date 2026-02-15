@@ -7,6 +7,7 @@ import TwaBootstrap from '../components/TwaBootstrap';
 import GlobalSafeTop from '../components/GlobalSafeTop';
 import TMAInit from '../components/TMAInit';
 import TelegramNoSwipeInit from '../components/TelegramNoSwipeInit';
+import SplashGate from '../components/Loading/SplashGate';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -50,7 +51,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <TMAInit />
 
         <div className="lm-page">
-          <TwaBootstrap>{children}</TwaBootstrap>
+          {/* ✅ Splash 3 секунды всегда при старте */}
+          <SplashGate bgUrl="/splash/doctor.jpg" durationMs={3000} spinnerSize={70}>
+            <TwaBootstrap>{children}</TwaBootstrap>
+          </SplashGate>
         </div>
       </body>
     </html>
