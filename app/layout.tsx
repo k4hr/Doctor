@@ -52,7 +52,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <div className="lm-page">
           {/* ✅ Splash 3 секунды всегда при старте */}
-          <SplashGate bgUrl="/splash/doctor.jpg" durationMs={3000} spinnerSize={70}>
+          <SplashGate
+            bgMobileUrl="/splash/doctor-9x16.jpg"
+            bgDesktopUrl="/splash/doctor-16x9.jpg"
+            durationMs={3000}
+            spinnerSize={70}
+            spinnerXPercent={50}
+            spinnerYPercent={72}
+          >
             <TwaBootstrap>{children}</TwaBootstrap>
           </SplashGate>
         </div>
