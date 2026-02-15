@@ -109,6 +109,7 @@ export default function DoctorConsultationsPage() {
   const [proUntil, setProUntil] = useState<string | null>(null);
 
   const [consultationEnabled, setConsultationEnabled] = useState(false);
+  const [thanksEnabled, setThanksEnabled] = useState(false);
   const [priceStr, setPriceStr] = useState('1000');
   const [saving, setSaving] = useState(false);
 
@@ -137,6 +138,7 @@ export default function DoctorConsultationsPage() {
           setSettingsWarn(String((j as any)?.hint || (j as any)?.error || 'Не удалось загрузить настройки'));
           setProActive(false);
           setProUntil(null);
+          setThanksEnabled(false);
           return;
         }
 
@@ -144,12 +146,14 @@ export default function DoctorConsultationsPage() {
         setProActive(Boolean(ok.proActive));
         setProUntil(ok.proUntil ?? null);
         setConsultationEnabled(Boolean(ok.consultationEnabled));
+        setThanksEnabled(Boolean(ok.thanksEnabled));
         setPriceStr(String(Math.max(1000, Math.round(Number(ok.consultationPriceRub || 1000)))));
       } catch (e: any) {
         console.error(e);
         setSettingsWarn('Ошибка загрузки настроек');
         setProActive(false);
         setProUntil(null);
+        setThanksEnabled(false);
       } finally {
         setSettingsLoading(false);
       }
@@ -233,7 +237,6 @@ export default function DoctorConsultationsPage() {
         return;
       }
 
-      // нормализуем строку цены обратно
       setPriceStr(String((j as SaveOk).consultationPriceRub));
       setConsultationEnabled(Boolean((j as SaveOk).consultationEnabled));
 
@@ -292,7 +295,7 @@ export default function DoctorConsultationsPage() {
         </div>
 
         <div className="setHint">
-          Минимум <b>1000 ₽</b>. Благодарности: <b>{proActive ? 'ON' : 'OFF'}</b>
+          Минимум <b>1000 ₽</b>. Благодарности: <b>{thanksEnabled ? 'ON' : 'OFF'}</b>
           {proUntil ? (
             <>
               {' '}
@@ -396,7 +399,6 @@ export default function DoctorConsultationsPage() {
           color: rgba(17, 24, 39, 0.58);
         }
 
-        /* settings */
         .setCard {
           background: #fff;
           border-radius: 18px;
