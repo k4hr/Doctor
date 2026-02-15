@@ -89,7 +89,6 @@ function isProActive(proUntil: Date | null) {
 function clampAmountRub(v: any) {
   const n = Math.round(Number(v));
   if (!Number.isFinite(n)) return 0;
-  // минималку можешь поменять; я поставил 100 как здравый порог
   return Math.max(100, Math.min(200_000, n));
 }
 
@@ -126,7 +125,7 @@ export async function POST(req: Request) {
 
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
-      select: { id: true, proUntil: true },
+      select: { id: true, proUntil: true, thanksEnabled: true },
     });
 
     if (!doctor) return NextResponse.json({ ok: false, error: 'DOCTOR_NOT_FOUND' }, { status: 404 });
@@ -134,6 +133,11 @@ export async function POST(req: Request) {
     // ✅ благодарности только при активном PRO
     if (!isProActive(doctor.proUntil)) {
       return NextResponse.json({ ok: false, error: 'PRO_REQUIRED' }, { status: 403 });
+    }
+
+    // ✅ и только если флаг включен
+    if (!doctor.thanksEnabled) {
+      return NextResponse.json({ ok: false, error: 'THANKS_DISABLED' }, { status: 403 });
     }
 
     const t = await prisma.thanks.create({
@@ -151,7 +155,10 @@ export async function POST(req: Request) {
       select: { id: true, amountRub: true },
     });
 
-    return NextResponse.json({ ok: true, thanksId: t.id, amountRub: t.amountRub }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { ok: true, thanksId: t.id, amountRub: t.amountRub },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (e: any) {
     console.error(e);
     return NextResponse.json({ ok: false, error: 'FAILED_CREATE', hint: String(e?.message || '') }, { status: 500 });
