@@ -350,37 +350,36 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     gap: 12,
   };
 
-  const pillFreeStyle: React.CSSProperties = {
-    fontSize: 12,
-    fontWeight: 900,
-    padding: '6px 10px',
+  // ✅ уменьшенные плашки, одинаковый шрифт как в QuestionCard
+  const pillBase: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    padding: '4px 9px',
     borderRadius: 999,
-    background: 'rgba(15, 23, 42, 0.04)',
-    border: '1px solid rgba(15, 23, 42, 0.10)',
-    color: 'rgba(15, 23, 42, 0.70)',
+    border: '1px solid transparent',
     whiteSpace: 'nowrap',
+    lineHeight: 1.05,
+  };
+
+  const pillFreeStyle: React.CSSProperties = {
+    ...pillBase,
+    background: 'rgba(15, 23, 42, 0.04)',
+    borderColor: 'rgba(15, 23, 42, 0.10)',
+    color: 'rgba(15, 23, 42, 0.70)',
   };
 
   const pillGoldStyle: React.CSSProperties = {
-    fontSize: 12,
-    fontWeight: 900,
-    padding: '6px 10px',
-    borderRadius: 999,
+    ...pillBase,
     background: 'rgba(245, 158, 11, 0.12)',
-    border: '1px solid rgba(245, 158, 11, 0.30)',
+    borderColor: 'rgba(245, 158, 11, 0.30)',
     color: '#92400e',
-    whiteSpace: 'nowrap',
   };
 
   const pillClosedGreen: React.CSSProperties = {
-    fontSize: 12,
-    fontWeight: 900,
-    padding: '6px 10px',
-    borderRadius: 999,
+    ...pillBase,
     background: 'rgba(34, 197, 94, 0.12)',
-    border: '1px solid rgba(34, 197, 94, 0.30)',
+    borderColor: 'rgba(34, 197, 94, 0.30)',
     color: 'rgba(22, 163, 74, 1)',
-    whiteSpace: 'nowrap',
   };
 
   return (
@@ -392,7 +391,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <QuestionHeaderActions questionId={String(qFinal.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
-        {/* ✅ Автор слева, цена справа. Цена серая как в QuestionCard */}
+        {/* ✅ верхняя строка: только автор (плашки ниже, как ты сказал) */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
           <div
             style={{
@@ -410,15 +409,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
             title={authorText}
           >
             {authorText}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: '0 0 auto' }}>
-            <span style={isPaid ? pillGoldStyle : pillFreeStyle} aria-label="Цена">
-              {priceLabel}
-            </span>
-
-            {/* ✅ Если закрыт — отдельная плашка ниже, как в карточке */}
-            {isClosed ? <span style={pillClosedGreen}>Вопрос закрыт</span> : null}
           </div>
         </div>
 
@@ -447,6 +437,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show((qFinal as any).body)}
         </div>
 
+        {/* ✅ строка: специальность + дата */}
         <div
           style={{
             display: 'flex',
@@ -482,7 +473,17 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        {/* ✅ Убрали “Закрыт/Открыт” и время закрытия полностью */}
+        {/* ✅ ВОТ ОНО: плашки ПОД специальностью и ПЕРЕД линией к "Фотографии" */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: -2 }}>
+          <span style={isPaid ? pillGoldStyle : pillFreeStyle} aria-label="Цена">
+            {priceLabel}
+          </span>
+          {isClosed ? (
+            <span style={pillClosedGreen} aria-label="Статус">
+              Вопрос закрыт
+            </span>
+          ) : null}
+        </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
