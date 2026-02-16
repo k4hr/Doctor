@@ -1,4 +1,3 @@
-/* path: app/vopros/[id]/page.tsx */
 import type React from 'react';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
@@ -167,7 +166,6 @@ function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardI
     experienceYears: typeof d?.experienceYears === 'number' ? d.experienceYears : null,
     avatarUrl: avatarUrl ?? null,
 
-    // ✅ рейтинг агрегаты
     ratingSum: typeof d?.ratingSum === 'number' ? d.ratingSum : d?.ratingSum != null ? Number(d.ratingSum) : null,
     ratingCount:
       typeof d?.ratingCount === 'number' ? d.ratingCount : d?.ratingCount != null ? Number(d.ratingCount) : null,
@@ -175,7 +173,6 @@ function doctorCardItemFromDoctor(d: any, avatarUrl: string | null): DoctorCardI
     ratingValue:
       typeof d?.ratingValue === 'number' ? d.ratingValue : d?.ratingValue != null ? Number(d.ratingValue) : null,
 
-    // ✅ PRO (для золота в DoctorCard)
     proUntil: proUntilIso,
     proActive,
   };
@@ -253,11 +250,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               profilephotourl: true,
               profilephotocrop: true,
 
-              // ✅ рейтинг агрегаты
               ratingSum: true,
               ratingCount: true,
 
-              // ✅ PRO (для золота)
               proUntil: true,
 
               files: {
@@ -338,6 +333,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   const priceLabel = priceBadgeLabel(qFinal as any);
   const authorText = authorLabelFromQuestion(qFinal as any);
+  const isPaid = priceLabel !== 'Бесплатно';
 
   const cardStyle: React.CSSProperties = {
     width: '100%',
@@ -354,6 +350,39 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     gap: 12,
   };
 
+  const pillFreeStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 900,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(15, 23, 42, 0.04)',
+    border: '1px solid rgba(15, 23, 42, 0.10)',
+    color: 'rgba(15, 23, 42, 0.70)',
+    whiteSpace: 'nowrap',
+  };
+
+  const pillGoldStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 900,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(245, 158, 11, 0.12)',
+    border: '1px solid rgba(245, 158, 11, 0.30)',
+    color: '#92400e',
+    whiteSpace: 'nowrap',
+  };
+
+  const pillClosedGreen: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 900,
+    padding: '6px 10px',
+    borderRadius: 999,
+    background: 'rgba(34, 197, 94, 0.12)',
+    border: '1px solid rgba(34, 197, 94, 0.30)',
+    color: 'rgba(22, 163, 74, 1)',
+    whiteSpace: 'nowrap',
+  };
+
   return (
     <main style={pageStyle}>
       <TopBarBack />
@@ -363,40 +392,33 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <QuestionHeaderActions questionId={String(qFinal.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 900,
-              padding: '6px 10px',
-              borderRadius: 999,
-              background: priceLabel === 'Бесплатно' ? 'rgba(59,130,246,0.10)' : 'rgba(34,197,94,0.12)',
-              border: '1px solid rgba(15,23,42,0.10)',
-              color: priceLabel === 'Бесплатно' ? '#1e40af' : '#166534',
-              whiteSpace: 'nowrap',
-              flex: '0 0 auto',
-            }}
-            aria-label="Цена"
-          >
-            {priceLabel}
-          </span>
-
+        {/* ✅ Автор слева, цена справа. Цена серая как в QuestionCard */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
           <div
             style={{
               fontSize: 12,
-              fontWeight: 900,
-              color: 'rgba(15,23,42,0.58)',
+              fontWeight: 700,
+              color: 'rgba(15,23,42,0.80)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               minWidth: 0,
               flex: '1 1 auto',
-              textAlign: 'right',
+              textAlign: 'left',
             }}
             aria-label="Автор вопроса"
             title={authorText}
           >
             {authorText}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: '0 0 auto' }}>
+            <span style={isPaid ? pillGoldStyle : pillFreeStyle} aria-label="Цена">
+              {priceLabel}
+            </span>
+
+            {/* ✅ Если закрыт — отдельная плашка ниже, как в карточке */}
+            {isClosed ? <span style={pillClosedGreen}>Вопрос закрыт</span> : null}
           </div>
         </div>
 
@@ -460,28 +482,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 900,
-              padding: '6px 10px',
-              borderRadius: 999,
-              border: '1px solid rgba(15,23,42,0.10)',
-              background: isClosed ? 'rgba(109, 40, 217, 0.10)' : 'rgba(15,23,42,0.04)',
-              color: isClosed ? '#6d28d9' : 'rgba(15,23,42,0.70)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {isClosed ? 'Закрыт' : 'Открыт'}
-          </span>
-
-          {isClosed ? (
-            <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.60)' }}>
-              Закрыт: {fmtDateTimeRuMsk((qFinal as any)?.close?.createdAt)}
-            </span>
-          ) : null}
-        </div>
+        {/* ✅ Убрали “Закрыт/Открыт” и время закрытия полностью */}
 
         <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
