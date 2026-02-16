@@ -1,4 +1,3 @@
-/* path: app/vopros/[id]/QuestionHeaderActions.tsx */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -111,9 +110,13 @@ export default function QuestionHeaderActions({ questionId, isAuthor }: Props) {
 
   return (
     <div className="qh">
-      <button type="button" className="qhClose" onClick={onCloseQuestion} aria-label="Закрыть вопрос">
-        Закрыть вопрос
-      </button>
+      {isAuthor ? (
+        <button type="button" className="qhClose" onClick={onCloseQuestion} aria-label="Закрыть вопрос">
+          Закрыть вопрос
+        </button>
+      ) : (
+        <span />
+      )}
 
       <div className="qhRight">
         <button type="button" className="qhMini" onClick={onToggle} aria-label={actionLabel} title={actionLabel}>
