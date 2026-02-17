@@ -5,6 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import TopBarBack from '../../../../components/TopBarBack';
 
+// ✅ используем ровно ту же карточку, что у врача
+import ConsultationCard, { type ConsultationCardData } from '../doctor/settings/consultation/Card';
+
 function tg(): any | null {
   try {
     return (window as any)?.Telegram?.WebApp || null;
@@ -51,35 +54,6 @@ function fmtDateTime(iso: string) {
   }
 }
 
-function timeAgoRu(input: string | Date) {
-  const d = input instanceof Date ? input : new Date(input);
-  const ts = d.getTime();
-  if (!Number.isFinite(ts)) return '—';
-
-  const diffMs = Date.now() - ts;
-  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-
-  if (diffSec < 60) return 'только что';
-
-  const min = Math.floor(diffSec / 60);
-  if (min < 60) return `${min} мин назад`;
-
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ч назад`;
-
-  const days = Math.floor(hr / 24);
-  if (days === 1) return '1 день назад';
-  if (days >= 2 && days <= 4) return `${days} дня назад`;
-  return `${days} дней назад`;
-}
-
-function safeSnippet(s: any) {
-  const t = String(s ?? '').trim();
-  if (!t) return '—';
-  const oneLine = t.replace(/\s+/g, ' ').trim();
-  return oneLine.length > 120 ? oneLine.slice(0, 120).trim() + '…' : oneLine;
-}
-
 type ListItem = {
   id: string;
   status: 'DRAFT' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CLOSED';
@@ -120,235 +94,31 @@ type ApiOkList = { ok: true; items: ListItem[] };
 type ApiOkDetail = { ok: true; item: Detail };
 type ApiErr = { ok: false; error: string; hint?: string };
 
-function statusUi(status: ListItem['status'] | Detail['status']) {
-  const st = String(status || 'PENDING').toUpperCase();
+type UiStatus = 'DRAFT' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CLOSED';
 
-  if (st === 'ACCEPTED') return { text: 'Принята', tone: 'green' as const };
-  if (st === 'DECLINED') return { text: 'Отказана', tone: 'red' as const };
-  if (st === 'CLOSED') return { text: 'Закрыта', tone: 'gray' as const };
-  if (st === 'DRAFT') return { text: 'Черновик', tone: 'gray' as const };
-
-  return { text: 'Ожидает решения', tone: 'blue' as const }; // PENDING
+function normalizeStatus(s: any): UiStatus {
+  const v = String(s || '').toUpperCase().trim();
+  if (v === 'DRAFT' || v === 'PENDING' || v === 'ACCEPTED' || v === 'DECLINED' || v === 'CLOSED') return v as UiStatus;
+  return 'PENDING';
 }
 
-function priceUi(priceRub: number) {
-  const p = Math.round(Number(priceRub) || 0);
-  if (p > 0) return { text: `${p} ₽`, tone: 'gold' as const };
-  return { text: 'Бесплатно', tone: 'free' as const };
+function safeSnippet(s: any) {
+  const t = String(s ?? '').trim();
+  if (!t) return '—';
+  const oneLine = t.replace(/\s+/g, ' ').trim();
+  return oneLine.length > 120 ? oneLine.slice(0, 120).trim() + '…' : oneLine;
 }
 
-/** Карточка 1:1 как у врача (ConsultationCard), только заголовок — имя врача */
-function PatientConsultationCard({
-  it,
-  onOpen,
-}: {
-  it: ListItem;
-  onOpen: () => void;
-}) {
-  const st = statusUi(it.status);
-  const pr = priceUi(it.priceRub);
-  const snippet = safeSnippet(it.lastText || '');
-  const time = timeAgoRu(it.createdAt);
-
-  return (
-    <>
-      <button type="button" className="cc" onClick={onOpen} aria-label="Открыть консультацию">
-        <div className="ccTop">
-          <div className="ccText">
-            <div className="ccTitle">{it.doctorName || 'Врач'}</div>
-            <div className="ccSnippet">{snippet || st.text}</div>
-          </div>
-
-          <div className="ccRight">
-            <span className={`ccPill ${pr.tone === 'gold' ? 'ccPill--gold' : 'ccPill--free'}`}>{pr.text}</span>
-
-            <span
-              className={`ccPill ${
-                st.tone === 'green'
-                  ? 'ccPill--green'
-                  : st.tone === 'blue'
-                  ? 'ccPill--blue'
-                  : st.tone === 'red'
-                  ? 'ccPill--red'
-                  : 'ccPill--gray'
-              }`}
-            >
-              {st.text}
-            </span>
-          </div>
-        </div>
-
-        <div className="ccBottom">
-          <span className="ccTime">{time}</span>
-        </div>
-      </button>
-
-      <style jsx>{`
-        .cc {
-          width: 100%;
-          max-width: 100%;
-          text-align: left;
-          cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-
-          border: 1px solid rgba(10, 12, 20, 0.08);
-          background: rgba(255, 255, 255, 0.96);
-          border-radius: 18px;
-
-          padding: 10px 12px 9px;
-
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.07);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-
-          position: relative;
-
-          display: flex;
-          flex-direction: column;
-
-          height: 92px;
-          overflow: hidden;
-
-          justify-content: space-between;
-        }
-
-        .cc::after {
-          content: '';
-          position: absolute;
-          left: 12px;
-          right: 12px;
-          bottom: 0px;
-
-          height: 1px;
-          background: rgba(15, 23, 42, 0.08);
-
-          transform: scaleY(0.5);
-          transform-origin: bottom;
-          pointer-events: none;
-        }
-
-        .cc:active {
-          transform: translateY(1px);
-          box-shadow: 0 6px 18px rgba(18, 28, 45, 0.11);
-        }
-
-        .ccTop {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          align-items: start;
-          gap: 10px;
-          min-width: 0;
-        }
-
-        .ccText {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          min-width: 0;
-        }
-
-        .ccTitle {
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.8);
-          line-height: 1.05;
-
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .ccSnippet {
-          margin: 0;
-          font-size: 14px;
-          font-weight: 700;
-          color: #022c22;
-
-          line-height: 16px;
-          height: 32px;
-          max-height: 32px;
-
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          min-width: 0;
-        }
-
-        .ccRight {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 4px;
-        }
-
-        .ccPill {
-          flex: 0 0 auto;
-
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 9px;
-
-          border-radius: 999px;
-          border: 1px solid transparent;
-          white-space: nowrap;
-          line-height: 1.05;
-        }
-
-        .ccPill--free {
-          background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.1);
-          color: rgba(15, 23, 42, 0.7);
-        }
-
-        .ccPill--gold {
-          background: rgba(245, 158, 11, 0.12);
-          border-color: rgba(245, 158, 11, 0.3);
-          color: #92400e;
-        }
-
-        .ccPill--green {
-          background: rgba(34, 197, 94, 0.12);
-          border-color: rgba(34, 197, 94, 0.3);
-          color: rgba(22, 163, 74, 1);
-        }
-
-        .ccPill--blue {
-          background: rgba(59, 130, 246, 0.12);
-          border-color: rgba(59, 130, 246, 0.3);
-          color: rgba(37, 99, 235, 1);
-        }
-
-        .ccPill--red {
-          background: rgba(239, 68, 68, 0.12);
-          border-color: rgba(239, 68, 68, 0.28);
-          color: rgba(185, 28, 28, 1);
-        }
-
-        .ccPill--gray {
-          background: rgba(15, 23, 42, 0.04);
-          border-color: rgba(15, 23, 42, 0.12);
-          color: rgba(15, 23, 42, 0.7);
-        }
-
-        .ccBottom {
-          display: flex;
-          justify-content: flex-end;
-          align-items: end;
-          min-width: 0;
-          margin-top: 2px;
-        }
-
-        .ccTime {
-          white-space: nowrap;
-          font-size: 11px;
-          font-weight: 600;
-          color: rgba(15, 23, 42, 0.62);
-          line-height: 1.05;
-        }
-      `}</style>
-    </>
-  );
+function toConsultationCardData(it: ListItem): ConsultationCardData {
+  return {
+    id: it.id,
+    status: normalizeStatus(it.status),
+    createdAt: it.createdAt,
+    priceRub: Number(it.priceRub || 0),
+    bodySnippet: safeSnippet(it.lastText),
+    // у врача в демо стоит PAID — оставим так же, чтобы визуально было 1:1
+    priceBadge: 'PAID',
+  };
 }
 
 export default function HamburgerConsultationsPage() {
@@ -524,42 +294,37 @@ export default function HamburgerConsultationsPage() {
     }
   }
 
+  const uiCards: ConsultationCardData[] = useMemo(() => items.map(toConsultationCardData), [items]);
+
   return (
     <main className="p">
-      <div className="top">
-        <TopBarBack />
-        <div className="head">
-          <div className="title">{title}</div>
-          <div className="sub">
-            {chatId ? (detail ? `Консультация • ${fmtDateTime(detail.createdAt)}` : 'загрузка…') : 'Ваши консультации'}
-          </div>
-        </div>
+      <TopBarBack />
 
-        {chatId ? (
-          <button className="x" type="button" onClick={closeChat}>
-            Назад
-          </button>
-        ) : null}
-      </div>
+      <h1 className="t">{chatId ? title : 'Консультации'}</h1>
+      <p className="s">
+        {chatId ? (detail ? `Консультация • ${fmtDateTime(detail.createdAt)}` : 'загрузка…') : 'Ваши консультации'}
+      </p>
+
+      {chatId ? (
+        <button className="backBtn" type="button" onClick={closeChat}>
+          Назад
+        </button>
+      ) : null}
 
       {warn ? <div className="warn">{warn}</div> : null}
 
       {/* ====== LIST ====== */}
       {!chatId ? (
         loading ? (
-          <div className="card">
-            <div className="muted">Загрузка…</div>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="card">
-            <div className="muted">Пока консультаций нет.</div>
-          </div>
+          <div className="muted">Загрузка…</div>
+        ) : uiCards.length === 0 ? (
+          <div className="muted">Пока консультаций нет.</div>
         ) : (
-          <div className="list" aria-label="Список консультаций">
-            {items.map((it) => (
-              <PatientConsultationCard key={it.id} it={it} onOpen={() => openChat(it.id)} />
+          <section className="cards" aria-label="Список консультаций">
+            {uiCards.map((c) => (
+              <ConsultationCard key={c.id} c={c} hrefBase="/hamburger/profile/consultations" />
             ))}
-          </div>
+          </section>
         )
       ) : null}
 
@@ -658,76 +423,73 @@ export default function HamburgerConsultationsPage() {
       ) : null}
 
       <style jsx>{`
-        :global(*),
-        :global(*::before),
-        :global(*::after) {
-          box-sizing: border-box;
-        }
-
         .p {
           min-height: 100dvh;
-          width: 100%;
-          max-width: 100%;
-          overflow-x: hidden;
-          padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
+          padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
           background: #f6f7fb;
+          overflow-x: hidden;
         }
 
-        .top {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 10px;
-          max-width: 100%;
-        }
-
-        .head {
-          min-width: 0;
-          flex: 1 1 auto;
-          max-width: 100%;
-        }
-
-        .title {
-          font-size: 16px;
+        .t {
+          margin: 6px 0 0;
+          font-size: 34px;
           font-weight: 950;
+          letter-spacing: -0.02em;
           color: #111827;
-          line-height: 1.1;
-          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
-        .sub {
-          margin-top: 2px;
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(17, 24, 39, 0.55);
-          white-space: nowrap;
+        .s {
+          margin: 8px 0 14px;
+          font-size: 16px;
+          font-weight: 600;
+          color: rgba(17, 24, 39, 0.58);
           overflow: hidden;
           text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
-        .x {
-          border: none;
-          height: 34px;
-          padding: 0 12px;
-          border-radius: 12px;
-          background: rgba(15, 23, 42, 0.06);
-          color: rgba(17, 24, 39, 0.86);
-          font-size: 12px;
-          font-weight: 950;
+        .backBtn {
+          width: 100%;
+          margin: 0 0 12px;
+          border: 1px solid rgba(15, 23, 42, 0.14);
+          background: rgba(255, 255, 255, 0.92);
+          border-radius: 18px;
+          padding: 12px 14px;
+          font-size: 16px;
+          font-weight: 900;
+          color: rgba(17, 24, 39, 0.78);
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          flex: 0 0 auto;
+          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.05);
+        }
+        .backBtn:active {
+          transform: scale(0.99);
         }
 
         .warn {
-          margin: 0 0 10px;
+          margin: 0 0 12px;
           font-size: 12px;
-          font-weight: 900;
+          line-height: 1.35;
           color: #ef4444;
+          font-weight: 900;
           overflow-wrap: anywhere;
-          max-width: 100%;
+        }
+
+        .muted {
+          font-size: 12px;
+          color: rgba(15, 23, 42, 0.6);
+          padding: 8px 0;
+          font-weight: 800;
+        }
+
+        .cards {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 8px;
         }
 
         .card {
@@ -737,20 +499,6 @@ export default function HamburgerConsultationsPage() {
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           padding: 12px;
           margin-bottom: 12px;
-          max-width: 100%;
-        }
-
-        .muted {
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.65);
-          font-size: 13px;
-        }
-
-        .list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          max-width: 100%;
         }
 
         .row {
@@ -758,7 +506,6 @@ export default function HamburgerConsultationsPage() {
           justify-content: space-between;
           align-items: baseline;
           gap: 10px;
-          max-width: 100%;
         }
 
         .lbl {
@@ -793,7 +540,6 @@ export default function HamburgerConsultationsPage() {
           color: rgba(11, 12, 16, 0.86);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
-          max-width: 100%;
         }
 
         .photos {
@@ -801,7 +547,6 @@ export default function HamburgerConsultationsPage() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 8px;
           margin-top: 6px;
-          max-width: 100%;
         }
 
         .ph2 {
@@ -810,7 +555,6 @@ export default function HamburgerConsultationsPage() {
           overflow: hidden;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(15, 23, 42, 0.03);
-          max-width: 100%;
         }
 
         .ph2 img {
@@ -830,7 +574,6 @@ export default function HamburgerConsultationsPage() {
           font-size: 12px;
           font-weight: 800;
           line-height: 1.35;
-          max-width: 100%;
         }
 
         .chat {
@@ -839,7 +582,6 @@ export default function HamburgerConsultationsPage() {
           border-radius: 18px;
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           overflow: hidden;
-          max-width: 100%;
         }
 
         .msgs {
@@ -849,7 +591,6 @@ export default function HamburgerConsultationsPage() {
           display: flex;
           flex-direction: column;
           gap: 8px;
-          max-width: 100%;
         }
 
         .empty {
@@ -860,19 +601,16 @@ export default function HamburgerConsultationsPage() {
 
         .msg {
           display: flex;
-          max-width: 100%;
         }
-
         .msg.me {
           justify-content: flex-end;
         }
-
         .msg.you {
           justify-content: flex-start;
         }
 
         .bubble {
-          max-width: min(78%, 520px);
+          max-width: 78%;
           border-radius: 16px;
           padding: 10px 10px 8px;
           border: 1px solid rgba(15, 23, 42, 0.08);
@@ -890,7 +628,6 @@ export default function HamburgerConsultationsPage() {
           color: rgba(11, 12, 16, 0.86);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
-          max-width: 100%;
         }
 
         .tm {
@@ -908,7 +645,6 @@ export default function HamburgerConsultationsPage() {
           padding: 10px;
           border-top: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(255, 255, 255, 0.9);
-          max-width: 100%;
         }
 
         .inp {
@@ -922,7 +658,6 @@ export default function HamburgerConsultationsPage() {
           color: #111827;
           outline: none;
           min-width: 0;
-          max-width: 100%;
         }
 
         .send {
@@ -937,7 +672,6 @@ export default function HamburgerConsultationsPage() {
           color: #fff;
           box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
           -webkit-tap-highlight-color: transparent;
-          flex: 0 0 auto;
         }
 
         .send:disabled {
