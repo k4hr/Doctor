@@ -1,5 +1,10 @@
 -- prisma/migrations/20260217_consultations_and_thanks/migration.sql
 
+-- ВАЖНО:
+-- Не используем ALTER TYPE ... ADD VALUE вообще.
+-- Prisma может оборачивать миграцию в транзакцию, а ADD VALUE часто ломается в транзакции.
+-- Мы считаем, что это новая фича и enum-ы создаём “с нуля”.
+
 -- ===========================
 -- 1) ENUM types (Postgres)
 -- ===========================
@@ -11,47 +16,10 @@ BEGIN
   END IF;
 END$$;
 
--- если enum уже есть — добиваем недостающие значения
-DO $$
-DECLARE
-  t_oid oid;
-BEGIN
-  SELECT oid INTO t_oid FROM pg_type WHERE typname = 'ConsultationStatus';
-  IF t_oid IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'DRAFT') THEN
-      ALTER TYPE "ConsultationStatus" ADD VALUE 'DRAFT';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'PENDING') THEN
-      ALTER TYPE "ConsultationStatus" ADD VALUE 'PENDING';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'ACCEPTED') THEN
-      ALTER TYPE "ConsultationStatus" ADD VALUE 'ACCEPTED';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'DECLINED') THEN
-      ALTER TYPE "ConsultationStatus" ADD VALUE 'DECLINED';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'CLOSED') THEN
-      ALTER TYPE "ConsultationStatus" ADD VALUE 'CLOSED';
-    END IF;
-  END IF;
-END$$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ConsultationFileKind') THEN
     CREATE TYPE "ConsultationFileKind" AS ENUM ('PHOTO');
-  END IF;
-END$$;
-
-DO $$
-DECLARE
-  t_oid oid;
-BEGIN
-  SELECT oid INTO t_oid FROM pg_type WHERE typname = 'ConsultationFileKind';
-  IF t_oid IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'PHOTO') THEN
-      ALTER TYPE "ConsultationFileKind" ADD VALUE 'PHOTO';
-    END IF;
   END IF;
 END$$;
 
@@ -63,48 +31,9 @@ BEGIN
 END$$;
 
 DO $$
-DECLARE
-  t_oid oid;
-BEGIN
-  SELECT oid INTO t_oid FROM pg_type WHERE typname = 'ConsultationMessageAuthorType';
-  IF t_oid IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'USER') THEN
-      ALTER TYPE "ConsultationMessageAuthorType" ADD VALUE 'USER';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'DOCTOR') THEN
-      ALTER TYPE "ConsultationMessageAuthorType" ADD VALUE 'DOCTOR';
-    END IF;
-  END IF;
-END$$;
-
-DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ThanksStatus') THEN
     CREATE TYPE "ThanksStatus" AS ENUM ('DRAFT','PENDING','PAID','FAILED','CANCELED');
-  END IF;
-END$$;
-
-DO $$
-DECLARE
-  t_oid oid;
-BEGIN
-  SELECT oid INTO t_oid FROM pg_type WHERE typname = 'ThanksStatus';
-  IF t_oid IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'DRAFT') THEN
-      ALTER TYPE "ThanksStatus" ADD VALUE 'DRAFT';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'PENDING') THEN
-      ALTER TYPE "ThanksStatus" ADD VALUE 'PENDING';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'PAID') THEN
-      ALTER TYPE "ThanksStatus" ADD VALUE 'PAID';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'FAILED') THEN
-      ALTER TYPE "ThanksStatus" ADD VALUE 'FAILED';
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = t_oid AND enumlabel = 'CANCELED') THEN
-      ALTER TYPE "ThanksStatus" ADD VALUE 'CANCELED';
-    END IF;
   END IF;
 END$$;
 
