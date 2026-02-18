@@ -1,4 +1,4 @@
-/* path: components/DownBarUtil/onlydown.tsx */
+/* path:components/DownBarUtil/onlydown.tsx */
 'use client';
 
 import { useRouter } from 'next/navigation';
