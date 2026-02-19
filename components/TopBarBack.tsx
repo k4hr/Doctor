@@ -27,7 +27,12 @@ export default function TopBarBack() {
             <BackBtn fallback="/" label="Назад" />
           </div>
 
-          <button type="button" className="app-logo-btn app-logo-btn--center" onClick={goHome} aria-label="На главную">
+          <button
+            type="button"
+            className="app-logo-btn app-logo-btn--center"
+            onClick={goHome}
+            aria-label="На главную"
+          >
             <span className="app-logo">
               <span className="app-logo-main">ВРАЧИ</span>
               <span className="app-logo-dot">.</span>
@@ -42,23 +47,32 @@ export default function TopBarBack() {
       </div>
 
       <style jsx>{`
-        /* ✅ ДОЛЖНО БЫТЬ 1в1 как TopBar по sticky/отступам */
+        /* ✅ НИКАКИХ отрицательных margin — они и раздувают ширину */
         .app-topbar {
           position: sticky;
           top: 0;
           z-index: 1000;
 
-          margin: 0 -16px 8px;
-          padding: 10px 16px 12px;
+          width: 100%;
+          max-width: 100%;
+
+          margin: 0 0 8px;
+          padding: 10px 12px 12px;
 
           background: #ffffff;
           box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+
+          overflow: hidden;
         }
 
         .app-topbar-row {
           display: flex;
           align-items: center;
           gap: 12px;
+
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
         }
 
         .app-topbar-row--back {
@@ -70,6 +84,7 @@ export default function TopBarBack() {
           min-width: 64px;
           display: flex;
           align-items: center;
+          flex: 0 0 auto;
         }
 
         .topbar-left {
@@ -87,7 +102,10 @@ export default function TopBarBack() {
           margin: 0;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          flex: 1;
+
+          flex: 1 1 auto;
+          min-width: 0;
+
           display: flex;
           justify-content: center;
         }
@@ -100,6 +118,9 @@ export default function TopBarBack() {
           font-weight: 900;
           font-size: 26px;
           letter-spacing: -0.02em;
+
+          max-width: 100%;
+          white-space: nowrap;
         }
 
         .app-logo-main,
