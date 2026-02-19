@@ -88,7 +88,6 @@ export default function PatientConsultationChatPage() {
 
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-
   const [paying, setPaying] = useState(false);
 
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -242,6 +241,17 @@ export default function PatientConsultationChatPage() {
     }
   }
 
+  const statusText =
+    item?.status === 'PENDING'
+      ? 'Ожидает решения'
+      : item?.status === 'ACCEPTED'
+      ? 'Принята'
+      : item?.status === 'DECLINED'
+      ? 'Отклонена'
+      : item?.status === 'CLOSED'
+      ? 'Закрыта'
+      : 'Черновик';
+
   return (
     <main className="p">
       <header className="top">
@@ -265,28 +275,18 @@ export default function PatientConsultationChatPage() {
       ) : (
         <div className="stack">
           <section className="card">
-            <div className="metaGrid">
-              <div className="metaItem">
+            <div className="rows">
+              <div className="row">
                 <div className="lbl">Статус</div>
-                <div className="val">
-                  {item.status === 'PENDING'
-                    ? 'Ожидает решения'
-                    : item.status === 'ACCEPTED'
-                    ? 'Принята'
-                    : item.status === 'DECLINED'
-                    ? 'Отклонена'
-                    : item.status === 'CLOSED'
-                    ? 'Закрыта'
-                    : 'Черновик'}
-                </div>
+                <div className="val">{statusText}</div>
               </div>
 
-              <div className="metaItem">
+              <div className="row">
                 <div className="lbl">Цена</div>
                 <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
               </div>
 
-              <div className="metaItem">
+              <div className="row">
                 <div className="lbl">Оплата</div>
                 <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
               </div>
@@ -358,17 +358,27 @@ export default function PatientConsultationChatPage() {
         </div>
       )}
 
+      {/* ГЛОБАЛЬНЫЙ АНТИ-OVERFLOW (самый важный фикс для Telegram iOS) */}
+      <style jsx global>{`
+        html,
+        body {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+      `}</style>
+
       <style jsx>{`
         .p {
           min-height: 100dvh;
           padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
           background: #f6f7fb;
 
-          /* ключевое: никаких горизонтальных сюрпризов */
+          width: 100%;
+          max-width: 100%;
           overflow-x: hidden;
         }
 
-        /* на всякий: внутри тоже не раздуваем */
         .p :global(*) {
           box-sizing: border-box;
           max-width: 100%;
@@ -379,6 +389,7 @@ export default function PatientConsultationChatPage() {
           align-items: center;
           gap: 10px;
           margin-bottom: 10px;
+          max-width: 100%;
         }
 
         .head {
@@ -412,12 +423,14 @@ export default function PatientConsultationChatPage() {
           font-weight: 900;
           color: #ef4444;
           overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .stack {
           display: flex;
           flex-direction: column;
           gap: 12px;
+          max-width: 100%;
         }
 
         .card {
@@ -426,6 +439,8 @@ export default function PatientConsultationChatPage() {
           border-radius: 18px;
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           padding: 12px;
+          max-width: 100%;
+          overflow: hidden;
         }
 
         .muted {
@@ -434,40 +449,39 @@ export default function PatientConsultationChatPage() {
           color: rgba(15, 23, 42, 0.55);
         }
 
-        /* вместо space-between делаем нормальную сетку, чтобы не сдвигало в одну строку */
-        .metaGrid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+        .rows {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .row {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
           gap: 10px;
-        }
-
-        @media (max-width: 420px) {
-          .metaGrid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .metaItem {
+          flex-wrap: wrap; /* чтобы никогда не “выталкивало” ширину */
           min-width: 0;
-          padding: 10px 10px;
-          border-radius: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.06);
-          background: rgba(15, 23, 42, 0.02);
         }
 
         .lbl {
           font-size: 12px;
           font-weight: 900;
           color: rgba(15, 23, 42, 0.58);
+          flex: 0 0 auto;
         }
 
         .val {
-          margin-top: 4px;
           font-size: 13px;
           font-weight: 950;
           color: rgba(17, 24, 39, 0.86);
+          flex: 1 1 auto;
+          min-width: 0;
+          text-align: right;
+
           overflow-wrap: anywhere;
           word-break: break-word;
+          white-space: normal;
         }
 
         .hr {
@@ -545,6 +559,7 @@ export default function PatientConsultationChatPage() {
           font-weight: 800;
           line-height: 1.35;
           overflow-wrap: anywhere;
+          word-break: break-word;
         }
         .hint.green {
           border-color: rgba(16, 185, 129, 0.25);
@@ -555,7 +570,6 @@ export default function PatientConsultationChatPage() {
           background: rgba(239, 68, 68, 0.08);
         }
 
-        /* ЧАТ: делаем “правильный” вертикальный flex */
         .chat {
           background: rgba(255, 255, 255, 0.92);
           border: 1px solid rgba(15, 23, 42, 0.08);
@@ -565,9 +579,8 @@ export default function PatientConsultationChatPage() {
 
           display: flex;
           flex-direction: column;
-
-          /* важно: чтобы внутренний скролл работал */
           min-height: 320px;
+          max-width: 100%;
         }
 
         .msgs {
@@ -579,7 +592,6 @@ export default function PatientConsultationChatPage() {
           overflow-y: auto;
           overflow-x: hidden;
 
-          /* ключевой фикс для iOS: */
           min-height: 0;
           flex: 1 1 auto;
           -webkit-overflow-scrolling: touch;
@@ -595,11 +607,9 @@ export default function PatientConsultationChatPage() {
           display: flex;
           max-width: 100%;
         }
-
         .msg.me {
           justify-content: flex-end;
         }
-
         .msg.you {
           justify-content: flex-start;
         }
@@ -610,7 +620,6 @@ export default function PatientConsultationChatPage() {
           padding: 10px 10px 8px;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(15, 23, 42, 0.03);
-
           overflow-wrap: anywhere;
           word-break: break-word;
         }
@@ -644,6 +653,7 @@ export default function PatientConsultationChatPage() {
           padding: 10px;
           border-top: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(255, 255, 255, 0.9);
+          max-width: 100%;
         }
 
         .inp {
@@ -656,7 +666,6 @@ export default function PatientConsultationChatPage() {
           font-weight: 800;
           color: #111827;
           outline: none;
-
           min-width: 0;
         }
 
