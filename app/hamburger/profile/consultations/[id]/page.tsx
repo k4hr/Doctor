@@ -1,6 +1,7 @@
 /* path: app/hamburger/profile/consultations/[id]/page.tsx */
 'use client';
 
+import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import TopBarBack from '../../../../../components/TopBarBack';
@@ -95,8 +96,8 @@ export default function PatientConsultationChatPage() {
   const canChat = !!item && item.status === 'ACCEPTED' && !!item.paidAt;
 
   const pageStyle: React.CSSProperties = {
-    padding: 16, // ✅ как в /vopros/[id]
-    overflowX: 'hidden', // ✅ жёстко режем горизонталь
+    padding: 16,
+    overflowX: 'hidden',
     background: '#f6f7fb',
     minHeight: '100dvh',
     width: '100%',
@@ -116,6 +117,34 @@ export default function PatientConsultationChatPage() {
     boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
     display: 'grid',
     gap: 12,
+  };
+
+  const metaBoxStyle: React.CSSProperties = {
+    borderRadius: 16,
+    border: '1px solid rgba(15,23,42,0.06)',
+    background: 'rgba(15,23,42,0.02)',
+    padding: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    minWidth: 0,
+    overflow: 'hidden',
+  };
+
+  const metaLabelStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 900,
+    color: 'rgba(15,23,42,0.58)',
+    lineHeight: 1.1,
+    ...wrapText,
+  };
+
+  const metaValueStyle: React.CSSProperties = {
+    fontSize: 14,
+    fontWeight: 950,
+    color: 'rgba(17,24,39,0.88)',
+    lineHeight: 1.15,
+    ...wrapText,
   };
 
   const chatStyle: React.CSSProperties = {
@@ -164,7 +193,7 @@ export default function PatientConsultationChatPage() {
     fontWeight: 800,
     color: '#111827',
     outline: 'none',
-    minWidth: 0, // ✅ критично для iOS/гряда
+    minWidth: 0,
     width: '100%',
   };
 
@@ -368,10 +397,8 @@ export default function PatientConsultationChatPage() {
 
   return (
     <main style={pageStyle}>
-      {/* ✅ TopBarBack ровно как в /vopros/[id] */}
       <TopBarBack />
 
-      {/* ✅ заголовок как в /vopros/[id] */}
       <h1 style={{ marginTop: 8, marginBottom: 10, fontSize: 34, fontWeight: 950, lineHeight: 1.05, ...wrapText }}>
         {title}
       </h1>
@@ -395,47 +422,34 @@ export default function PatientConsultationChatPage() {
       ) : (
         <>
           <section style={cardStyle}>
-            {/* ✅ мета — вертикально */}
+            {/* ✅ ВОТ КЛЮЧЕВОЕ: мета БЛОКАМИ ВНИЗ */}
             <div style={{ display: 'grid', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
-                  Статус
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
-                  {statusText}
-                </div>
+              <div style={metaBoxStyle}>
+                <div style={metaLabelStyle}>Статус</div>
+                <div style={metaValueStyle}>{statusText}</div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
-                  Цена
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
-                  {Math.round(item.priceRub || 0)} ₽
-                </div>
+              <div style={metaBoxStyle}>
+                <div style={metaLabelStyle}>Цена</div>
+                <div style={metaValueStyle}>{Math.round(item.priceRub || 0)} ₽</div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
-                  Оплата
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
-                  {item.paidAt ? 'Оплачено' : 'Не оплачено'}
-                </div>
+              <div style={metaBoxStyle}>
+                <div style={metaLabelStyle}>Оплата</div>
+                <div style={metaValueStyle}>{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
               </div>
             </div>
 
-            {/* ✅ плашки/состояния */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
               {item.status === 'PENDING' ? <span style={pillBase}>Ждём решения врача</span> : null}
               {item.status === 'DECLINED' ? <span style={pillRed}>Врач отказал</span> : null}
               {item.status === 'ACCEPTED' && item.paidAt ? <span style={pillGreen}>Оплачено. Чат открыт</span> : null}
               {item.status === 'ACCEPTED' && !item.paidAt ? <span style={pillBase}>Нужно оплатить</span> : null}
             </div>
 
-            <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
+            <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '8px 0' }} />
 
-            <div style={{ fontWeight: 900, fontSize: 13, color: 'rgba(17,24,39,0.84)', marginBottom: 6 }}>
+            <div style={{ fontWeight: 950, fontSize: 14, color: 'rgba(17,24,39,0.88)', marginBottom: 6 }}>
               Ваше сообщение
             </div>
 
@@ -461,7 +475,11 @@ export default function PatientConsultationChatPage() {
                         background: 'rgba(15, 23, 42, 0.03)',
                       }}
                     >
-                      <img src={u} alt={`photo-${i + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                      <img
+                        src={u}
+                        alt={`photo-${i + 1}`}
+                        style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
+                      />
                     </a>
                   ))}
                 </div>
@@ -474,7 +492,7 @@ export default function PatientConsultationChatPage() {
                 onClick={markPaidMock}
                 disabled={paying}
                 style={{
-                  marginTop: 8,
+                  marginTop: 10,
                   width: '100%',
                   border: 'none',
                   borderRadius: 16,
@@ -502,69 +520,14 @@ export default function PatientConsultationChatPage() {
                 item.messages.map((m) => {
                   const isMe = m.authorType === 'USER';
                   return (
-                    <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
+                    <div
+                      key={m.id}
+                      style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}
+                    >
                       <div
                         style={{
                           maxWidth: '78%',
                           borderRadius: 16,
                           padding: '10px 10px 8px',
                           border: isMe ? '1px solid rgba(36, 199, 104, 0.25)' : '1px solid rgba(15, 23, 42, 0.08)',
-                          background: isMe ? 'rgba(36, 199, 104, 0.12)' : 'rgba(15, 23, 42, 0.03)',
-                          ...wrapText,
-                        }}
-                      >
-                        <div style={{ fontSize: 14, lineHeight: 1.45, color: 'rgba(11,12,16,0.86)', whiteSpace: 'pre-wrap', ...wrapText }}>
-                          {m.body}
-                        </div>
-                        <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: 'rgba(15,23,42,0.45)', textAlign: 'right' }}>
-                          {fmtTime(m.createdAt)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={endRef} />
-            </div>
-
-            <div style={composerStyle}>
-              <input
-                style={inpStyle}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'}
-                disabled={!canChat || sending}
-              />
-              <button
-                type="button"
-                onClick={send}
-                disabled={!canChat || sending || !text.trim()}
-                style={{
-                  ...sendStyle,
-                  opacity: !canChat || sending || !text.trim() ? 0.6 : 1,
-                  cursor: !canChat || sending || !text.trim() ? 'not-allowed' : 'pointer',
-                  boxShadow: !canChat || sending || !text.trim() ? 'none' : sendStyle.boxShadow,
-                }}
-              >
-                Отправить
-              </button>
-            </div>
-          </section>
-        </>
-      )}
-
-      {/* ✅ как “ремень безопасности” (но это не “подстройка”, просто запрет горизонта) */}
-      <style jsx global>{`
-        html,
-        body {
-          width: 100%;
-          max-width: 100%;
-          overflow-x: hidden;
-        }
-        * {
-          box-sizing: border-box;
-        }
-      `}</style>
-    </main>
-  );
-}
+                          background: isMe ? 'rgba(36, 199, 
