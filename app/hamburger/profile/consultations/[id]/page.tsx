@@ -1,3 +1,4 @@
+/* path: app/hamburger/profile/consultations/[id]/page.tsx */
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -93,7 +94,6 @@ export default function PatientConsultationChatPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const title = useMemo(() => item?.doctorName || 'Врач', [item?.doctorName]);
-
   const canChat = !!item && item.status === 'ACCEPTED' && !!item.paidAt;
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function PatientConsultationChatPage() {
         setItem(null);
       } finally {
         setLoading(false);
-        setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'instant' as any, block: 'end' }), 50);
+        setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'instant' as any, block: 'end' }), 60);
       }
     })();
   }, [id]);
@@ -155,7 +155,7 @@ export default function PatientConsultationChatPage() {
         return;
       }
       setItem((j as ApiOk).item);
-      if (scroll) setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50);
+      if (scroll) setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 60);
     } catch (e: any) {
       setWarn(String(e?.message || 'Сеть/сервер недоступны'));
     }
@@ -244,50 +244,52 @@ export default function PatientConsultationChatPage() {
 
   return (
     <main className="p">
-      <div className="top">
+      <header className="top">
         <TopBarBack />
         <div className="head">
           <div className="title">{title}</div>
           <div className="sub">{item ? `Консультация • ${fmtDateTime(item.createdAt)}` : 'загрузка…'}</div>
         </div>
-      </div>
+      </header>
 
       {warn ? <div className="warn">{warn}</div> : null}
 
       {loading ? (
-        <div className="card">
+        <section className="card">
           <div className="muted">Загрузка…</div>
-        </div>
+        </section>
       ) : !item ? (
-        <div className="card">
+        <section className="card">
           <div className="muted">Не найдено.</div>
-        </div>
+        </section>
       ) : (
-        <>
+        <div className="stack">
           <section className="card">
-            <div className="row">
-              <div className="lbl">Статус</div>
-              <div className="val">
-                {item.status === 'PENDING'
-                  ? 'Ожидает решения'
-                  : item.status === 'ACCEPTED'
-                  ? 'Принята'
-                  : item.status === 'DECLINED'
-                  ? 'Отклонена'
-                  : item.status === 'CLOSED'
-                  ? 'Закрыта'
-                  : 'Черновик'}
+            <div className="metaGrid">
+              <div className="metaItem">
+                <div className="lbl">Статус</div>
+                <div className="val">
+                  {item.status === 'PENDING'
+                    ? 'Ожидает решения'
+                    : item.status === 'ACCEPTED'
+                    ? 'Принята'
+                    : item.status === 'DECLINED'
+                    ? 'Отклонена'
+                    : item.status === 'CLOSED'
+                    ? 'Закрыта'
+                    : 'Черновик'}
+                </div>
               </div>
-            </div>
 
-            <div className="row">
-              <div className="lbl">Цена</div>
-              <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
-            </div>
+              <div className="metaItem">
+                <div className="lbl">Цена</div>
+                <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
+              </div>
 
-            <div className="row">
-              <div className="lbl">Оплата</div>
-              <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
+              <div className="metaItem">
+                <div className="lbl">Оплата</div>
+                <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
+              </div>
             </div>
 
             <div className="hr" />
@@ -343,7 +345,9 @@ export default function PatientConsultationChatPage() {
                 className="inp"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'}
+                placeholder={
+                  canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
+                }
                 disabled={!canChat || sending}
               />
               <button className="send" type="button" onClick={send} disabled={!canChat || sending || !text.trim()}>
@@ -351,7 +355,7 @@ export default function PatientConsultationChatPage() {
               </button>
             </div>
           </section>
-        </>
+        </div>
       )}
 
       <style jsx>{`
@@ -359,6 +363,15 @@ export default function PatientConsultationChatPage() {
           min-height: 100dvh;
           padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
           background: #f6f7fb;
+
+          /* ключевое: никаких горизонтальных сюрпризов */
+          overflow-x: hidden;
+        }
+
+        /* на всякий: внутри тоже не раздуваем */
+        .p :global(*) {
+          box-sizing: border-box;
+          max-width: 100%;
         }
 
         .top {
@@ -401,20 +414,45 @@ export default function PatientConsultationChatPage() {
           overflow-wrap: anywhere;
         }
 
+        .stack {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
         .card {
           background: rgba(255, 255, 255, 0.92);
           border: 1px solid rgba(15, 23, 42, 0.08);
           border-radius: 18px;
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           padding: 12px;
-          margin-bottom: 12px;
         }
 
-        .row {
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
+        .muted {
+          font-size: 12px;
+          font-weight: 800;
+          color: rgba(15, 23, 42, 0.55);
+        }
+
+        /* вместо space-between делаем нормальную сетку, чтобы не сдвигало в одну строку */
+        .metaGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
           gap: 10px;
+        }
+
+        @media (max-width: 420px) {
+          .metaGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .metaItem {
+          min-width: 0;
+          padding: 10px 10px;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+          background: rgba(15, 23, 42, 0.02);
         }
 
         .lbl {
@@ -424,16 +462,18 @@ export default function PatientConsultationChatPage() {
         }
 
         .val {
-          font-size: 12px;
+          margin-top: 4px;
+          font-size: 13px;
           font-weight: 950;
-          color: rgba(17, 24, 39, 0.84);
-          white-space: nowrap;
+          color: rgba(17, 24, 39, 0.86);
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .hr {
           height: 1px;
           background: rgba(15, 23, 42, 0.08);
-          margin: 10px 0;
+          margin: 12px 0;
         }
 
         .lbl2 {
@@ -449,11 +489,12 @@ export default function PatientConsultationChatPage() {
           color: rgba(11, 12, 16, 0.86);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .photos {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 8px;
           margin-top: 6px;
         }
@@ -503,6 +544,7 @@ export default function PatientConsultationChatPage() {
           font-size: 12px;
           font-weight: 800;
           line-height: 1.35;
+          overflow-wrap: anywhere;
         }
         .hint.green {
           border-color: rgba(16, 185, 129, 0.25);
@@ -513,21 +555,34 @@ export default function PatientConsultationChatPage() {
           background: rgba(239, 68, 68, 0.08);
         }
 
+        /* ЧАТ: делаем “правильный” вертикальный flex */
         .chat {
           background: rgba(255, 255, 255, 0.92);
           border: 1px solid rgba(15, 23, 42, 0.08);
           border-radius: 18px;
           box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
           overflow: hidden;
+
+          display: flex;
+          flex-direction: column;
+
+          /* важно: чтобы внутренний скролл работал */
+          min-height: 320px;
         }
 
         .msgs {
           padding: 12px;
-          max-height: 48vh;
-          overflow: auto;
           display: flex;
           flex-direction: column;
           gap: 8px;
+
+          overflow-y: auto;
+          overflow-x: hidden;
+
+          /* ключевой фикс для iOS: */
+          min-height: 0;
+          flex: 1 1 auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .empty {
@@ -538,6 +593,7 @@ export default function PatientConsultationChatPage() {
 
         .msg {
           display: flex;
+          max-width: 100%;
         }
 
         .msg.me {
@@ -554,6 +610,9 @@ export default function PatientConsultationChatPage() {
           padding: 10px 10px 8px;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: rgba(15, 23, 42, 0.03);
+
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .msg.me .bubble {
@@ -567,6 +626,7 @@ export default function PatientConsultationChatPage() {
           color: rgba(11, 12, 16, 0.86);
           white-space: pre-wrap;
           overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
         .tm {
@@ -596,6 +656,8 @@ export default function PatientConsultationChatPage() {
           font-weight: 800;
           color: #111827;
           outline: none;
+
+          min-width: 0;
         }
 
         .send {
@@ -610,6 +672,7 @@ export default function PatientConsultationChatPage() {
           color: #fff;
           box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
           -webkit-tap-highlight-color: transparent;
+          white-space: nowrap;
         }
 
         .send:disabled {
