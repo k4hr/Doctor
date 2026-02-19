@@ -39,7 +39,6 @@ type Detail = {
   status: 'DRAFT' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CLOSED';
   createdAt: string;
   priceRub: number;
-
   paidAt: string | null;
 
   doctorId: string;
@@ -253,112 +252,112 @@ export default function PatientConsultationChatPage() {
       : 'Черновик';
 
   return (
-    <main className="p">
-      <header className="top">
-        <TopBarBack />
-        <div className="head">
+    <main className="page">
+      {/* ✅ топбар НЕ кладём внутрь flex-строки — он сам по себе */}
+      <TopBarBack />
+
+      <section className="content">
+        <header className="titleBlock">
           <div className="title">{title}</div>
           <div className="sub">{item ? `Консультация • ${fmtDateTime(item.createdAt)}` : 'загрузка…'}</div>
-        </div>
-      </header>
+        </header>
 
-      {warn ? <div className="warn">{warn}</div> : null}
+        {warn ? <div className="warn">{warn}</div> : null}
 
-      {loading ? (
-        <section className="card">
-          <div className="muted">Загрузка…</div>
-        </section>
-      ) : !item ? (
-        <section className="card">
-          <div className="muted">Не найдено.</div>
-        </section>
-      ) : (
-        <div className="stack">
+        {loading ? (
           <section className="card">
-            <div className="rows">
-              <div className="row">
-                <div className="lbl">Статус</div>
-                <div className="val">{statusText}</div>
-              </div>
-
-              <div className="row">
-                <div className="lbl">Цена</div>
-                <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
-              </div>
-
-              <div className="row">
-                <div className="lbl">Оплата</div>
-                <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
-              </div>
-            </div>
-
-            <div className="hr" />
-
-            <div className="lbl2">Ваше сообщение</div>
-            <div className="body">{item.problemText}</div>
-
-            {item.photos?.length ? (
-              <>
-                <div className="lbl2" style={{ marginTop: 10 }}>
-                  Фото
-                </div>
-                <div className="photos">
-                  {item.photos.map((u, i) => (
-                    <a key={u + i} className="ph" href={u} target="_blank" rel="noreferrer">
-                      <img src={u} alt={`photo-${i + 1}`} />
-                    </a>
-                  ))}
-                </div>
-              </>
-            ) : null}
-
-            {item.status === 'ACCEPTED' && !item.paidAt ? (
-              <button className="payBtn" type="button" onClick={markPaidMock} disabled={paying}>
-                {paying ? 'Оплачиваем…' : 'Оплатить (мок)'}
-              </button>
-            ) : null}
-
-            {item.status === 'PENDING' ? <div className="hint">Ждём, пока врач примет или отклонит консультацию.</div> : null}
-            {item.status === 'DECLINED' ? <div className="hint red">Врач отклонил консультацию.</div> : null}
-            {item.status === 'ACCEPTED' && item.paidAt ? <div className="hint green">Оплачено. Чат открыт.</div> : null}
+            <div className="muted">Загрузка…</div>
           </section>
+        ) : !item ? (
+          <section className="card">
+            <div className="muted">Не найдено.</div>
+          </section>
+        ) : (
+          <>
+            <section className="card">
+              {/* ✅ мета строго вертикально, без space-between “на вытягивание” */}
+              <div className="meta">
+                <div className="metaRow">
+                  <div className="lbl">Статус</div>
+                  <div className="val">{statusText}</div>
+                </div>
+                <div className="metaRow">
+                  <div className="lbl">Цена</div>
+                  <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
+                </div>
+                <div className="metaRow">
+                  <div className="lbl">Оплата</div>
+                  <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
+                </div>
+              </div>
 
-          <section className="chat">
-            <div className="msgs" aria-label="Сообщения">
-              {item.messages.length === 0 ? (
-                <div className="empty">Пока сообщений нет.</div>
-              ) : (
-                item.messages.map((m) => (
-                  <div key={m.id} className={'msg ' + (m.authorType === 'USER' ? 'me' : 'you')}>
-                    <div className="bubble">
-                      <div className="txt">{m.body}</div>
-                      <div className="tm">{fmtTime(m.createdAt)}</div>
-                    </div>
+              <div className="hr" />
+
+              <div className="lbl2">Ваше сообщение</div>
+              <div className="body">{item.problemText}</div>
+
+              {item.photos?.length ? (
+                <>
+                  <div className="lbl2" style={{ marginTop: 10 }}>
+                    Фото
                   </div>
-                ))
-              )}
-              <div ref={endRef} />
-            </div>
+                  <div className="photos">
+                    {item.photos.map((u, i) => (
+                      <a key={u + i} className="ph" href={u} target="_blank" rel="noreferrer">
+                        <img src={u} alt={`photo-${i + 1}`} />
+                      </a>
+                    ))}
+                  </div>
+                </>
+              ) : null}
 
-            <div className="composer">
-              <input
-                className="inp"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={
-                  canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
-                }
-                disabled={!canChat || sending}
-              />
-              <button className="send" type="button" onClick={send} disabled={!canChat || sending || !text.trim()}>
-                Отправить
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+              {item.status === 'ACCEPTED' && !item.paidAt ? (
+                <button className="payBtn" type="button" onClick={markPaidMock} disabled={paying}>
+                  {paying ? 'Оплачиваем…' : 'Оплатить (мок)'}
+                </button>
+              ) : null}
 
-      {/* ГЛОБАЛЬНЫЙ АНТИ-OVERFLOW (самый важный фикс для Telegram iOS) */}
+              {item.status === 'PENDING' ? <div className="hint">Ждём, пока врач примет или отклонит консультацию.</div> : null}
+              {item.status === 'DECLINED' ? <div className="hint red">Врач отклонил консультацию.</div> : null}
+              {item.status === 'ACCEPTED' && item.paidAt ? <div className="hint green">Оплачено. Чат открыт.</div> : null}
+            </section>
+
+            <section className="chat">
+              <div className="msgs" aria-label="Сообщения">
+                {item.messages.length === 0 ? (
+                  <div className="empty">Пока сообщений нет.</div>
+                ) : (
+                  item.messages.map((m) => (
+                    <div key={m.id} className={'msg ' + (m.authorType === 'USER' ? 'me' : 'you')}>
+                      <div className="bubble">
+                        <div className="txt">{m.body}</div>
+                        <div className="tm">{fmtTime(m.createdAt)}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={endRef} />
+              </div>
+
+              <div className="composer">
+                <input
+                  className="inp"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder={
+                    canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
+                  }
+                  disabled={!canChat || sending}
+                />
+                <button className="send" type="button" onClick={send} disabled={!canChat || sending || !text.trim()}>
+                  Отправить
+                </button>
+              </div>
+            </section>
+          </>
+        )}
+      </section>
+
       <style jsx global>{`
         html,
         body {
@@ -369,9 +368,8 @@ export default function PatientConsultationChatPage() {
       `}</style>
 
       <style jsx>{`
-        .p {
+        .page {
           min-height: 100dvh;
-          padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
           background: #f6f7fb;
 
           width: 100%;
@@ -379,37 +377,34 @@ export default function PatientConsultationChatPage() {
           overflow-x: hidden;
         }
 
-        .p :global(*) {
-          box-sizing: border-box;
-          max-width: 100%;
-        }
-
-        .top {
+        /* ✅ контент как на главной: всё столбиком */
+        .content {
+          padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
           display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 10px;
+          flex-direction: column;
+          gap: 12px;
           max-width: 100%;
         }
 
-        .head {
-          min-width: 0;
-          flex: 1 1 auto;
+        .titleBlock {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          max-width: 100%;
         }
 
         .title {
-          font-size: 16px;
+          font-size: 34px;
           font-weight: 950;
           color: #111827;
-          line-height: 1.1;
+          line-height: 1.05;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
         .sub {
-          margin-top: 2px;
-          font-size: 12px;
+          font-size: 14px;
           font-weight: 800;
           color: rgba(17, 24, 39, 0.55);
           white-space: nowrap;
@@ -418,19 +413,11 @@ export default function PatientConsultationChatPage() {
         }
 
         .warn {
-          margin: 0 0 10px;
           font-size: 12px;
           font-weight: 900;
           color: #ef4444;
           overflow-wrap: anywhere;
           word-break: break-word;
-        }
-
-        .stack {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          max-width: 100%;
         }
 
         .card {
@@ -449,36 +436,34 @@ export default function PatientConsultationChatPage() {
           color: rgba(15, 23, 42, 0.55);
         }
 
-        .rows {
+        .meta {
           display: flex;
           flex-direction: column;
           gap: 8px;
         }
 
-        .row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
+        /* ✅ ключ: не “растягиваем” строкой в ширину, а делим на 2 колонки */
+        .metaRow {
+          display: grid;
+          grid-template-columns: 110px 1fr;
           gap: 10px;
-          flex-wrap: wrap; /* чтобы никогда не “выталкивало” ширину */
-          min-width: 0;
+          align-items: baseline;
+          max-width: 100%;
         }
 
         .lbl {
           font-size: 12px;
           font-weight: 900;
           color: rgba(15, 23, 42, 0.58);
-          flex: 0 0 auto;
+          white-space: nowrap;
         }
 
         .val {
           font-size: 13px;
           font-weight: 950;
           color: rgba(17, 24, 39, 0.86);
-          flex: 1 1 auto;
           min-width: 0;
           text-align: right;
-
           overflow-wrap: anywhere;
           word-break: break-word;
           white-space: normal;
@@ -579,6 +564,7 @@ export default function PatientConsultationChatPage() {
 
           display: flex;
           flex-direction: column;
+
           min-height: 320px;
           max-width: 100%;
         }
