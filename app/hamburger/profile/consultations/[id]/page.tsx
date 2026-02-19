@@ -422,7 +422,6 @@ export default function PatientConsultationChatPage() {
       ) : (
         <>
           <section style={cardStyle}>
-            {/* ✅ ВОТ КЛЮЧЕВОЕ: мета БЛОКАМИ ВНИЗ */}
             <div style={{ display: 'grid', gap: 10 }}>
               <div style={metaBoxStyle}>
                 <div style={metaLabelStyle}>Статус</div>
@@ -453,7 +452,15 @@ export default function PatientConsultationChatPage() {
               Ваше сообщение
             </div>
 
-            <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(11,12,16,0.82)', whiteSpace: 'pre-wrap', ...wrapText }}>
+            <div
+              style={{
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: 'rgba(11,12,16,0.82)',
+                whiteSpace: 'pre-wrap',
+                ...wrapText,
+              }}
+            >
               {String(item.problemText || '').trim() || '—'}
             </div>
 
@@ -529,5 +536,82 @@ export default function PatientConsultationChatPage() {
                           maxWidth: '78%',
                           borderRadius: 16,
                           padding: '10px 10px 8px',
-                          border: isMe ? '1px solid rgba(36, 199, 104, 0.25)' : '1px solid rgba(15, 23, 42, 0.08)',
-                          background: isMe ? 'rgba(36, 199, 
+                          border: isMe
+                            ? '1px solid rgba(36, 199, 104, 0.25)'
+                            : '1px solid rgba(15, 23, 42, 0.08)',
+                          background: isMe ? 'rgba(36, 199, 104, 0.12)' : 'rgba(15, 23, 42, 0.03)',
+                          ...wrapText,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 14,
+                            lineHeight: 1.45,
+                            color: 'rgba(11,12,16,0.86)',
+                            whiteSpace: 'pre-wrap',
+                            ...wrapText,
+                          }}
+                        >
+                          {m.body}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: 'rgba(15,23,42,0.45)',
+                            textAlign: 'right',
+                          }}
+                        >
+                          {fmtTime(m.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={endRef} />
+            </div>
+
+            <div style={composerStyle}>
+              <input
+                style={inpStyle}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={
+                  canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
+                }
+                disabled={!canChat || sending}
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={!canChat || sending || !text.trim()}
+                style={{
+                  ...sendStyle,
+                  opacity: !canChat || sending || !text.trim() ? 0.6 : 1,
+                  cursor: !canChat || sending || !text.trim() ? 'not-allowed' : 'pointer',
+                  boxShadow: !canChat || sending || !text.trim() ? 'none' : sendStyle.boxShadow,
+                }}
+              >
+                Отправить
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      <style jsx global>{`
+        html,
+        body {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+        * {
+          box-sizing: border-box;
+        }
+      `}</style>
+    </main>
+  );
+}
