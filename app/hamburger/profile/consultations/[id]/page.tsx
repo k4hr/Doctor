@@ -94,6 +94,121 @@ export default function PatientConsultationChatPage() {
   const title = useMemo(() => item?.doctorName || 'Врач', [item?.doctorName]);
   const canChat = !!item && item.status === 'ACCEPTED' && !!item.paidAt;
 
+  const pageStyle: React.CSSProperties = {
+    padding: 16, // ✅ как в /vopros/[id]
+    overflowX: 'hidden', // ✅ жёстко режем горизонталь
+    background: '#f6f7fb',
+    minHeight: '100dvh',
+    width: '100%',
+    maxWidth: '100%',
+  };
+
+  const wrapText: React.CSSProperties = { overflowWrap: 'anywhere', wordBreak: 'break-word' };
+
+  const cardStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    border: '1px solid rgba(10,12,20,0.08)',
+    background: 'rgba(255,255,255,0.92)',
+    borderRadius: 18,
+    padding: 14,
+    boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
+    display: 'grid',
+    gap: 12,
+  };
+
+  const chatStyle: React.CSSProperties = {
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    border: '1px solid rgba(10,12,20,0.08)',
+    background: 'rgba(255,255,255,0.92)',
+    borderRadius: 18,
+    boxShadow: '0 10px 26px rgba(18, 28, 45, 0.08)',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 340,
+  };
+
+  const msgsStyle: React.CSSProperties = {
+    padding: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    minHeight: 0,
+    flex: '1 1 auto',
+    WebkitOverflowScrolling: 'touch' as any,
+  };
+
+  const composerStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1fr auto',
+    gap: 10,
+    padding: 10,
+    borderTop: '1px solid rgba(15,23,42,0.08)',
+    background: 'rgba(255,255,255,0.9)',
+    width: '100%',
+    maxWidth: '100%',
+  };
+
+  const inpStyle: React.CSSProperties = {
+    height: 42,
+    borderRadius: 14,
+    border: '1px solid rgba(15, 23, 42, 0.12)',
+    background: 'rgba(249, 250, 251, 0.9)',
+    padding: '0 12px',
+    fontSize: 14,
+    fontWeight: 800,
+    color: '#111827',
+    outline: 'none',
+    minWidth: 0, // ✅ критично для iOS/гряда
+    width: '100%',
+  };
+
+  const sendStyle: React.CSSProperties = {
+    height: 42,
+    borderRadius: 14,
+    border: 'none',
+    padding: '0 14px',
+    fontSize: 14,
+    fontWeight: 950,
+    cursor: 'pointer',
+    background: '#24c768',
+    color: '#fff',
+    boxShadow: '0 10px 20px rgba(36, 199, 104, 0.22)',
+    WebkitTapHighlightColor: 'transparent' as any,
+    whiteSpace: 'nowrap',
+  };
+
+  const pillBase: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 800,
+    padding: '6px 10px',
+    borderRadius: 999,
+    border: '1px solid rgba(15,23,42,0.10)',
+    background: 'rgba(15,23,42,0.03)',
+    color: 'rgba(15,23,42,0.75)',
+    lineHeight: 1.05,
+    whiteSpace: 'nowrap',
+  };
+
+  const pillGreen: React.CSSProperties = {
+    ...pillBase,
+    borderColor: 'rgba(16,185,129,0.25)',
+    background: 'rgba(16,185,129,0.10)',
+    color: 'rgba(5,150,105,1)',
+  };
+
+  const pillRed: React.CSSProperties = {
+    ...pillBase,
+    borderColor: 'rgba(239,68,68,0.25)',
+    background: 'rgba(239,68,68,0.08)',
+    color: 'rgba(185,28,28,1)',
+  };
+
   useEffect(() => {
     try {
       tg()?.ready?.();
@@ -252,112 +367,193 @@ export default function PatientConsultationChatPage() {
       : 'Черновик';
 
   return (
-    <main className="page">
-      {/* ✅ топбар НЕ кладём внутрь flex-строки — он сам по себе */}
+    <main style={pageStyle}>
+      {/* ✅ TopBarBack ровно как в /vopros/[id] */}
       <TopBarBack />
 
-      <section className="content">
-        <header className="titleBlock">
-          <div className="title">{title}</div>
-          <div className="sub">{item ? `Консультация • ${fmtDateTime(item.createdAt)}` : 'загрузка…'}</div>
-        </header>
+      {/* ✅ заголовок как в /vopros/[id] */}
+      <h1 style={{ marginTop: 8, marginBottom: 10, fontSize: 34, fontWeight: 950, lineHeight: 1.05, ...wrapText }}>
+        {title}
+      </h1>
 
-        {warn ? <div className="warn">{warn}</div> : null}
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(17,24,39,0.55)', marginBottom: 12, ...wrapText }}>
+        {item ? `Консультация • ${fmtDateTime(item.createdAt)}` : 'загрузка…'}
+      </div>
 
-        {loading ? (
-          <section className="card">
-            <div className="muted">Загрузка…</div>
-          </section>
-        ) : !item ? (
-          <section className="card">
-            <div className="muted">Не найдено.</div>
-          </section>
-        ) : (
-          <>
-            <section className="card">
-              {/* ✅ мета строго вертикально, без space-between “на вытягивание” */}
-              <div className="meta">
-                <div className="metaRow">
-                  <div className="lbl">Статус</div>
-                  <div className="val">{statusText}</div>
+      {warn ? (
+        <div style={{ marginBottom: 12, fontSize: 12, fontWeight: 900, color: '#ef4444', ...wrapText }}>{warn}</div>
+      ) : null}
+
+      {loading ? (
+        <section style={cardStyle}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)' }}>Загрузка…</div>
+        </section>
+      ) : !item ? (
+        <section style={cardStyle}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)' }}>Не найдено.</div>
+        </section>
+      ) : (
+        <>
+          <section style={cardStyle}>
+            {/* ✅ мета — вертикально */}
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
+                  Статус
                 </div>
-                <div className="metaRow">
-                  <div className="lbl">Цена</div>
-                  <div className="val">{Math.round(item.priceRub || 0)} ₽</div>
-                </div>
-                <div className="metaRow">
-                  <div className="lbl">Оплата</div>
-                  <div className="val">{item.paidAt ? 'Оплачено' : 'Не оплачено'}</div>
+                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
+                  {statusText}
                 </div>
               </div>
 
-              <div className="hr" />
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
+                  Цена
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
+                  {Math.round(item.priceRub || 0)} ₽
+                </div>
+              </div>
 
-              <div className="lbl2">Ваше сообщение</div>
-              <div className="body">{item.problemText}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: 'rgba(15,23,42,0.58)', whiteSpace: 'nowrap' }}>
+                  Оплата
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 950, color: 'rgba(17,24,39,0.86)', textAlign: 'right', ...wrapText }}>
+                  {item.paidAt ? 'Оплачено' : 'Не оплачено'}
+                </div>
+              </div>
+            </div>
 
-              {item.photos?.length ? (
-                <>
-                  <div className="lbl2" style={{ marginTop: 10 }}>
-                    Фото
-                  </div>
-                  <div className="photos">
-                    {item.photos.map((u, i) => (
-                      <a key={u + i} className="ph" href={u} target="_blank" rel="noreferrer">
-                        <img src={u} alt={`photo-${i + 1}`} />
-                      </a>
-                    ))}
-                  </div>
-                </>
-              ) : null}
+            {/* ✅ плашки/состояния */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {item.status === 'PENDING' ? <span style={pillBase}>Ждём решения врача</span> : null}
+              {item.status === 'DECLINED' ? <span style={pillRed}>Врач отказал</span> : null}
+              {item.status === 'ACCEPTED' && item.paidAt ? <span style={pillGreen}>Оплачено. Чат открыт</span> : null}
+              {item.status === 'ACCEPTED' && !item.paidAt ? <span style={pillBase}>Нужно оплатить</span> : null}
+            </div>
 
-              {item.status === 'ACCEPTED' && !item.paidAt ? (
-                <button className="payBtn" type="button" onClick={markPaidMock} disabled={paying}>
-                  {paying ? 'Оплачиваем…' : 'Оплатить (мок)'}
-                </button>
-              ) : null}
+            <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
-              {item.status === 'PENDING' ? <div className="hint">Ждём, пока врач примет или отклонит консультацию.</div> : null}
-              {item.status === 'DECLINED' ? <div className="hint red">Врач отклонил консультацию.</div> : null}
-              {item.status === 'ACCEPTED' && item.paidAt ? <div className="hint green">Оплачено. Чат открыт.</div> : null}
-            </section>
+            <div style={{ fontWeight: 900, fontSize: 13, color: 'rgba(17,24,39,0.84)', marginBottom: 6 }}>
+              Ваше сообщение
+            </div>
 
-            <section className="chat">
-              <div className="msgs" aria-label="Сообщения">
-                {item.messages.length === 0 ? (
-                  <div className="empty">Пока сообщений нет.</div>
-                ) : (
-                  item.messages.map((m) => (
-                    <div key={m.id} className={'msg ' + (m.authorType === 'USER' ? 'me' : 'you')}>
-                      <div className="bubble">
-                        <div className="txt">{m.body}</div>
-                        <div className="tm">{fmtTime(m.createdAt)}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(11,12,16,0.82)', whiteSpace: 'pre-wrap', ...wrapText }}>
+              {String(item.problemText || '').trim() || '—'}
+            </div>
+
+            {item.photos?.length ? (
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ fontWeight: 900, marginTop: 6 }}>Фото</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                  {item.photos.map((u, i) => (
+                    <a
+                      key={u + i}
+                      href={u}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'block',
+                        borderRadius: 14,
+                        overflow: 'hidden',
+                        border: '1px solid rgba(15, 23, 42, 0.08)',
+                        background: 'rgba(15, 23, 42, 0.03)',
+                      }}
+                    >
+                      <img src={u} alt={`photo-${i + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {item.status === 'ACCEPTED' && !item.paidAt ? (
+              <button
+                type="button"
+                onClick={markPaidMock}
+                disabled={paying}
+                style={{
+                  marginTop: 8,
+                  width: '100%',
+                  border: 'none',
+                  borderRadius: 16,
+                  padding: '12px 12px',
+                  fontSize: 14,
+                  fontWeight: 950,
+                  color: '#fff',
+                  cursor: paying ? 'not-allowed' : 'pointer',
+                  background: '#24c768',
+                  boxShadow: paying ? 'none' : '0 10px 20px rgba(36, 199, 104, 0.28)',
+                  opacity: paying ? 0.75 : 1,
+                  WebkitTapHighlightColor: 'transparent' as any,
+                }}
+              >
+                {paying ? 'Оплачиваем…' : 'Оплатить (мок)'}
+              </button>
+            ) : null}
+          </section>
+
+          <section style={{ ...chatStyle, marginTop: 12 }}>
+            <div style={msgsStyle} aria-label="Сообщения">
+              {item.messages.length === 0 ? (
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(15,23,42,0.55)' }}>Пока сообщений нет.</div>
+              ) : (
+                item.messages.map((m) => {
+                  const isMe = m.authorType === 'USER';
+                  return (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
+                      <div
+                        style={{
+                          maxWidth: '78%',
+                          borderRadius: 16,
+                          padding: '10px 10px 8px',
+                          border: isMe ? '1px solid rgba(36, 199, 104, 0.25)' : '1px solid rgba(15, 23, 42, 0.08)',
+                          background: isMe ? 'rgba(36, 199, 104, 0.12)' : 'rgba(15, 23, 42, 0.03)',
+                          ...wrapText,
+                        }}
+                      >
+                        <div style={{ fontSize: 14, lineHeight: 1.45, color: 'rgba(11,12,16,0.86)', whiteSpace: 'pre-wrap', ...wrapText }}>
+                          {m.body}
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: 'rgba(15,23,42,0.45)', textAlign: 'right' }}>
+                          {fmtTime(m.createdAt)}
+                        </div>
                       </div>
                     </div>
-                  ))
-                )}
-                <div ref={endRef} />
-              </div>
+                  );
+                })
+              )}
+              <div ref={endRef} />
+            </div>
 
-              <div className="composer">
-                <input
-                  className="inp"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={
-                    canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
-                  }
-                  disabled={!canChat || sending}
-                />
-                <button className="send" type="button" onClick={send} disabled={!canChat || sending || !text.trim()}>
-                  Отправить
-                </button>
-              </div>
-            </section>
-          </>
-        )}
-      </section>
+            <div style={composerStyle}>
+              <input
+                style={inpStyle}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'}
+                disabled={!canChat || sending}
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={!canChat || sending || !text.trim()}
+                style={{
+                  ...sendStyle,
+                  opacity: !canChat || sending || !text.trim() ? 0.6 : 1,
+                  cursor: !canChat || sending || !text.trim() ? 'not-allowed' : 'pointer',
+                  boxShadow: !canChat || sending || !text.trim() ? 'none' : sendStyle.boxShadow,
+                }}
+              >
+                Отправить
+              </button>
+            </div>
+          </section>
+        </>
+      )}
 
+      {/* ✅ как “ремень безопасности” (но это не “подстройка”, просто запрет горизонта) */}
       <style jsx global>{`
         html,
         body {
@@ -365,315 +561,8 @@ export default function PatientConsultationChatPage() {
           max-width: 100%;
           overflow-x: hidden;
         }
-      `}</style>
-
-      <style jsx>{`
-        .page {
-          min-height: 100dvh;
-          background: #f6f7fb;
-
-          width: 100%;
-          max-width: 100%;
-          overflow-x: hidden;
-        }
-
-        /* ✅ контент как на главной: всё столбиком */
-        .content {
-          padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 18px);
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          max-width: 100%;
-        }
-
-        .titleBlock {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          max-width: 100%;
-        }
-
-        .title {
-          font-size: 34px;
-          font-weight: 950;
-          color: #111827;
-          line-height: 1.05;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .sub {
-          font-size: 14px;
-          font-weight: 800;
-          color: rgba(17, 24, 39, 0.55);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .warn {
-          font-size: 12px;
-          font-weight: 900;
-          color: #ef4444;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .card {
-          background: rgba(255, 255, 255, 0.92);
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 18px;
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
-          padding: 12px;
-          max-width: 100%;
-          overflow: hidden;
-        }
-
-        .muted {
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.55);
-        }
-
-        .meta {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        /* ✅ ключ: не “растягиваем” строкой в ширину, а делим на 2 колонки */
-        .metaRow {
-          display: grid;
-          grid-template-columns: 110px 1fr;
-          gap: 10px;
-          align-items: baseline;
-          max-width: 100%;
-        }
-
-        .lbl {
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(15, 23, 42, 0.58);
-          white-space: nowrap;
-        }
-
-        .val {
-          font-size: 13px;
-          font-weight: 950;
-          color: rgba(17, 24, 39, 0.86);
-          min-width: 0;
-          text-align: right;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-          white-space: normal;
-        }
-
-        .hr {
-          height: 1px;
-          background: rgba(15, 23, 42, 0.08);
-          margin: 12px 0;
-        }
-
-        .lbl2 {
-          font-size: 13px;
-          font-weight: 950;
-          color: rgba(17, 24, 39, 0.84);
-          margin-bottom: 6px;
-        }
-
-        .body {
-          font-size: 14px;
-          line-height: 1.5;
-          color: rgba(11, 12, 16, 0.86);
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .photos {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 8px;
-          margin-top: 6px;
-        }
-
-        .ph {
-          display: block;
-          border-radius: 14px;
-          overflow: hidden;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(15, 23, 42, 0.03);
-        }
-
-        .ph img {
-          width: 100%;
-          height: 110px;
-          object-fit: cover;
-          display: block;
-        }
-
-        .payBtn {
-          margin-top: 12px;
-          width: 100%;
-          border: none;
-          border-radius: 16px;
-          padding: 12px 12px;
-          font-size: 14px;
-          font-weight: 950;
-          color: #fff;
-          cursor: pointer;
-          background: #24c768;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.28);
-          -webkit-tap-highlight-color: transparent;
-        }
-        .payBtn:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-
-        .hint {
-          margin-top: 10px;
-          padding: 10px;
-          border-radius: 14px;
-          border: 1px solid rgba(59, 130, 246, 0.22);
-          background: rgba(59, 130, 246, 0.08);
-          color: rgba(17, 24, 39, 0.78);
-          font-size: 12px;
-          font-weight: 800;
-          line-height: 1.35;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-        .hint.green {
-          border-color: rgba(16, 185, 129, 0.25);
-          background: rgba(16, 185, 129, 0.1);
-        }
-        .hint.red {
-          border-color: rgba(239, 68, 68, 0.25);
-          background: rgba(239, 68, 68, 0.08);
-        }
-
-        .chat {
-          background: rgba(255, 255, 255, 0.92);
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 18px;
-          box-shadow: 0 10px 26px rgba(18, 28, 45, 0.06);
-          overflow: hidden;
-
-          display: flex;
-          flex-direction: column;
-
-          min-height: 320px;
-          max-width: 100%;
-        }
-
-        .msgs {
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-
-          overflow-y: auto;
-          overflow-x: hidden;
-
-          min-height: 0;
-          flex: 1 1 auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        .empty {
-          font-size: 12px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.55);
-        }
-
-        .msg {
-          display: flex;
-          max-width: 100%;
-        }
-        .msg.me {
-          justify-content: flex-end;
-        }
-        .msg.you {
-          justify-content: flex-start;
-        }
-
-        .bubble {
-          max-width: 78%;
-          border-radius: 16px;
-          padding: 10px 10px 8px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(15, 23, 42, 0.03);
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .msg.me .bubble {
-          background: rgba(36, 199, 104, 0.12);
-          border-color: rgba(36, 199, 104, 0.25);
-        }
-
-        .txt {
-          font-size: 14px;
-          line-height: 1.45;
-          color: rgba(11, 12, 16, 0.86);
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .tm {
-          margin-top: 4px;
-          font-size: 11px;
-          font-weight: 800;
-          color: rgba(15, 23, 42, 0.45);
-          text-align: right;
-        }
-
-        .composer {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 10px;
-          padding: 10px;
-          border-top: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(255, 255, 255, 0.9);
-          max-width: 100%;
-        }
-
-        .inp {
-          height: 42px;
-          border-radius: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: rgba(249, 250, 251, 0.9);
-          padding: 0 12px;
-          font-size: 14px;
-          font-weight: 800;
-          color: #111827;
-          outline: none;
-          min-width: 0;
-        }
-
-        .send {
-          height: 42px;
-          border-radius: 14px;
-          border: none;
-          padding: 0 14px;
-          font-size: 14px;
-          font-weight: 950;
-          cursor: pointer;
-          background: #24c768;
-          color: #fff;
-          box-shadow: 0 10px 20px rgba(36, 199, 104, 0.22);
-          -webkit-tap-highlight-color: transparent;
-          white-space: nowrap;
-        }
-
-        .send:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          box-shadow: none;
+        * {
+          box-sizing: border-box;
         }
       `}</style>
     </main>
