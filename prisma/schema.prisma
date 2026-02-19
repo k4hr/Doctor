@@ -495,6 +495,9 @@ model Consultation {
   // цена консультации фиксируем на момент создания
   priceRub Int @default(1000)
 
+  // ✅ ВАЖНО: отметка оплаты (когда пациент оплатил)
+  paidAt DateTime?
+
   status ConsultationStatus @default(DRAFT)
 
   files    ConsultationFile[]
@@ -506,6 +509,7 @@ model Consultation {
   @@index([createdAt])
   @@index([doctorId, status, createdAt])
   @@index([authorTelegramId, status, createdAt])
+  @@index([paidAt])
 }
 
 model ConsultationFile {
