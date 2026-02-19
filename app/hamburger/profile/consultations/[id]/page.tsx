@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import TopBarBack from '../../../../../components/TopBarBack';
 
 function tg(): any | null {
@@ -40,7 +40,7 @@ type Detail = {
   status: 'DRAFT' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CLOSED';
   createdAt: string;
   priceRub: number;
-  paidAt: string | null;
+  paidAt?: string | null;
 
   doctorId: string;
   doctorName: string;
@@ -79,6 +79,7 @@ function fmtDateTime(iso: string) {
 }
 
 export default function PatientConsultationChatPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = String(params?.id || '').trim();
 
@@ -88,12 +89,10 @@ export default function PatientConsultationChatPage() {
 
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [paying, setPaying] = useState(false);
 
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const title = useMemo(() => item?.doctorName || 'Врач', [item?.doctorName]);
-  const canChat = !!item && item.status === 'ACCEPTED' && !!item.paidAt;
 
   const pageStyle: React.CSSProperties = {
     padding: 16,
@@ -257,7 +256,7 @@ export default function PatientConsultationChatPage() {
         setLoading(true);
         setWarn('');
 
-        const res = await fetch(`/api/consultations/${encodeURIComponent(id)}`, {
+        const res = await fetch(`/api/profile/consultations/${encodeURIComponent(id)}`, {
           method: 'GET',
           headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
           cache: 'no-store',
@@ -286,7 +285,7 @@ export default function PatientConsultationChatPage() {
     const idata = tg()?.initData || '';
     try {
       setWarn('');
-      const res = await fetch(`/api/consultations/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/profile/consultations/${encodeURIComponent(id)}`, {
         method: 'GET',
         headers: { 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
         cache: 'no-store',
@@ -303,45 +302,7 @@ export default function PatientConsultationChatPage() {
     }
   }
 
-  async function markPaidMock() {
-    if (!item) return;
-    haptic('medium');
-
-    if (item.status !== 'ACCEPTED') {
-      tgAlert('Сначала врач должен принять консультацию.');
-      return;
-    }
-    if (item.paidAt) {
-      tgAlert('Уже оплачено.');
-      return;
-    }
-
-    setPaying(true);
-    setWarn('');
-
-    const idata = tg()?.initData || '';
-    try {
-      const res = await fetch('/api/consultation/mark-paid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
-        cache: 'no-store',
-        body: JSON.stringify({ consultationId: item.id }),
-      });
-
-      const j = await res.json().catch(() => null);
-      if (!res.ok || !j || j.ok !== true) {
-        tgAlert(String(j?.hint || j?.error || 'Не удалось отметить оплату'));
-        return;
-      }
-
-      await reload();
-      tgAlert('Оплата отмечена (мок). Чат открыт.');
-    } catch (e: any) {
-      tgAlert(String(e?.message || 'Сеть/сервер недоступны'));
-    } finally {
-      setPaying(false);
-    }
-  }
+  const canChat = !!item && item.status === 'ACCEPTED' && !!item.paidAt;
 
   async function send() {
     if (!item) return;
@@ -362,7 +323,7 @@ export default function PatientConsultationChatPage() {
 
     const idata = tg()?.initData || '';
     try {
-      const res = await fetch(`/api/consultations/${encodeURIComponent(id)}/messages`, {
+      const res = await fetch(`/api/profile/consultations/${encodeURIComponent(id)}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': idata, 'X-Init-Data': idata },
         cache: 'no-store',
@@ -452,15 +413,7 @@ export default function PatientConsultationChatPage() {
               Ваше сообщение
             </div>
 
-            <div
-              style={{
-                fontSize: 14,
-                lineHeight: 1.55,
-                color: 'rgba(11,12,16,0.82)',
-                whiteSpace: 'pre-wrap',
-                ...wrapText,
-              }}
-            >
+            <div style={{ fontSize: 14, lineHeight: 1.55, color: 'rgba(11,12,16,0.82)', whiteSpace: 'pre-wrap', ...wrapText }}>
               {String(item.problemText || '').trim() || '—'}
             </div>
 
@@ -482,40 +435,11 @@ export default function PatientConsultationChatPage() {
                         background: 'rgba(15, 23, 42, 0.03)',
                       }}
                     >
-                      <img
-                        src={u}
-                        alt={`photo-${i + 1}`}
-                        style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
-                      />
+                      <img src={u} alt={`photo-${i + 1}`} style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
                     </a>
                   ))}
                 </div>
               </div>
-            ) : null}
-
-            {item.status === 'ACCEPTED' && !item.paidAt ? (
-              <button
-                type="button"
-                onClick={markPaidMock}
-                disabled={paying}
-                style={{
-                  marginTop: 10,
-                  width: '100%',
-                  border: 'none',
-                  borderRadius: 16,
-                  padding: '12px 12px',
-                  fontSize: 14,
-                  fontWeight: 950,
-                  color: '#fff',
-                  cursor: paying ? 'not-allowed' : 'pointer',
-                  background: '#24c768',
-                  boxShadow: paying ? 'none' : '0 10px 20px rgba(36, 199, 104, 0.28)',
-                  opacity: paying ? 0.75 : 1,
-                  WebkitTapHighlightColor: 'transparent' as any,
-                }}
-              >
-                {paying ? 'Оплачиваем…' : 'Оплатить (мок)'}
-              </button>
             ) : null}
           </section>
 
@@ -527,42 +451,21 @@ export default function PatientConsultationChatPage() {
                 item.messages.map((m) => {
                   const isMe = m.authorType === 'USER';
                   return (
-                    <div
-                      key={m.id}
-                      style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}
-                    >
+                    <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
                       <div
                         style={{
                           maxWidth: '78%',
                           borderRadius: 16,
                           padding: '10px 10px 8px',
-                          border: isMe
-                            ? '1px solid rgba(36, 199, 104, 0.25)'
-                            : '1px solid rgba(15, 23, 42, 0.08)',
+                          border: isMe ? '1px solid rgba(36, 199, 104, 0.25)' : '1px solid rgba(15, 23, 42, 0.08)',
                           background: isMe ? 'rgba(36, 199, 104, 0.12)' : 'rgba(15, 23, 42, 0.03)',
                           ...wrapText,
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: 14,
-                            lineHeight: 1.45,
-                            color: 'rgba(11,12,16,0.86)',
-                            whiteSpace: 'pre-wrap',
-                            ...wrapText,
-                          }}
-                        >
+                        <div style={{ fontSize: 14, lineHeight: 1.45, color: 'rgba(11,12,16,0.86)', whiteSpace: 'pre-wrap', ...wrapText }}>
                           {m.body}
                         </div>
-                        <div
-                          style={{
-                            marginTop: 4,
-                            fontSize: 11,
-                            fontWeight: 800,
-                            color: 'rgba(15,23,42,0.45)',
-                            textAlign: 'right',
-                          }}
-                        >
+                        <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: 'rgba(15,23,42,0.45)', textAlign: 'right' }}>
                           {fmtTime(m.createdAt)}
                         </div>
                       </div>
@@ -578,9 +481,7 @@ export default function PatientConsultationChatPage() {
                 style={inpStyle}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={
-                  canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'
-                }
+                placeholder={canChat ? 'Написать сообщение…' : item.status === 'ACCEPTED' ? 'Оплатите, чтобы писать' : 'Ждём решения врача'}
                 disabled={!canChat || sending}
               />
               <button
