@@ -1,7 +1,6 @@
 /* path: app/documents/page.tsx */
 'use client';
 
-import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBarBack from '../../components/TopBarBack';
 
@@ -48,7 +47,6 @@ type DocItem = (typeof DOCS)[number];
 
 export default function DocumentsIndexPage() {
   const router = useRouter();
-  const version = useMemo(() => '1.0', []);
 
   const go = (path: string) => {
     haptic('light');
@@ -72,6 +70,7 @@ export default function DocumentsIndexPage() {
               </button>
             ))}
           </div>
+        </div>
 
         {/* Блок 2 — реквизиты */}
         <div className="miniinfo-block">
@@ -151,7 +150,6 @@ export default function DocumentsIndexPage() {
           gap: 12px;
         }
 
-        /* теперь это просто “кнопка-карточка” без надписи Открыть */
         .doc-row {
           width: 100%;
           text-align: left;
@@ -183,20 +181,6 @@ export default function DocumentsIndexPage() {
           line-height: 1.45;
           color: rgba(17, 24, 39, 0.62);
           word-break: break-word;
-        }
-
-        .meta {
-          margin-top: 12px;
-          font-size: 13px;
-          color: rgba(17, 24, 39, 0.62);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        .meta-dot {
-          color: rgba(17, 24, 39, 0.45);
         }
 
         .req {
