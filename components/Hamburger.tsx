@@ -105,12 +105,27 @@ export default function Hamburger() {
           </button>
 
           <nav className="side-items">
-            <button type="button" onClick={() => go('/hamburger/profile')}>Мой профиль</button>
-            <button type="button" onClick={() => go('/hamburger/consultations')}>Консультации</button>
-            <button type="button" onClick={() => go('/hamburger/vrachi')}>Врачи</button>
-            <button type="button" onClick={() => go('/hamburger/help')}>Помощь</button>
-            <button type="button" onClick={() => go('/hamburger/about')}>О нас</button>
-            <button type="button" onClick={() => go('/hamburger/contacts')}>Контакты</button>
+            <button type="button" onClick={() => go('/hamburger/profile')}>
+              Мой профиль
+            </button>
+            <button type="button" onClick={() => go('/hamburger/consultations')}>
+              Консультации
+            </button>
+            <button type="button" onClick={() => go('/hamburger/vrachi')}>
+              Врачи
+            </button>
+            <button type="button" onClick={() => go('/hamburger/help')}>
+              Помощь
+            </button>
+
+            {/* ✅ было: /hamburger/about — теперь ведём на документы */}
+            <button type="button" onClick={() => go('/documents')}>
+              О нас
+            </button>
+
+            <button type="button" onClick={() => go('/hamburger/contacts')}>
+              Контакты
+            </button>
           </nav>
 
           <button type="button" className="side-doctor-btn" onClick={() => go('/hamburger/vracham', 'medium')}>
