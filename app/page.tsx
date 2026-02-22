@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import TopBar from '../components/TopBar';
 import MainSearch from '../components/MainSearch';
 import DownBar from '../components/DownBar';
+import Pagination from '../components/Pagination';
 
 import QuestionCard from './vopros/main/QuestionCard';
-import { FeedQuestionItem, feedMergeServerItems, useFeedItems } from './lib/questionsStore';
+import type { FeedQuestionItem } from './lib/questionsStore';
 
 function haptic(type: 'light' | 'medium' = 'light') {
   try {
@@ -28,16 +29,29 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit & { 
   }
 }
 
+type ListOk = {
+  ok: true;
+  items: FeedQuestionItem[];
+  totalCount: number;
+  totalPages: number;
+  pageSize: number;
+};
+type ListErr = { ok: false; error: string; hint?: string };
+type ListResponse = ListOk | ListErr;
+
 export default function FeedPage() {
   const router = useRouter();
 
-  // ✅ мгновенно показываем то, что уже есть (в т.ч. добавленное из /vopros)
-  const storeItems = useFeedItems();
+  const PAGE_SIZE = 10;
+
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState<FeedQuestionItem[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState('');
 
-  const hasItems = useMemo(() => storeItems.length > 0, [storeItems]);
+  const hasItems = useMemo(() => items.length > 0, [items.length]);
 
   useEffect(() => {
     try {
@@ -46,7 +60,7 @@ export default function FeedPage() {
     } catch {}
   }, []);
 
-  // ✅ подгружаем серверную ленту и мерджим со стором (optimistic не “теряем”)
+  // ✅ грузим РЕАЛЬНУЮ страницу с сервера
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -57,27 +71,38 @@ export default function FeedPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           timeoutMs: 25000,
-          body: JSON.stringify({ limit: 30 }),
+          body: JSON.stringify({ page, pageSize: PAGE_SIZE }),
         });
 
-        const j = await res.json().catch(() => ({} as any));
-        if (!res.ok || !j?.ok) {
-          setInfo(j?.error ? `Ошибка: ${String(j.error)}` : `Ошибка загрузки (${res.status})`);
+        const j = (await res.json().catch(() => null)) as ListResponse | null;
+
+        if (!res.ok || !j || (j as any).ok !== true) {
+          const err = (j as any)?.error ? `Ошибка: ${String((j as any).error)}` : `Ошибка загрузки (${res.status})`;
+          setInfo((j as any)?.hint ? `${err}. ${String((j as any).hint)}` : err);
+          setItems([]);
+          setTotalPages(1);
           return;
         }
 
-        const items: FeedQuestionItem[] = Array.isArray(j?.items) ? j.items : [];
-        feedMergeServerItems(items);
+        const ok = j as ListOk;
+        setItems(Array.isArray(ok.items) ? ok.items : []);
+        setTotalPages(Math.max(1, Number(ok.totalPages || 1)));
+
+        // если сервер сказал, что страниц меньше — поджимаем page
+        const tp = Math.max(1, Number(ok.totalPages || 1));
+        if (page > tp) setPage(tp);
       } catch (e: any) {
         console.error(e);
         setInfo(e?.name === 'AbortError' ? 'Таймаут: сервер отвечает слишком долго.' : 'Сеть/сервер недоступны.');
+        setItems([]);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, []);
+  }, [page]);
 
   const handleAskClick = () => {
     haptic('medium');
@@ -107,16 +132,20 @@ export default function FeedPage() {
         </div>
 
         <section className="feed-list" aria-label="Вопросы">
-          {loading && !hasItems ? <div className="muted">Загружаем вопросы…</div> : null}
+          {loading ? <div className="muted">Загружаем вопросы…</div> : null}
           {!loading && info ? <div className="muted">{info}</div> : null}
           {!loading && !info && !hasItems ? <div className="muted">Пока нет вопросов.</div> : null}
 
-          {hasItems ? (
-            <div className="cards">
-              {storeItems.map((q) => (
-                <QuestionCard key={q.id} q={q as any} hrefBase="/vopros" />
-              ))}
-            </div>
+          {!info && hasItems ? (
+            <>
+              <div className="cards">
+                {items.map((q) => (
+                  <QuestionCard key={q.id} q={q as any} hrefBase="/vopros" />
+                ))}
+              </div>
+
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+            </>
           ) : null}
         </section>
 
