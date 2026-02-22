@@ -67,28 +67,20 @@ export default function DocumentsIndexPage() {
           <div className="docs">
             {DOCS.map((d: DocItem) => (
               <button key={d.href} type="button" className="doc-row" onClick={() => go(d.href)}>
-                <div className="doc-row-top">
-                  <div className="doc-row-title">{d.title}</div>
-                  <div className="doc-row-go">Открыть →</div>
-                </div>
+                <div className="doc-row-title">{d.title}</div>
                 <div className="doc-row-desc">{d.desc}</div>
               </button>
             ))}
           </div>
 
-          <div className="meta">
-            <span className="meta-dot">•</span> Редакция: <b>{version}</b>
-          </div>
-        </div>
-
-        {/* Блок 2 — реквизиты (БЕЗ кнопок “копировать”) */}
+        {/* Блок 2 — реквизиты */}
         <div className="miniinfo-block">
           <h2 className="miniinfo-title">Реквизиты оператора</h2>
 
           <div className="req">
             <div className="req-line">
               <span className="req-k">ИП</span>
-              <span className="req-v">Меньшакова Анастасия Сергеевна</span>
+              <span className="req-v">МЕНЬШАКОВА А.С.</span>
             </div>
 
             <div className="req-line">
@@ -159,13 +151,14 @@ export default function DocumentsIndexPage() {
           gap: 12px;
         }
 
+        /* теперь это просто “кнопка-карточка” без надписи Открыть */
         .doc-row {
           width: 100%;
           text-align: left;
           border: 1px solid rgba(15, 23, 42, 0.08);
           background: #ffffff;
           border-radius: 16px;
-          padding: 12px 12px;
+          padding: 14px 14px;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
@@ -176,33 +169,17 @@ export default function DocumentsIndexPage() {
           opacity: 0.96;
         }
 
-        .doc-row-top {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
         .doc-row-title {
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 900;
           color: #111827;
           line-height: 1.25;
           word-break: break-word;
         }
 
-        .doc-row-go {
-          font-size: 13px;
-          font-weight: 900;
-          color: #24c768;
-          white-space: nowrap;
-          flex: 0 0 auto;
-          padding-top: 1px;
-        }
-
         .doc-row-desc {
-          margin-top: 6px;
-          font-size: 13px;
+          margin-top: 8px;
+          font-size: 14px;
           line-height: 1.45;
           color: rgba(17, 24, 39, 0.62);
           word-break: break-word;
@@ -262,7 +239,6 @@ export default function DocumentsIndexPage() {
           word-break: break-word;
         }
 
-        /* чуть мягче на очень узких экранах */
         @media (max-width: 360px) {
           .req-k {
             width: 56px;
@@ -270,6 +246,9 @@ export default function DocumentsIndexPage() {
           }
           .miniinfo-block {
             padding: 16px 14px 16px;
+          }
+          .doc-row {
+            padding: 13px 13px;
           }
         }
       `}</style>
