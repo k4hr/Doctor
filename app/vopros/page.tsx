@@ -36,10 +36,7 @@ function haptic(type: 'light' | 'medium' = 'light') {
   } catch {}
 }
 
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit & { timeoutMs?: number } = {}
-) {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit & { timeoutMs?: number } = {}) {
   const timeoutMs = init.timeoutMs ?? 25000;
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -125,7 +122,6 @@ function revokeUrls(urls: string[]) {
 }
 
 function parseKeywordsClient(raw: string): string {
-  // оставим в виде строки — сервер сам нормализует
   return String(raw || '').trim();
 }
 
@@ -138,10 +134,13 @@ export default function VoprosPage() {
   const [body, setBody] = useState('');
   const [keywords, setKeywords] = useState('');
 
+  // ✅ выбор: платный/бесплатный
+  const [isPaid, setIsPaid] = useState(false);
+
   // ✅ выбор: анонимно / показать имя
   const [authorIsAnonymous, setAuthorIsAnonymous] = useState(true);
 
-  // ✅ опционально (для будущего фильтра “по врачу”), пока скрыто и не обязательно
+  // ✅ опционально (скрыто, на будущее)
   const [assignedDoctorId, setAssignedDoctorId] = useState('');
 
   const [photos, setPhotos] = useState<File[]>([]);
@@ -212,8 +211,11 @@ export default function VoprosPage() {
     try {
       setSubmitting(true);
 
-      // 1) create question
       setStage('Отправляем вопрос…');
+
+      // ✅ Для платного вопроса: isFree=false, priceRub=600 (минимум по твоим правилам)
+      const isFree = !isPaid;
+      const priceRub = isPaid ? 600 : 0;
 
       const resCreate = await fetchWithTimeout('/api/question/create', {
         method: 'POST',
@@ -226,7 +228,9 @@ export default function VoprosPage() {
           body: body.trim(),
           keywords: parseKeywordsClient(keywords),
           assignedDoctorId: assignedDoctorId.trim() || undefined,
-          authorIsAnonymous, // ✅ новое поле
+          authorIsAnonymous,
+          isFree,
+          priceRub,
         }),
       });
 
@@ -251,20 +255,19 @@ export default function VoprosPage() {
       const tgUser = extractTgUserFromInitData(initData);
       const optimisticAuthorLabel = buildAuthorLabel(authorIsAnonymous, tgUser);
 
-      // ✅ МГНОВЕННО добавляем в ленту (optimistic)
       feedUpsertTop({
         id: questionId,
         title: title.trim(),
         bodySnippet: body.trim(),
         createdAt: createdAtIso,
         doctorLabel: speciality.trim() || '—',
-        authorLabel: optimisticAuthorLabel, // ✅ показываем на карточке
+        authorLabel: optimisticAuthorLabel,
         status: 'WAITING',
-        priceBadge: 'FREE',
+        priceBadge: isPaid ? 'PAID' : 'FREE',
+        priceText: isPaid ? '600 ₽' : undefined,
         optimistic: true,
       });
 
-      // 2) upload photos (если выбраны)
       if (photos.length > 0) {
         setStage('Загружаем фото…');
 
@@ -290,9 +293,8 @@ export default function VoprosPage() {
       }
 
       setStage('Готово ✅');
-      showToast('Вопрос отправлен. Он будет доступен врачам выбранной категории.');
+      showToast('Вопрос отправлен.');
 
-      // очистим форму
       setSpeciality('');
       setTitle('');
       setBody('');
@@ -301,8 +303,8 @@ export default function VoprosPage() {
       setPhotos([]);
       setPhotosInputKey((x) => x + 1);
       setAuthorIsAnonymous(true);
+      setIsPaid(false);
 
-      // ✅ просто уходим на главную — там уже есть новый вопрос из стора
       router.push('/');
     } catch (e: any) {
       console.error(e);
@@ -330,6 +332,70 @@ export default function VoprosPage() {
         </header>
 
         <form ref={formRef} onSubmit={handleSubmit}>
+          {/* ✅ 1) В САМОМ ВЕРХУ — платный/бесплатный */}
+          <section className="field" aria-label="Тип вопроса">
+            <span className="field-label">Тип вопроса</span>
+
+            <div className="payRow" role="group" aria-label="Платный или бесплатный">
+              <button
+                type="button"
+                className={'payBtn ' + (!isPaid ? 'payBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setIsPaid(false);
+                }}
+              >
+                Бесплатный вопрос
+              </button>
+
+              <button
+                type="button"
+                className={'payBtn ' + (isPaid ? 'payBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setIsPaid(true);
+                }}
+              >
+                Платный вопрос
+              </button>
+            </div>
+
+            {isPaid ? <p className="field-hint">Минимальная стоимость платного вопроса — <b>600 ₽</b>.</p> : null}
+          </section>
+
+          {/* ✅ 2) СРАЗУ ПОД ЭТИМ — показывать автора */}
+          <section className="field" aria-label="Приватность автора">
+            <span className="field-label">Показывать автора</span>
+
+            <div className="anonRow" role="group" aria-label="Настройка автора">
+              <button
+                type="button"
+                className={'anonBtn ' + (authorIsAnonymous ? 'anonBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setAuthorIsAnonymous(true);
+                }}
+              >
+                Анонимно
+              </button>
+
+              <button
+                type="button"
+                className={'anonBtn ' + (!authorIsAnonymous ? 'anonBtn--active' : '')}
+                onClick={() => {
+                  haptic('light');
+                  setAuthorIsAnonymous(false);
+                }}
+              >
+                Моё имя в Telegram
+              </button>
+            </div>
+
+            <p className="field-hint">
+              На карточке будет: <b>{authorIsAnonymous ? 'Вопрос от Анонимно' : 'Вопрос от @username/Имя'}</b>
+            </p>
+          </section>
+
           <label className="field">
             <span className="field-label">Раздел медицины</span>
             <div className="select-wrap">
@@ -359,43 +425,7 @@ export default function VoprosPage() {
               </button>
               .
             </p>
-
-            <p className="privacy-hint">
-              Фото и детали вопроса будут доступны <b>только врачам выбранной категории</b>.
-            </p>
           </label>
-
-          <section className="field" aria-label="Приватность автора">
-            <span className="field-label">Показывать автора</span>
-
-            <div className="anonRow" role="group" aria-label="Настройка автора">
-              <button
-                type="button"
-                className={'anonBtn ' + (authorIsAnonymous ? 'anonBtn--active' : '')}
-                onClick={() => {
-                  haptic('light');
-                  setAuthorIsAnonymous(true);
-                }}
-              >
-                Анонимно
-              </button>
-
-              <button
-                type="button"
-                className={'anonBtn ' + (!authorIsAnonymous ? 'anonBtn--active' : '')}
-                onClick={() => {
-                  haptic('light');
-                  setAuthorIsAnonymous(false);
-                }}
-              >
-                Моё имя в Telegram
-              </button>
-            </div>
-
-            <p className="field-hint">
-              На главной карточке будет: <b>{authorIsAnonymous ? 'Вопрос от Анонимно' : 'Вопрос от @username/Имя'}</b>
-            </p>
-          </section>
 
           <label className="field">
             <span className="field-label">Заголовок вопроса</span>
@@ -555,6 +585,37 @@ export default function VoprosPage() {
           color: #111827;
         }
 
+        .payRow {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .payBtn {
+          width: 100%;
+          border-radius: 12px;
+          padding: 10px 12px;
+          border: 1px solid rgba(15, 23, 42, 0.14);
+          background: rgba(249, 250, 251, 1);
+          color: rgba(17, 24, 39, 0.82);
+          font-weight: 900;
+          font-size: 12px;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
+
+        .payBtn--active {
+          border-color: rgba(36, 199, 104, 0.42);
+          background: rgba(36, 199, 104, 0.1);
+          color: #166534;
+          box-shadow: 0 10px 22px rgba(36, 199, 104, 0.14);
+        }
+
+        .payBtn:active {
+          transform: scale(0.99);
+        }
+
         .anonRow {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -577,7 +638,7 @@ export default function VoprosPage() {
 
         .anonBtn--active {
           border-color: rgba(36, 199, 104, 0.42);
-          background: rgba(36, 199, 104, 0.10);
+          background: rgba(36, 199, 104, 0.1);
           color: #166534;
           box-shadow: 0 10px 22px rgba(36, 199, 104, 0.14);
         }
@@ -643,17 +704,6 @@ export default function VoprosPage() {
 
         .field-hint--warning {
           color: #b45309;
-        }
-
-        .privacy-hint {
-          margin: 6px 0 0;
-          font-size: 11px;
-          line-height: 1.35;
-          color: rgba(17, 24, 39, 0.72);
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(36, 199, 104, 0.08);
-          border: 1px solid rgba(36, 199, 104, 0.18);
         }
 
         .link-btn {
