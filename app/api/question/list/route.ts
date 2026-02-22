@@ -47,13 +47,8 @@ function buildAuthorLabel(q: any) {
 }
 
 function mapStatusToUi(statusDb: any, answersCount: number): 'WAITING' | 'ANSWERING' | 'CLOSED' {
-  // ✅ CLOSED
   if (String(statusDb) === String(QuestionStatus.DONE) || String(statusDb) === 'DONE') return 'CLOSED';
-
-  // ✅ если есть ответы — считаем что уже “ANSWERING”
   if (answersCount > 0) return 'ANSWERING';
-
-  // ✅ иначе ждёт
   return 'WAITING';
 }
 
@@ -61,41 +56,69 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
 
-    const limit = clampInt(body?.limit, 30, 1, 50);
+    // ✅ новый режим: page + pageSize (реальная пагинация)
+    const page = clampInt(body?.page, 1, 1, 1_000_000); // 1-based
+    const pageSize = clampInt(body?.pageSize ?? body?.limit, 10, 1, 50);
+
+    // ✅ старый режим: cursor (оставляем совместимость)
     const cursor = body?.cursor ? String(body.cursor).trim() : '';
+    const useCursor = !!cursor && !body?.page; // если page задан — работаем по page/skip
 
-    const rows = await prisma.question.findMany({
-      take: limit,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        body: true,
-        createdAt: true,
-        speciality: true,
-        status: true,
+    // тут можно добавить фильтры (например, только не удалённые/только опубликованные)
+    const where: any = {};
 
-        // ✅ автор
-        authorIsAnonymous: true,
-        authorUsername: true,
-        authorFirstName: true,
-        authorLastName: true,
+    // totalCount — реальное число записей для реальных страниц
+    const totalCount = await prisma.question.count({ where });
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-        // ✅ цена (если у тебя эти поля есть — оставь; если нет, просто удали их + mapPriceToUi/buildPriceText)
-        isFree: true,
-        priceRub: true,
+    const select = {
+      id: true,
+      title: true,
+      body: true,
+      createdAt: true,
+      speciality: true,
+      status: true,
 
-        // ✅ СКОЛЬКО ОТВЕТОВ (только не удалённые)
-        _count: {
-          select: {
-            answers: {
-              where: { isDeleted: false },
-            },
+      authorIsAnonymous: true,
+      authorUsername: true,
+      authorFirstName: true,
+      authorLastName: true,
+
+      isFree: true,
+      priceRub: true,
+
+      _count: {
+        select: {
+          answers: {
+            where: { isDeleted: false },
           },
         },
       },
-    });
+    } as const;
+
+    let rows: any[] = [];
+
+    if (useCursor) {
+      rows = await prisma.question.findMany({
+        where,
+        take: pageSize,
+        skip: 1,
+        cursor: { id: cursor },
+        orderBy: { createdAt: 'desc' },
+        select,
+      });
+    } else {
+      const safePage = Math.max(1, Math.min(totalPages, page));
+      const skip = (safePage - 1) * pageSize;
+
+      rows = await prisma.question.findMany({
+        where,
+        take: pageSize,
+        skip,
+        orderBy: { createdAt: 'desc' },
+        select,
+      });
+    }
 
     const items = rows.map((q: any) => {
       const answersCount = Number(q?._count?.answers ?? 0);
@@ -108,7 +131,6 @@ export async function POST(req: Request) {
         doctorLabel: String(q.speciality || '—'),
         authorLabel: buildAuthorLabel(q),
 
-        // ✅ ВАЖНО: теперь карточка реально получит и статус, и answersCount
         answersCount,
         status: mapStatusToUi(q.status, answersCount),
 
@@ -120,7 +142,14 @@ export async function POST(req: Request) {
     const nextCursor = rows.length ? String(rows[rows.length - 1].id) : null;
 
     return NextResponse.json(
-      { ok: true, items, nextCursor },
+      {
+        ok: true,
+        items,
+        nextCursor, // совместимость
+        totalCount,
+        totalPages,
+        pageSize,
+      },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   } catch (e: any) {
