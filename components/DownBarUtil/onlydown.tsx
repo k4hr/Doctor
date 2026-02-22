@@ -43,10 +43,7 @@ export default function OnlyDown() {
     { label: 'Технологии', href: '/docs/tech' },
   ];
 
-  const colContacts: LinkItem[] = [
-    { label: 'Контакты', href: '/contacts' },
-    // почту оставим текстом, чтобы выглядело как на скрине
-  ];
+  const colContacts: LinkItem[] = [{ label: 'Контакты', href: '/contacts' }];
 
   return (
     <>
@@ -95,7 +92,7 @@ export default function OnlyDown() {
                   </button>
                 ))}
                 <div className="contactLine">
-                  <span className="muted">Почта:</span> <span className="mail">info@sprosvracha.com</span>
+                  <span className="muted">Почта:</span> <span className="mail">vrachi.tut@yandex.ru</span>
                 </div>
               </div>
             </div>
@@ -105,18 +102,7 @@ export default function OnlyDown() {
 
           <div className="ip">
             <div className="ipTitle">ИП МЕНЬШАКОВА А.С</div>
-            <div className="ipRow">ОГРН 1212200005984, ИНН 2222890750</div>
-
-            <div className="ipRow2">
-              <div className="kv">
-                <span className="k">ИНН</span>
-                <span className="v">290221242314</span>
-              </div>
-              <div className="kv">
-                <span className="k">ОГРН/ОГРНИП</span>
-                <span className="v">325290000042402</span>
-              </div>
-            </div>
+            <div className="ipRow">ОГРН 325290000042402, ИНН 290221242314</div>
 
             <div className="disc">
               Напоминаем, что консультации специалистов сайта даются исключительно в справочных целях и не являются
@@ -228,41 +214,6 @@ export default function OnlyDown() {
           color: rgba(17, 24, 39, 0.5);
         }
 
-        .ipRow2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin: 8px auto 0;
-          max-width: 640px;
-        }
-
-        .kv {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-
-          padding: 10px 12px;
-          border-radius: 12px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          background: rgba(249, 250, 251, 0.9);
-          text-align: left;
-        }
-
-        .k {
-          font-size: 12px;
-          font-weight: 900;
-          color: rgba(17, 24, 39, 0.5);
-          white-space: nowrap;
-        }
-
-        .v {
-          font-size: 13px;
-          font-weight: 950;
-          color: rgba(17, 24, 39, 0.85);
-          white-space: nowrap;
-        }
-
         .disc {
           margin-top: 8px;
           font-size: 11px;
@@ -288,12 +239,6 @@ export default function OnlyDown() {
           .cols {
             grid-template-columns: 1fr;
             gap: 16px;
-          }
-          .ipRow2 {
-            grid-template-columns: 1fr;
-          }
-          .kv {
-            text-align: left;
           }
         }
       `}</style>
