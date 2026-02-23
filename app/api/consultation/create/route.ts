@@ -1,6 +1,6 @@
 /* path: app/api/consultation/create/route.ts */
-import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
@@ -122,14 +122,12 @@ export async function POST(req: Request) {
     if (!doctorId) return NextResponse.json({ ok: false, error: 'NO_DOCTOR' }, { status: 400 });
     if (problemText.length < 10) return NextResponse.json({ ok: false, error: 'TOO_SHORT' }, { status: 400 });
 
+    // ✅ берём цену и настройки у врача
     const doctor = await prisma.doctor.findUnique({
       where: { id: doctorId },
       select: {
         id: true,
-        status: true,
-
         proUntil: true,
-
         consultationEnabled: true,
         consultationPriceRub: true,
       },
@@ -147,6 +145,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'CONSULTATIONS_DISABLED' }, { status: 403 });
     }
 
+    // ✅ фиксируем цену на момент создания консультации
     const price = clampPriceRub(doctor.consultationPriceRub);
 
     const c = await prisma.consultation.create({
@@ -157,10 +156,15 @@ export async function POST(req: Request) {
         authorUsername: v.user.username,
         authorFirstName: v.user.first_name,
         authorLastName: v.user.last_name,
+
+        // сейчас у тебя в клиенте нет переключателя, поэтому оставим true
         authorIsAnonymous: true,
 
         body: problemText,
+
+        // ✅ ВОТ ТУТ КЛЮЧ: ставим цену врача, а не дефолт 1000
         priceRub: price,
+
         status: 'DRAFT',
       },
       select: { id: true, priceRub: true },
@@ -168,13 +172,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { ok: true, consultationId: c.id, priceRub: c.priceRub },
-      { headers: { 'Cache-Control': 'no-store' } }
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
       { ok: false, error: 'FAILED_CREATE', hint: String(e?.message || 'See logs') },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } }
     );
   }
 }
