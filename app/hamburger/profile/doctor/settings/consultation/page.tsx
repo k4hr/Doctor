@@ -35,7 +35,7 @@ type Item = {
   priceRub: number;
   patientTelegramId: string;
   problemSnippet: string;
-  coverUrl: string | null; // больше не используем в UI, но пусть приходит как раньше
+  coverUrl: string | null;
 };
 
 type ApiOk = { ok: true; items: Item[] };
@@ -250,7 +250,6 @@ export default function DoctorConsultationsPage() {
       <h1 className="t">Консультации</h1>
       <p className="s">Заявки от пациентов. Можно принять или отказать.</p>
 
-      {/* ✅ SETTINGS BLOCK */}
       <section className="setCard" aria-label="Настройки консультаций">
         <div className="setTop">
           <div className="setTitle">Настройки</div>
@@ -301,12 +300,7 @@ export default function DoctorConsultationsPage() {
 
         {settingsWarn ? <div className="warn">{settingsWarn}</div> : null}
 
-        <button
-          type="button"
-          className="saveBtn"
-          onClick={saveSettings}
-          disabled={!proActive || settingsLoading || saving}
-        >
+        <button type="button" className="saveBtn" onClick={saveSettings} disabled={!proActive || settingsLoading || saving}>
           {saving ? 'Сохраняем…' : 'Сохранить'}
         </button>
       </section>
