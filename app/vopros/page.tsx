@@ -109,6 +109,8 @@ function buildAuthorLabel(authorIsAnonymous: boolean, user: TgUser | null): stri
 
 const MAX_PHOTOS = 10;
 const MAX_TITLE_LEN = 30;
+const MIN_PAID_RUB = 600;
+const MAX_PAID_RUB = 100_000;
 
 function clampFiles(files: FileList | null | undefined, max: number): File[] {
   if (!files || files.length === 0) return [];
@@ -125,6 +127,12 @@ function parseKeywordsClient(raw: string): string {
   return String(raw || '').trim();
 }
 
+function clampIntStr(raw: string, def: number) {
+  const n = Number(String(raw || '').replace(/[^\d]/g, ''));
+  if (!Number.isFinite(n)) return def;
+  return Math.floor(n);
+}
+
 export default function VoprosPage() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -136,6 +144,9 @@ export default function VoprosPage() {
 
   // ✅ выбор: платный/бесплатный
   const [isPaid, setIsPaid] = useState(false);
+
+  // ✅ цена платного вопроса (строкой для инпута)
+  const [priceStr, setPriceStr] = useState(String(MIN_PAID_RUB));
 
   // ✅ выбор: анонимно / показать имя
   const [authorIsAnonymous, setAuthorIsAnonymous] = useState(true);
@@ -175,12 +186,34 @@ export default function VoprosPage() {
 
   useEffect(() => () => revokeUrls(photoUrls), [photoUrls]);
 
+  // ✅ если переключили на бесплатный — сбрасываем фотки и прячем загрузку
+  useEffect(() => {
+    if (!isPaid) {
+      if (photos.length) setPhotos([]);
+      setPhotosInputKey((x) => x + 1);
+    } else {
+      // при переключении на платный — гарантируем минимум
+      const n = clampIntStr(priceStr, MIN_PAID_RUB);
+      if (n < MIN_PAID_RUB) setPriceStr(String(MIN_PAID_RUB));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaid]);
+
   const validate = () => {
     if (!speciality) return 'Выберите раздел медицины.';
     if (title.trim().length < 6) return 'Заголовок слишком короткий (минимум 6 символов).';
     if (title.trim().length > MAX_TITLE_LEN) return `Заголовок слишком длинный (максимум ${MAX_TITLE_LEN} символов).`;
     if (body.trim().length < 50) return 'Опишите вопрос подробнее (минимум 50 символов).';
-    if (photos.length > MAX_PHOTOS) return `Можно загрузить максимум ${MAX_PHOTOS} фото.`;
+
+    if (isPaid) {
+      const p = clampIntStr(priceStr, MIN_PAID_RUB);
+      if (!Number.isFinite(p)) return 'Введите цену платного вопроса.';
+      if (p < MIN_PAID_RUB) return `Минимальная цена платного вопроса — ${MIN_PAID_RUB} ₽.`;
+      if (p > MAX_PAID_RUB) return `Максимальная цена — ${MAX_PAID_RUB} ₽.`;
+    }
+
+    if (isPaid && photos.length > MAX_PHOTOS) return `Можно загрузить максимум ${MAX_PHOTOS} фото.`;
+    if (!isPaid && photos.length > 0) return 'Фото можно прикреплять только к платному вопросу.';
     return '';
   };
 
@@ -210,12 +243,10 @@ export default function VoprosPage() {
 
     try {
       setSubmitting(true);
-
       setStage('Отправляем вопрос…');
 
-      // ✅ Для платного вопроса: isFree=false, priceRub=600 (минимум по твоим правилам)
       const isFree = !isPaid;
-      const priceRub = isPaid ? 600 : 0;
+      const priceRub = isPaid ? clampIntStr(priceStr, MIN_PAID_RUB) : 0;
 
       const resCreate = await fetchWithTimeout('/api/question/create', {
         method: 'POST',
@@ -264,11 +295,11 @@ export default function VoprosPage() {
         authorLabel: optimisticAuthorLabel,
         status: 'WAITING',
         priceBadge: isPaid ? 'PAID' : 'FREE',
-        priceText: isPaid ? '600 ₽' : undefined,
+        priceText: isPaid ? `${priceRub} ₽` : undefined,
         optimistic: true,
       });
 
-      if (photos.length > 0) {
+      if (isPaid && photos.length > 0) {
         setStage('Загружаем фото…');
 
         const fd = new FormData();
@@ -304,6 +335,7 @@ export default function VoprosPage() {
       setPhotosInputKey((x) => x + 1);
       setAuthorIsAnonymous(true);
       setIsPaid(false);
+      setPriceStr(String(MIN_PAID_RUB));
 
       router.push('/');
     } catch (e: any) {
@@ -332,7 +364,7 @@ export default function VoprosPage() {
         </header>
 
         <form ref={formRef} onSubmit={handleSubmit}>
-          {/* ✅ 1) В САМОМ ВЕРХУ — платный/бесплатный */}
+          {/* 1) Тип вопроса */}
           <section className="field" aria-label="Тип вопроса">
             <span className="field-label">Тип вопроса</span>
 
@@ -345,7 +377,7 @@ export default function VoprosPage() {
                   setIsPaid(false);
                 }}
               >
-                Бесплатный вопрос
+                Бесплатный
               </button>
 
               <button
@@ -356,14 +388,41 @@ export default function VoprosPage() {
                   setIsPaid(true);
                 }}
               >
-                Платный вопрос
+                Платный
               </button>
             </div>
 
-            {isPaid ? <p className="field-hint">Минимальная стоимость платного вопроса — <b>600 ₽</b>.</p> : null}
+            {isPaid ? (
+              <div className="priceBox" aria-label="Цена платного вопроса">
+                <span className="field-label small">Цена (₽)</span>
+                <input
+                  type="number"
+                  className="price-input"
+                  inputMode="numeric"
+                  min={MIN_PAID_RUB}
+                  max={MAX_PAID_RUB}
+                  step={50}
+                  value={priceStr}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setPriceStr(raw);
+                  }}
+                  onBlur={() => {
+                    const p = clampIntStr(priceStr, MIN_PAID_RUB);
+                    const fixed = Math.max(MIN_PAID_RUB, Math.min(MAX_PAID_RUB, p));
+                    setPriceStr(String(fixed));
+                  }}
+                />
+                <p className="field-hint">
+                  Минимум <b>{MIN_PAID_RUB} ₽</b>. Можно больше.
+                </p>
+              </div>
+            ) : (
+              <p className="field-hint">Фото прикреплять можно только к платному вопросу.</p>
+            )}
           </section>
 
-          {/* ✅ 2) СРАЗУ ПОД ЭТИМ — показывать автора */}
+          {/* 2) Автор */}
           <section className="field" aria-label="Приватность автора">
             <span className="field-label">Показывать автора</span>
 
@@ -387,7 +446,7 @@ export default function VoprosPage() {
                   setAuthorIsAnonymous(false);
                 }}
               >
-                Моё имя в Telegram
+                Моё имя
               </button>
             </div>
 
@@ -470,62 +529,65 @@ export default function VoprosPage() {
             <p className="field-hint">Это поможет людям находить похожие вопросы в общем поиске.</p>
           </label>
 
-          <section className="field">
-            <div className="photos-head">
-              <span className="field-label">Фотографии (необязательно)</span>
-              <span className="photos-limit">до {MAX_PHOTOS}</span>
-            </div>
-
-            {photoUrls.length ? (
-              <div className="thumbs">
-                {photoUrls.map((u, idx) => (
-                  <div className="thumb" key={u}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="thumbImg" src={u} alt={`photo-${idx + 1}`} />
-                  </div>
-                ))}
+          {/* ✅ Фото только если платный */}
+          {isPaid ? (
+            <section className="field">
+              <div className="photos-head">
+                <span className="field-label">Фотографии (необязательно)</span>
+                <span className="photos-limit">до {MAX_PHOTOS}</span>
               </div>
-            ) : (
-              <div className="placeholder">Фото не выбраны</div>
-            )}
 
-            <input
-              key={photosInputKey}
-              className="file"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => {
-                const next = clampFiles(e.target.files, MAX_PHOTOS);
-                if (e.target.files && e.target.files.length > MAX_PHOTOS) {
-                  showToast(`Можно выбрать максимум ${MAX_PHOTOS} фото.`);
-                }
-                setPhotos(next);
-                setPhotosInputKey((x) => x + 1);
-              }}
-            />
+              {photoUrls.length ? (
+                <div className="thumbs">
+                  {photoUrls.map((u, idx) => (
+                    <div className="thumb" key={u}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img className="thumbImg" src={u} alt={`photo-${idx + 1}`} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="placeholder">Фото не выбраны</div>
+              )}
 
-            <div className="hint">Загружайте только то, что относится к вопросу (анализы/кожа/снимки и т.п.).</div>
-
-            {photos.length > 0 && (
-              <button
-                type="button"
-                className="miniDanger"
-                onClick={() => {
-                  haptic('light');
-                  setPhotos([]);
+              <input
+                key={photosInputKey}
+                className="file"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const next = clampFiles(e.target.files, MAX_PHOTOS);
+                  if (e.target.files && e.target.files.length > MAX_PHOTOS) {
+                    showToast(`Можно выбрать максимум ${MAX_PHOTOS} фото.`);
+                  }
+                  setPhotos(next);
                   setPhotosInputKey((x) => x + 1);
                 }}
-              >
-                Очистить фото
-              </button>
-            )}
-          </section>
+              />
+
+              <div className="hint">Загружайте только то, что относится к вопросу (анализы/кожа/снимки и т.п.).</div>
+
+              {photos.length > 0 && (
+                <button
+                  type="button"
+                  className="miniDanger"
+                  onClick={() => {
+                    haptic('light');
+                    setPhotos([]);
+                    setPhotosInputKey((x) => x + 1);
+                  }}
+                >
+                  Очистить фото
+                </button>
+              )}
+            </section>
+          ) : null}
 
           <input type="hidden" value={assignedDoctorId} onChange={(e) => setAssignedDoctorId(e.target.value)} />
 
           <button type="submit" className="ask-submit" disabled={submitting} onClick={() => haptic('medium')}>
-            {submitting ? 'Отправка…' : 'Отправить вопрос'}
+            {submitting ? 'Отправка…' : isPaid ? 'Перейти к оплате' : 'Отправить вопрос'}
           </button>
 
           {stage ? <div className="stage">{stage}</div> : null}
@@ -585,6 +647,12 @@ export default function VoprosPage() {
           color: #111827;
         }
 
+        .field-label.small {
+          font-size: 12px;
+          font-weight: 800;
+          color: rgba(17, 24, 39, 0.8);
+        }
+
         .payRow {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -614,6 +682,26 @@ export default function VoprosPage() {
 
         .payBtn:active {
           transform: scale(0.99);
+        }
+
+        .priceBox {
+          margin-top: 10px;
+          padding: 12px 12px 10px;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: #ffffff;
+          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+        }
+
+        .price-input {
+          width: 100%;
+          margin-top: 6px;
+          border-radius: 10px;
+          border: 1px solid rgba(15, 23, 42, 0.18);
+          background: #f9fafb;
+          font-size: 14px;
+          padding: 10px 12px;
+          color: #111827;
         }
 
         .anonRow {
