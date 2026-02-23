@@ -33,7 +33,7 @@ const MODES: ModeCard[] = [
     id: 2,
     title: 'Диагноз+',
     subtitle: 'Популярный режим',
-    price: 'от 599 ₽',
+    price: 'от 600 ₽',
     color: 'gold',
     features: [
       { good: true, text: 'Мгновенная публикация вопроса' },
