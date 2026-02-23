@@ -74,7 +74,6 @@ function answersSuffix(cnt: number) {
   const mod10 = n % 10;
   const mod100 = n % 100;
 
-  // 1 ответ, 2-4 ответа, 5-20 ответов, 21 ответ, 22-24 ответа, ...
   if (mod10 === 1 && mod100 !== 11) return '';
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'а';
   return 'ов';
@@ -84,13 +83,8 @@ function statusLabel(q: QuestionCardData) {
   const st = String(q.status || 'WAITING').toUpperCase() as QuestionStatusUI;
   const cnt = Number.isFinite(q.answersCount as number) ? Math.max(0, Number(q.answersCount)) : 0;
 
-  // ✅ ЗАКРЫТ — ЗЕЛЁНЫЙ
   if (st === 'CLOSED') return { text: 'Вопрос закрыт', tone: 'green' as const };
-
-  // ✅ ЕСТЬ ОТВЕТЫ — ГОЛУБОЙ (счётчик)
   if (cnt > 0) return { text: `${cnt} ответ${answersSuffix(cnt)}`, tone: 'blue' as const };
-
-  // ✅ НЕТ ОТВЕТОВ — СЕРЫЙ
   return { text: 'Ждёт ответа', tone: 'gray' as const };
 }
 
@@ -118,6 +112,7 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
       statusTone: st.tone,
       priceText: pr.text,
       priceTone: pr.tone,
+      isPaid: q.priceBadge === 'PAID',
     };
   }, [q]);
 
@@ -128,7 +123,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
 
   return (
     <>
-      <button type="button" className="qc" onClick={onOpen} aria-label={`Открыть вопрос: ${q.title}`}>
+      <button
+        type="button"
+        className={`qc ${ui.isPaid ? 'qc--paid' : ''}`}
+        onClick={onOpen}
+        aria-label={`Открыть вопрос: ${q.title}`}
+      >
         <div className="qcTop">
           <div className="qcTopLeft">
             <div className="qcAuthorTop">{authorLabelSafe(q)}</div>
@@ -188,6 +188,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           justify-content: space-between;
         }
 
+        /* ✅ платный вопрос: рамка тем же “золотым”, что и плашка */
+        .qc--paid {
+          border-color: rgba(245, 158, 11, 0.30);
+          box-shadow: 0 10px 26px rgba(245, 158, 11, 0.08);
+        }
+
         .qc::after {
           content: '';
           position: absolute;
@@ -206,6 +212,11 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
         .qc:active {
           transform: translateY(1px);
           box-shadow: 0 6px 18px rgba(18, 28, 45, 0.11);
+        }
+
+        /* ✅ платный: активное нажатие тоже с золотым оттенком */
+        .qc--paid:active {
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.14);
         }
 
         .qcTop {
@@ -301,14 +312,12 @@ export default function QuestionCard({ q, hrefBase = '/vopros' }: Props) {
           color: #92400e;
         }
 
-        /* ✅ ЗЕЛЁНЫЙ — как в ovrachax (green) */
         .qcPill--green {
           background: rgba(34, 197, 94, 0.12);
           border-color: rgba(34, 197, 94, 0.3);
           color: rgba(22, 163, 74, 1);
         }
 
-        /* ✅ ГОЛУБОЙ — как в ovrachax (blue) */
         .qcPill--blue {
           background: rgba(59, 130, 246, 0.12);
           border-color: rgba(59, 130, 246, 0.3);
