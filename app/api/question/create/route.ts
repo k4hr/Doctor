@@ -85,6 +85,12 @@ function parseKeywords(raw: any): string[] {
   return Array.from(new Set(arr)).slice(0, 20);
 }
 
+function clampInt(n: any, def: number, min: number, max: number) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return def;
+  return Math.max(min, Math.min(max, Math.floor(x)));
+}
+
 export async function POST(req: Request) {
   try {
     const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
@@ -108,16 +114,26 @@ export async function POST(req: Request) {
     const qBody = String((body as any).body || '').trim();
     const keywords = parseKeywords((body as any).keywords);
 
-    // ✅ новое: выбор анонимности (по умолчанию true)
     const authorIsAnonymous =
       typeof (body as any).authorIsAnonymous === 'boolean' ? Boolean((body as any).authorIsAnonymous) : true;
 
-    // опционально на будущее: назначение врачу (для “фильтр по врачу”)
     const assignedDoctorId = (body as any).assignedDoctorId ? String((body as any).assignedDoctorId).trim() : null;
+
+    // ✅ новое: платность
+    const isFree = typeof (body as any).isFree === 'boolean' ? Boolean((body as any).isFree) : true;
+    const priceRubRaw = (body as any).priceRub;
+    const priceRub = clampInt(priceRubRaw, 0, 0, 100_000);
 
     if (!speciality) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'speciality' }, { status: 400 });
     if (title.length < 6) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'title' }, { status: 400 });
     if (qBody.length < 50) return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'body' }, { status: 400 });
+
+    // ✅ валидация платного вопроса
+    if (!isFree) {
+      if (priceRub < 600) {
+        return NextResponse.json({ ok: false, error: 'VALIDATION', field: 'priceRub', hint: 'MIN_600' }, { status: 400 });
+      }
+    }
 
     if (assignedDoctorId) {
       const doc = await prisma.doctor.findUnique({ where: { id: assignedDoctorId }, select: { status: true } });
@@ -133,12 +149,15 @@ export async function POST(req: Request) {
         authorFirstName: v.user.first_name,
         authorLastName: v.user.last_name,
 
-        authorIsAnonymous, // ✅ сохранили выбор
+        authorIsAnonymous,
 
         speciality,
         title,
         body: qBody,
         keywords,
+
+        isFree,
+        priceRub: isFree ? 0 : priceRub,
 
         assignedDoctorId,
       },
