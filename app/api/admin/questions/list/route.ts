@@ -52,11 +52,7 @@ function verifyAndExtractTelegramId(initData: string, botToken: string): string 
 }
 
 function isAdminTelegramId(tgId: string) {
-  const raw =
-    envClean('ADMIN_TELEGRAM_IDS') ||
-    envClean('ADMIN_TG_IDS') ||
-    envClean('ADMIN_IDS') ||
-    '';
+  const raw = envClean('ADMIN_TELEGRAM_IDS') || envClean('ADMIN_TG_IDS') || envClean('ADMIN_IDS') || '';
   const set = new Set(
     raw
       .split(',')
@@ -86,10 +82,7 @@ function clampInt(n: any, def: number, min: number, max: number) {
 
 export async function POST(req: Request) {
   try {
-    const initData =
-      req.headers.get('x-telegram-init-data') ||
-      req.headers.get('x-init-data') ||
-      '';
+    const initData = req.headers.get('x-telegram-init-data') || req.headers.get('x-init-data') || '';
 
     const botToken = envClean('TELEGRAM_BOT_TOKEN');
     if (!botToken) {
@@ -104,19 +97,52 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({} as any));
     const limit = clampInt(body?.limit, 100, 1, 200);
 
+    // ✅ IMPORTANT: отдаём isFree, priceRub и answersCount — чтобы карточки в админке
+    // выглядели 1:1 как в ленте (плашка цены + золотая рамка)
     const rows = await prisma.question.findMany({
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: {
-        files: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+        speciality: true,
+        title: true,
+        body: true,
+        keywords: true,
+
+        authorTelegramId: true,
+        authorUsername: true,
+        authorFirstName: true,
+        authorLastName: true,
+
+        isFree: true,
+        priceRub: true,
+
+        files: {
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+          select: { kind: true, url: true, sortOrder: true, createdAt: true },
+        },
+
+        _count: {
+          select: {
+            answers: {
+              where: { isDeleted: false },
+            },
+          },
+        },
       },
     });
 
-    const items = rows.map((q) => {
-      const photoUrls = q.files
-        .filter((f) => String(f.kind) === 'PHOTO')
-        .map((f) => toPublicUrlMaybe(f.url))
-        .filter(Boolean) as string[];
+    const items = rows.map((q: any) => {
+      const photoUrls = Array.isArray(q?.files)
+        ? q.files
+            .filter((f: any) => String(f.kind) === 'PHOTO')
+            .map((f: any) => toPublicUrlMaybe(f.url))
+            .filter(Boolean)
+        : [];
+
+      const answersCount = Number(q?._count?.answers ?? 0);
 
       return {
         id: String(q.id),
@@ -126,18 +152,21 @@ export async function POST(req: Request) {
         title: String(q.title),
         body: String(q.body),
         keywords: Array.isArray(q.keywords) ? q.keywords.map(String) : [],
+
         authorTelegramId: String(q.authorTelegramId),
         authorUsername: q.authorUsername ? String(q.authorUsername) : null,
         authorFirstName: q.authorFirstName ? String(q.authorFirstName) : null,
         authorLastName: q.authorLastName ? String(q.authorLastName) : null,
+
+        isFree: q.isFree === true,
+        priceRub: typeof q.priceRub === 'number' ? q.priceRub : q.priceRub != null ? Number(q.priceRub) : 0,
+        answersCount: Number.isFinite(answersCount) ? answersCount : 0,
+
         photoUrls,
       };
     });
 
-    return NextResponse.json(
-      { ok: true, items },
-      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
-    );
+    return NextResponse.json({ ok: true, items }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
