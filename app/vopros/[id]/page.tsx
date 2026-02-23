@@ -333,7 +333,11 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
   const priceLabel = priceBadgeLabel(qFinal as any);
   const authorText = authorLabelFromQuestion(qFinal as any);
-  const isPaid = priceLabel !== 'Бесплатно';
+
+  // ✅ КЛЮЧ: платный = isFree=false и priceRub>0
+  const qIsFree = (qFinal as any)?.isFree === true;
+  const qPrice = Number((qFinal as any)?.priceRub ?? 0);
+  const isPaid = !qIsFree && Number.isFinite(qPrice) && qPrice > 0;
 
   const cardStyle: React.CSSProperties = {
     width: '100%',
@@ -350,7 +354,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
     gap: 12,
   };
 
-  // ✅ уменьшенные плашки, одинаковый шрифт как в QuestionCard
   const pillBase: React.CSSProperties = {
     fontSize: 11,
     fontWeight: 600,
@@ -391,7 +394,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
       <QuestionHeaderActions questionId={String(qFinal.id)} isAuthor={!!isAuthor} />
 
       <div style={cardStyle}>
-        {/* ✅ верхняя строка: только автор (плашки ниже, как ты сказал) */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, minWidth: 0 }}>
           <div
             style={{
@@ -437,7 +439,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           {show((qFinal as any).body)}
         </div>
 
-        {/* ✅ строка: специальность + дата */}
         <div
           style={{
             display: 'flex',
@@ -473,7 +474,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           </div>
         </div>
 
-        {/* ✅ ВОТ ОНО: плашки ПОД специальностью и ПЕРЕД линией к "Фотографии" */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: -2 }}>
           <span style={isPaid ? pillGoldStyle : pillFreeStyle} aria-label="Цена">
             {priceLabel}
@@ -485,35 +485,40 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           ) : null}
         </div>
 
-        <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
+        {/* ✅ ФОТО БЛОК: показываем ТОЛЬКО если вопрос платный */}
+        {isPaid ? (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
-        <div style={{ minWidth: 0, overflow: 'hidden' }}>
-          <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
-
-          {photoUrls.length === 0 ? (
-            <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
-          ) : canSeePhotos ? (
             <div style={{ minWidth: 0, overflow: 'hidden' }}>
-              <PhotoLightbox urls={photoUrls} />
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
+
+              {photoUrls.length === 0 ? (
+                <div style={{ opacity: 0.7 }}>Фото не прикреплены</div>
+              ) : canSeePhotos ? (
+                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                  <PhotoLightbox urls={photoUrls} />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 14,
+                    background: 'rgba(15,23,42,0.03)',
+                    border: '1px solid rgba(15,23,42,0.08)',
+                    color: 'rgba(15,23,42,0.70)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    lineHeight: 1.35,
+                    ...wrapText,
+                  }}
+                >
+                  Фото доступны только автору вопроса и врачам выбранной категории.
+                </div>
+              )}
             </div>
-          ) : (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 14,
-                background: 'rgba(15,23,42,0.03)',
-                border: '1px solid rgba(15,23,42,0.08)',
-                color: 'rgba(15,23,42,0.70)',
-                fontSize: 12,
-                fontWeight: 700,
-                lineHeight: 1.35,
-                ...wrapText,
-              }}
-            >
-              Фото доступны только автору вопроса и врачам выбранной категории.
-            </div>
-          )}
-        </div>
+          </>
+        ) : null}
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -559,13 +564,11 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
             {answers.map((a) => {
               const d = a.doctor;
 
-              const profileUrl =
-                toPublicUrlMaybe(d?.files?.[0]?.url || null) || toPublicUrlMaybe(d?.profilephotourl || null);
+              const profileUrl = toPublicUrlMaybe(d?.files?.[0]?.url || null) || toPublicUrlMaybe(d?.profilephotourl || null);
 
               const doctorCard = doctorCardItemFromDoctor(d, profileUrl);
 
-              const canDoctorComment =
-                isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
+              const canDoctorComment = isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
 
               const initialComments = Array.isArray(a?.comments)
