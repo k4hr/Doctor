@@ -62,10 +62,13 @@ type AdminQuestion = {
   authorFirstName: string | null;
   authorLastName: string | null;
 
-  // опционально — если отдашь из API
+  // ✅ отдаём из API
   isFree?: boolean | null;
   priceRub?: number | null;
   answersCount?: number | null;
+
+  // опционально, но пусть будет
+  photoUrls?: string[] | null;
 };
 
 type ListOk = { ok: true; items: AdminQuestion[] };
@@ -115,12 +118,10 @@ function answersSuffix(cnt: number) {
 
 function mapStatusToUI(s: string): 'WAITING' | 'ANSWERING' | 'CLOSED' {
   const v = String(s || '').toUpperCase();
-  // новая схема
   if (v === 'DONE') return 'CLOSED';
   if (v === 'IN_PROGRESS') return 'ANSWERING';
   if (v === 'OPEN') return 'WAITING';
 
-  // старая схема (если где-то ещё прилетает)
   if (v === 'CLOSED') return 'CLOSED';
   if (v === 'ANSWERING') return 'ANSWERING';
   if (v === 'WAITING') return 'WAITING';
@@ -131,18 +132,20 @@ function mapStatusToUI(s: string): 'WAITING' | 'ANSWERING' | 'CLOSED' {
 function toQuestionCardData(q: AdminQuestion): QuestionCardData {
   const cnt = typeof q.answersCount === 'number' && Number.isFinite(q.answersCount) ? Math.max(0, q.answersCount) : 0;
 
-  const isFree = q.isFree === true;
   const price = typeof q.priceRub === 'number' && Number.isFinite(q.priceRub) ? Math.max(0, q.priceRub) : 0;
+
+  // ✅ если есть цена > 0 — точно платный, даже если isFree вдруг не пришёл
+  const isPaid = price > 0 || q.isFree === false;
+  const isFree = !isPaid;
 
   const status = mapStatusToUI(q.status);
 
-  const priceBadge: QuestionCardData['priceBadge'] = isFree ? 'FREE' : q.isFree === false ? 'PAID' : 'FREE';
-  const priceText = isFree ? 'Бесплатно' : price > 0 ? `${Math.round(price)} ₽` : q.isFree === false ? 'Платно' : 'Бесплатно';
+  const priceBadge: QuestionCardData['priceBadge'] = isPaid ? 'PAID' : 'FREE';
+  const priceText = isFree ? 'Бесплатно' : `${Math.round(price || 0)} ₽`;
 
   const author = authorName(q);
   const created = fmtDateTimeRuMsk(q.createdAt);
 
-  // верхняя строка мелким — коротко и по делу
   const authorLabel =
     status === 'CLOSED'
       ? `Закрыт · ${author}`
@@ -356,7 +359,7 @@ export default function AdminQuestionsPage() {
         .cards {
           display: flex;
           flex-direction: column;
-          gap: 10px; /* ✅ как на главной */
+          gap: 10px;
           margin-top: 8px;
         }
       `}</style>
