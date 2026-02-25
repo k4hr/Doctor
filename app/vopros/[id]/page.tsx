@@ -1,15 +1,17 @@
+/* path: app/vopros/[id]/page.tsx */
 import type React from 'react';
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import TopBarBack from '../../../components/TopBarBack';
-import { DoctorFileKind, DoctorStatus } from '@prisma/client';
+import { DoctorFileKind, DoctorStatus, QuestionStatus } from '@prisma/client';
 import PhotoLightbox from './PhotoLightbox';
 import AnswerComments from './AnswerComments';
 import AnswerCreate from './AnswerCreate';
 import QuestionHeaderActions from './QuestionHeaderActions';
 import AnswerDoctorCardLink from './AnswerDoctorCardLink';
 import { type DoctorCardItem } from '../../../components/DoctorCard/DoctorCard';
+import SendPhotosToDoctorButton from './SendPhotosToDoctorButton';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -142,7 +144,6 @@ function authorLabelFromQuestion(q: any): string {
   return 'Вопрос от Пользователь';
 }
 
-/** ✅ Только Фамилия + Имя (для комментариев) */
 function doctorLastFirst(d: any) {
   const ln = String(d?.lastName || '').trim();
   const fn = String(d?.firstName || '').trim();
@@ -252,7 +253,6 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
 
               ratingSum: true,
               ratingCount: true,
-
               proUntil: true,
 
               files: {
@@ -307,7 +307,7 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   const answers = Array.isArray((qFinal as any).answers) ? ((qFinal as any).answers as any[]) : [];
   const alreadyAnsweredByMe = !!viewerDoctor?.id && answers.some((a) => String(a.doctorId) === String(viewerDoctor.id));
 
-  const isClosed = !!qFinal.close;
+  const isClosed = !!qFinal.close || String((qFinal as any).status) === String(QuestionStatus.DONE);
 
   const canAnswer =
     !!tgId &&
@@ -334,10 +334,12 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
   const priceLabel = priceBadgeLabel(qFinal as any);
   const authorText = authorLabelFromQuestion(qFinal as any);
 
-  // ✅ КЛЮЧ: платный = isFree=false и priceRub>0
   const qIsFree = (qFinal as any)?.isFree === true;
   const qPrice = Number((qFinal as any)?.priceRub ?? 0);
   const isPaid = !qIsFree && Number.isFinite(qPrice) && qPrice > 0;
+
+  const showDoctorSendButton =
+    isPaid && photoUrls.length > 0 && canSeePhotos && !!viewerDoctor?.id && !!canAnswer;
 
   const cardStyle: React.CSSProperties = {
     width: '100%',
@@ -485,12 +487,12 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
           ) : null}
         </div>
 
-        {/* ✅ ФОТО БЛОК: показываем ТОЛЬКО если вопрос платный */}
+        {/* ✅ ФОТО БЛОК: только платный */}
         {isPaid ? (
           <>
             <hr style={{ border: 'none', borderTop: '1px solid rgba(15,23,42,0.08)', margin: '6px 0' }} />
 
-            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontWeight: 900, marginBottom: 8 }}>Фотографии</div>
 
               {photoUrls.length === 0 ? (
@@ -516,6 +518,9 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
                   Фото доступны только автору вопроса и врачам выбранной категории.
                 </div>
               )}
+
+              {/* ✅ Кнопка ТОЛЬКО врачу, который может отвечать */}
+              {showDoctorSendButton ? <SendPhotosToDoctorButton questionId={String(qFinal.id)} /> : null}
             </div>
           </>
         ) : null}
@@ -565,10 +570,10 @@ export default async function VoprosIdPage({ params }: { params: { id: string } 
               const d = a.doctor;
 
               const profileUrl = toPublicUrlMaybe(d?.files?.[0]?.url || null) || toPublicUrlMaybe(d?.profilephotourl || null);
-
               const doctorCard = doctorCardItemFromDoctor(d, profileUrl);
 
-              const canDoctorComment = isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
+              const canDoctorComment =
+                isApprovedDoctor && viewerDoctor?.id && String(viewerDoctor.id) === String(a.doctorId);
               const canComment = isAuthor || canDoctorComment;
 
               const initialComments = Array.isArray(a?.comments)
